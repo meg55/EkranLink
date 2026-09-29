@@ -1,0 +1,33 @@
+# Android / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/captures/
+*.iml
+
+# Windows / C++
+host-windows/build/
+host-windows/out/
+*.obj
+*.pdb
+*.ilk
+
+# iOS
+ios/build/
+ios/**/xcuserdata/
+ios/**/DerivedData/
+
+# Genel
+.vs/
+.vscode/
+*.log
+*.h264
+
+# Dağıtım paketleri
+dist/
+
+# Sürücü derleme çıktısı
+driver/out/
+driver/obj/

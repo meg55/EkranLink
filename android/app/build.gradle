@@ -1,0 +1,35 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'org.ekran.android'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'org.ekran.android'
+        // 16 = Android 4.1: MediaCodec (donanım video çözücü) bu sürümde geldi.
+        minSdk 16
+        // Android 14+ çok eski targetSdk'li APK'ları kurmuyor; tek APK her sürümde çalışsın.
+        targetSdk 35
+        versionCode 3
+        versionName '0.2.0'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    lint {
+        // Eski API'lere bilerek dokunuyoruz; derlemeyi durdurmasın, raporda görünsün.
+        abortOnError false
+    }
+}

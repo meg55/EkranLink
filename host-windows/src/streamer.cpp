@@ -1,0 +1,490 @@
+// Hat: DXGI yakalama → GPU video işlemci (ölçek + NV12) → donanım H.264 → TCP → tablet.
+// Görüntü hiç CPU belleğine inmez. Ekran değişmiyorsa kodlama da gönderim de yapılmaz.
+
+#include "streamer.h"
+
+#include <winsock2.h>
+#include <psapi.h>
+
+#include <cstdio>
+#include <thread>
+
+#include "adb.h"
+#include "capture.h"
+#include "com.h"
+#include "discovery.h"
+#include "encoder.h"
+#include "input.h"
+#include "net.h"
+#include "protocol.h"
+#include "scaler.h"
+#include "virtual_display.h"
+
+namespace ekran {
+
+namespace {
+
+// Tanı: EKRAN_BELLEK=1 ise oturum kurulurken her adımdaki özel belleği günlüğe yaz
+void logMemory(const char* stage) {
+    static const bool on = GetEnvironmentVariableA("EKRAN_BELLEK", nullptr, 0) > 0;
+    if (!on) return;
+    PROCESS_MEMORY_COUNTERS_EX m{};
+    m.cb = sizeof m;
+    GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&m), sizeof m);
+    logf("[bellek] %-22s özel %6.1f MB  çalışma %6.1f MB", stage, m.PrivateUsage / 1048576.0, m.WorkingSetSize / 1048576.0);
+}
+// Yüksek çözünürlüklü bekleme: sistem saat hassasiyetini (timeBeginPeriod) değiştirmeden.
+class Waiter {
+public:
+    Waiter() {
+        timer_ = CreateWaitableTimerExW(nullptr, nullptr, 0x00000002 /*HIGH_RESOLUTION*/, TIMER_ALL_ACCESS);
+        if (!timer_) timer_ = CreateWaitableTimerW(nullptr, FALSE, nullptr);
+    }
+    ~Waiter() { CloseHandle(timer_); }
+    void waitUs(int64_t us) {
+        if (us <= 0) return;
+        LARGE_INTEGER due;
+        due.QuadPart = -us * 10;
+        SetWaitableTimer(timer_, &due, 0, nullptr, nullptr, FALSE);
+        WaitForSingleObject(timer_, INFINITE);
+    }
+
+private:
+    HANDLE timer_;
+};
+
+struct Stats {
+    std::atomic<int> frames{0}, pushers{0}, acks{0};
+    std::atomic<int64_t> bytes{0}, e2eSumUs{0}, decodeSumUs{0};
+    std::atomic<int64_t> rttUs{0};
+};
+
+bool makeNv12Pool(ID3D11Device* dev, int w, int h, ComPtr<ID3D11Texture2D> (&pool)[4]) {
+    D3D11_TEXTURE2D_DESC td{};
+    td.Width = UINT(w);
+    td.Height = UINT(h);
+    td.MipLevels = 1;
+    td.ArraySize = 1;
+    td.Format = DXGI_FORMAT_NV12;
+    td.SampleDesc.Count = 1;
+    td.Usage = D3D11_USAGE_DEFAULT;
+    td.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_VIDEO_ENCODER;
+    for (auto& t : pool) {
+        if (FAILED(dev->CreateTexture2D(&td, nullptr, t.put()))) {
+            td.BindFlags = D3D11_BIND_RENDER_TARGET;  // eski sürücüler VIDEO_ENCODER bayrağını tanımayabilir
+            if (!check(dev->CreateTexture2D(&td, nullptr, t.put()), "NV12 dokusu")) return false;
+        }
+    }
+    return true;
+}
+
+}  // namespace
+
+Streamer::Streamer(Options opt, StreamerEvents ev)
+    : opt_(std::move(opt)), ev_(std::move(ev)), mode_(opt_.mode), wake_(CreateEventW(nullptr, FALSE, FALSE, nullptr)) {}
+
+Streamer::~Streamer() { CloseHandle(wake_); }
+
+void Streamer::stop() {
+    stop_ = true;
+    SetEvent(wake_);
+    std::lock_guard<std::mutex> lock(connMutex_);
+    if (conn_) conn_->close();
+}
+
+void Streamer::setMode(LinkMode m) {
+    mode_ = m;
+    SetEvent(wake_);
+    std::lock_guard<std::mutex> lock(connMutex_);
+    if (conn_) conn_->close();
+}
+
+void Streamer::sleepInterruptible(int ms) { WaitForSingleObject(wake_, DWORD(ms)); }
+
+void Streamer::run() {
+    if (!displayPower_.start()) logf("Ekran güç bildirimi alınamıyor; uyku eşitleme kapalı");
+    std::wstring adbPath;
+    int64_t nextAdbLookupUs = 0;
+    bool warnedNoAdb = false;
+
+    while (!stop_) {
+        const LinkMode m = mode_;
+
+        if (m != LinkMode::Wifi) {
+            if (adbPath.empty() && nowUs() >= nextAdbLookupUs) {
+                adbPath = adb::find();
+                if (!adbPath.empty()) logf("USB: adb %ls", adbPath.c_str());
+                nextAdbLookupUs = nowUs() + 30'000'000;
+            }
+            if (adbPath.empty()) {
+                if (!warnedNoAdb) logf("USB: adb bulunamadı (Android SDK platform-tools gerekli)");
+                warnedNoAdb = true;
+            } else if (adb::hasDevice(adbPath) && adb::prepareUsb(adbPath, proto::kPort)) {
+                runSession("127.0.0.1", "USB", adbPath);
+                if (!stop_) sleepInterruptible(1000);
+                continue;
+            }
+        }
+        if (stop_) break;
+
+        if (m != LinkMode::Usb) {
+            std::string ip = opt_.ip;
+            if (ip.empty()) {
+                const int64_t now = nowUs();
+                for (const auto& dev : discoverDevices(700)) {
+                    auto it = rejectedUntil_.find(dev.id);
+                    if (it != rejectedUntil_.end() && it->second > now) continue;  // az önce reddedildi
+                    ip = dev.ip;
+                    break;
+                }
+            }
+            if (!ip.empty()) {
+                runSession(ip, "Wi-Fi " + ip);
+                if (!stop_) sleepInterruptible(1000);
+                continue;
+            }
+        }
+        sleepInterruptible(3000);  // kimse yok: 3 sn sonra tekrar bak (yoklama çok hafif)
+    }
+}
+
+void Streamer::runSession(const std::string& host, const std::string& link, const std::wstring& adbPath) {
+    Connection conn;
+    proto::Hello hello;
+    PairingHooks hooks;
+    hooks.confirm = ev_.onPairRequest;
+    const bool usb = link == "USB";  // adb forward: kablo + adb yetkisi = güvenilir bağlantı
+    if (!conn.connect(host, proto::kPort, 2000)) return;
+    if (!conn.handshake(usb, hooks, hello)) {
+        if (conn.pairingRejected()) rejectedUntil_[conn.deviceId()] = nowUs() + 60'000'000;  // 1 dk sorma
+        return;
+    }
+    {
+        std::lock_guard<std::mutex> lock(connMutex_);
+        conn_ = &conn;
+    }
+    auto detach = [&] {
+        std::lock_guard<std::mutex> lock(connMutex_);
+        conn_ = nullptr;
+    };
+    if (stop_) {
+        detach();
+        return;
+    }
+
+    logf("Tablet: %s, Android API %u, yüzey %ux%u, %u dpi, çözücü %s (%s, %s)", hello.model.c_str(), hello.sdk,
+         hello.surfaceW, hello.surfaceH, hello.dpi, hello.decoder.c_str(), link.c_str(),
+         conn.encrypted() ? "şifreli" : "şifresiz");
+
+    const int W = (hello.surfaceW ? hello.surfaceW : hello.screenW) & ~1;
+    const int H = (hello.surfaceH ? hello.surfaceH : hello.screenH) & ~1;
+
+    // İkinci ekran: tabletin tam çözünürlüğünde sanal monitör (yakalama nesnelerinden önce tanımlı →
+    // en son yok edilir, yani oturum biterken monitör en son kaldırılır).
+    VirtualDisplay vdisp;
+    std::wstring target;
+    if (opt_.extend && W > 0 && H > 0 && VirtualDisplay::driverAvailable()) {
+        VirtualDisplaySpec s;
+        s.width = W;
+        s.height = H;
+        s.refreshHz = 60;
+        s.monitorGuid = VirtualDisplay::guidFor(conn.deviceId());
+        s.name = "EKRAN Tablet";
+        s.serial = conn.deviceId().substr(0, 13);
+        const double dpi = hello.dpi ? hello.dpi : 160;  // Windows ölçeklemeyi bu boyuta göre önerir
+        s.widthMm = int(W * 25.4 / dpi + 0.5);
+        s.heightMm = int(H * 25.4 / dpi + 0.5);
+        if (!vdisp.add(s, target)) {
+            target.clear();
+            logf("İkinci ekran açılamadı; yansıtmaya geçiliyor");
+        }
+    }
+    const bool only = !target.empty() && opt_.onlyTablet && vdisp.isolate();
+    const std::string modeName = target.empty() ? "yansıtma" : only ? "tek ekran" : "ikinci ekran";
+    logMemory("el sıkışma sonrası");
+
+    GpuDevice gpu;
+    DesktopCapture cap;
+    Scaler scaler;
+    ComPtr<ID3D11Texture2D> pool[4];
+    bool gpuOk = false;
+    if (target.empty()) {
+        gpuOk = createDeviceForOutput(opt_.output, gpu) && cap.init(gpu);
+    } else {
+        // Yeni monitör DXGI'de biraz geç görünebilir
+        for (int i = 0; i < 30 && !stop_ && !gpuOk; i++) {
+            gpuOk = createDeviceForOutputName(target, gpu) && cap.init(gpu);
+            if (!gpuOk) Sleep(100);
+        }
+    }
+    if (W <= 0 || H <= 0 || !gpuOk ||
+        !scaler.init(gpu.device.get(), gpu.context.get(), cap.desk(), cap.width(), cap.height(), W, H) ||
+        !makeNv12Pool(gpu.device.get(), W, H, pool)) {
+        detach();
+        return;
+    }
+
+    logMemory("yakalama + ölçekleyici");
+    RECT content = scaler.content();
+    auto sendConfig = [&] {
+        proto::Writer w;
+        w.u16(uint16_t(W));
+        w.u16(uint16_t(H));
+        w.u8(1);  // H.264
+        w.u16(uint16_t(cap.width()));
+        w.u16(uint16_t(cap.height()));
+        w.u16(uint16_t(content.left));
+        w.u16(uint16_t(content.top));
+        w.u16(uint16_t(content.right - content.left));
+        w.u16(uint16_t(content.bottom - content.top));
+        conn.send(proto::kConfig, w.buf);
+    };
+    sendConfig();
+
+    TouchInjector touch(opt_.touchAsMouse ? TouchInjector::Mode::Mouse : TouchInjector::Mode::Touch);
+    touch.setMapping(gpu.desktopRect, content, cap.width(), cap.height(), cap.orientation());
+
+    Stats stats;
+    std::atomic<int> inFlight{0};
+    std::atomic<int64_t> lastAckUs{nowUs()};
+    HANDLE ackEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    std::atomic<int> wantRotation{-1};  // tabletin bildirdiği yön (-1: bildirmedi, dönüş kilitli)
+    std::atomic<bool> keyRequested{false};  // tablet çözücüsünü yeniden kurdu (ekranı kapanıp açıldı)
+
+    // Zaman damgası: gerçek kareler çift, itici kareler tek sayı (ayrı liste tutmadan ayırt etmek için).
+    auto isPusher = [](int64_t pts) { return (pts & 1) != 0; };
+
+    Encoder enc;
+    auto onPacket = [&](EncodedPacket&& p) {
+        uint8_t flags = p.key ? proto::kKeyFrame : 0;
+        if (isPusher(p.ptsUs)) flags |= proto::kPusher;
+        stats.bytes += int64_t(p.data.size());
+        conn.sendVideo(p.ptsUs, flags, p.data.data(), p.data.size());
+    };
+    if (!enc.init(gpu.device.get(), gpu.vendorId, W, H, opt_.fps, opt_.kbps, onPacket)) {
+        CloseHandle(ackEvent);
+        detach();
+        return;
+    }
+    logMemory("kodlayıcı");
+    logf("Kodlayıcı: %s | akış %dx%d, içerik %ldx%ld, %d kbps", enc.name().c_str(), W, H,
+         content.right - content.left, content.bottom - content.top, opt_.kbps);
+    if (ev_.onState) ev_.onState(true, hello.model, link + " · " + modeName);
+
+    // Tabletten gelenler: kare onayı, pong, dokunma
+    std::thread reader([&] {
+        uint8_t type;
+        std::vector<uint8_t> payload;
+        while (conn.readMessage(type, payload)) {
+            proto::Reader r(payload.data(), payload.size());
+            if (type == proto::kFrameAck) {
+                const int64_t pts = int64_t(r.u64());
+                const uint32_t decodeUs = r.u32();
+                const int count = payload.size() >= 14 ? r.u16() : 1;  // toplu onay
+                const int64_t now = nowUs();
+                inFlight = std::max(0, inFlight.load() - count);
+                lastAckUs = now;
+                // Gecikmeyi sadece gerçek karelerle ölç: itici kareler bir sonraki değişime kadar
+                // çözücüde bekleyebilir, ortalamayı bozarlar.
+                if (!isPusher(pts)) {
+                    stats.acks++;
+                    stats.e2eSumUs += now - pts;
+                    stats.decodeSumUs += decodeUs;
+                }
+                SetEvent(ackEvent);
+            } else if (type == proto::kPong) {
+                stats.rttUs = nowUs() - int64_t(r.u64());
+            } else if (type == proto::kTouch) {
+                const uint8_t action = r.u8(), id = r.u8();
+                const int x = r.u16(), y = r.u16(), pressure = r.u16();
+                if (r.ok()) touch.onTouch(action, id, x, y, pressure);
+            } else if (type == proto::kKeyRequest) {
+                keyRequested = true;
+            } else if (type == proto::kOrientation) {
+                const int deg = r.u16();
+                if (r.ok() && deg % 90 == 0 && deg < 360) wantRotation = deg;
+            }
+        }
+    });
+
+    CursorState cursor;
+    Waiter waiter;
+    int appliedRotation = 0;  // yeni eklenen sanal monitör yatay başlar
+    bool tabletAwake = true;  // tablet ekranı açık başlar
+    bool dirty = true, forceKey = true;
+    int pushersLeft = 0, slot = 0, lastSlot = 0;
+    int64_t nextPusherUs = 0, lastPts = 0, nextStatsUs = nowUs() + 1000000;
+    // Kare hızı sınırı: tabletin ekranı 60 Hz; daha fazlası iki cihazı da boşuna yorar.
+    const int64_t minFrameUs = 1000000 / std::max(1, opt_.fps);
+    int64_t lastRealUs = 0;
+    // İlk itici kare: düşük gecikmede kareler arasına (çözücü sırası hızlı akar), dengeli modda yalnızca
+    // hareket durduğunda (bir kare süresi yeni görüntü gelmezse) — sürekli harekette çözücü 60/s çalışır.
+    const int64_t firstPusherUs = opt_.lowLatency ? opt_.pusherMs * 1000 : minFrameUs + 2000;
+
+    while (!stop_ && conn.alive()) {
+        // Tablet dikey/yatay çevrildi: sanal monitörü döndür (yakalama kendiliğinden yeniden kurulur).
+        // Yansıtmada PC'nin gerçek ekranına dokunulmaz.
+        const int want = wantRotation;
+        if (want >= 0 && want != appliedRotation) {
+            appliedRotation = want;
+            if (!target.empty()) vdisp.setRotation(want);
+        }
+
+        // Uyku eşitleme: Windows ekranları kapatınca tablet de ekranını kapatır; açınca uyanır
+        if (displayPower_.on() != tabletAwake) {
+            tabletAwake = !tabletAwake;
+            proto::Writer w;
+            w.u8(tabletAwake ? 1 : 0);
+            conn.send(proto::kDisplayPower, w.buf);
+            if (!tabletAwake && !adbPath.empty()) {
+                // USB: tablet mesajı işleyip (uyku kilidi) hazırlansın, sonra ekranını kapat
+                std::thread([adbPath, sdk = int(hello.sdk)] {
+                    Sleep(300);
+                    adb::screenOff(adbPath, sdk);
+                }).detach();
+            }
+        }
+        if (keyRequested.exchange(false)) {
+            logf("Tablet görüntüyü yeniden başlattı (anahtar kare)");
+            inFlight = 0;  // kapalıyken gönderilenler hiç onaylanmayacak
+            dirty = forceKey = true;
+        }
+
+        const bool busy = dirty || pushersLeft > 0;
+        bool changed = false;
+        auto res = cap.acquire(busy ? 0 : 100, changed, cursor);
+        if (res == DesktopCapture::Result::Lost || res == DesktopCapture::Result::Error) {
+            // UAC / kilit ekranı / çözünürlük, yön ya da yerleşim değişimi: yakalamayı yeniden kur.
+            // Akış boyutu aynı kalır; yalnızca yerleşim ve eşleme tazelenir, bağlantı kopmaz.
+            const int w0 = cap.width(), h0 = cap.height(), r0 = cap.orientation().rotation;
+            while (!stop_ && conn.alive() && !cap.init(gpu)) Sleep(250);
+            if (stop_ || !conn.alive()) break;
+            scaler = Scaler();
+            if (!scaler.init(gpu.device.get(), gpu.context.get(), cap.desk(), cap.width(), cap.height(), W, H)) break;
+            content = scaler.content();
+            if (cap.width() != w0 || cap.height() != h0) sendConfig();
+            touch.setMapping(gpu.desktopRect, content, cap.width(), cap.height(), cap.orientation());
+            if (cap.orientation().rotation != r0) {
+                logf("Yön: %d°", cap.orientation().rotation);
+                // İmleç yeni yöne çevrilerek yeniden gönderilir (henüz resim gelmediyse yalnızca konum)
+                cursor.shapeChanged = cursor.w > 0 && cursor.h > 0;
+                cursor.posChanged = true;
+            }
+            dirty = forceKey = true;
+            continue;
+        }
+        if (changed) {
+            dirty = true;
+            if (!opt_.lowLatency) pushersLeft = 0;  // dengeli: yeni görüntü geliyorsa itici kareye gerek yok
+        }
+
+        // İmleç masaüstü yönünde gelir; tablete yakalanan görüntünün (panel) yönünde gönderilir.
+        const Orientation& orient = cap.orientation();
+        if (cursor.shapeChanged && (cursor.w <= 0 || cursor.h <= 0)) cursor.shapeChanged = false;
+        if (cursor.shapeChanged) {
+            int w = cursor.w, h = cursor.h, hx = cursor.hotX, hy = cursor.hotY;
+            std::vector<uint32_t> px;
+            const std::vector<uint32_t>* shape = &cursor.argb;
+            if (orient.rotation != 0) {
+                px = cursor.argb;
+                orient.rotateImage(px, w, h, hx, hy);
+                shape = &px;
+            }
+            proto::Writer w8;
+            w8.u16(uint16_t(w));
+            w8.u16(uint16_t(h));
+            w8.u16(uint16_t(hx));
+            w8.u16(uint16_t(hy));
+            for (uint32_t p : *shape) w8.u32(p);
+            conn.send(proto::kCursorShape, w8.buf);
+            cursor.shapeChanged = false;
+            if (orient.rotation != 0) cursor.posChanged = true;  // sol üst köşe resmin boyutuna bağlı
+        }
+        if (cursor.posChanged) {
+            const POINT p = orient.rectToImage(cursor.x, cursor.y, cursor.w, cursor.h);
+            proto::Writer w;
+            w.u16(uint16_t(int16_t(p.x)));
+            w.u16(uint16_t(int16_t(p.y)));
+            w.u8(cursor.visible ? 1 : 0);
+            conn.send(proto::kCursorPos, w.buf);
+            cursor.posChanged = false;
+        }
+
+        int64_t now = nowUs();
+        if (inFlight >= opt_.maxInFlight && now - lastAckUs > 1000000) {
+            inFlight = 0;  // onay kayboldu: sıfırla, anahtar kareyle toparla
+            forceKey = true;
+        }
+
+        const bool room = enc.canAccept() && inFlight < opt_.maxInFlight;
+        const bool rateLimited = dirty && now - lastRealUs < minFrameUs;
+        // Düşük gecikmede, kare sınırı yüzünden beklerken araya itici kare girer (çözücü sırası hızlı akar)
+        const bool pusherDue = (!dirty || (opt_.lowLatency && rateLimited)) && pushersLeft > 0 && now >= nextPusherUs;
+        if (dirty && room && !rateLimited) {
+            slot = (slot + 1) % 4;
+            const int64_t pts = std::max(now & ~int64_t(1), lastPts + 2);
+            if (scaler.process(pool[slot].get()) && enc.submit(pool[slot].get(), pts, forceKey)) {
+                inFlight++;
+                stats.frames++;
+                lastSlot = slot;
+                lastPts = pts;
+                lastRealUs = now;
+                forceKey = false;
+                dirty = false;
+                pushersLeft = opt_.pushers;
+                nextPusherUs = now + firstPusherUs;
+            }
+        } else if (pusherDue && room) {
+            // Değişmemiş görüntüyü tekrar kodla: kodlayıcı "atla" blokları üretir, neredeyse sıfır bayt.
+            const int64_t pts = lastPts + 1;  // tek sayı = itici
+            if (enc.submit(pool[lastSlot].get(), pts, false)) {
+                inFlight++;
+                stats.pushers++;
+                lastPts = pts + 1;
+            }
+            pushersLeft--;
+            nextPusherUs = now + opt_.pusherMs * 1000;
+        }
+
+        // Bekleme: meşgul döngü yok. Kare sınırındaysak sıradaki kare zamanına kadar uyu;
+        // yer yoksa kodlayıcı/onay olayını bekle.
+        if (rateLimited) {
+            int64_t until = lastRealUs + minFrameUs;
+            if (opt_.lowLatency && pushersLeft > 0) until = std::min(until, nextPusherUs);
+            waiter.waitUs(until - nowUs());
+        } else if ((dirty || pusherDue) && !room) {
+            HANDLE hs[2] = {enc.wakeEvent(), ackEvent};
+            WaitForMultipleObjects(2, hs, FALSE, 5);
+        } else if (!dirty && pushersLeft > 0) {
+            waiter.waitUs(nextPusherUs - nowUs());
+        }
+
+        now = nowUs();
+        if (now >= nextStatsUs) {
+            proto::Writer w;
+            w.u64(uint64_t(now));
+            conn.send(proto::kPing, w.buf);
+
+            const int acks = stats.acks.exchange(0);
+            const int64_t e2e = stats.e2eSumUs.exchange(0), dec = stats.decodeSumUs.exchange(0);
+            char line[256];
+            std::snprintf(line, sizeof line,
+                          "%3d kare +%3d itici  %6.2f Mbit/s  RTT %5.1f ms  PC→çizim %5.1f ms  çözme %5.1f ms",
+                          stats.frames.exchange(0), stats.pushers.exchange(0), stats.bytes.exchange(0) * 8 / 1e6,
+                          stats.rttUs / 1000.0, acks ? e2e / 1000.0 / acks : 0.0, acks ? dec / 1000.0 / acks : 0.0);
+            if (ev_.onStats) ev_.onStats(line);
+            logMemory("yayın sürerken");
+            nextStatsUs = now + 1000000;
+        }
+    }
+
+    enc.shutdown();
+    conn.close();
+    if (reader.joinable()) reader.join();
+    CloseHandle(ackEvent);
+    detach();
+    logf("Bağlantı kapandı (%s)", link.c_str());
+    if (ev_.onState) ev_.onState(false, hello.model, link + " · " + modeName);
+}
+
+}  // namespace ekran

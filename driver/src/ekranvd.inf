@@ -1,0 +1,77 @@
+;
+; ekranvd.inf - EKRAN sanal ekran surucusu (IddCx, kullanici modu / UMDF 2)
+; SudoVDA'dan (SudoMaker, MIT) turetilmistir.
+;
+
+[Version]
+PnpLockdown=1
+Signature="$Windows NT$"
+ClassGUID = {4D36E968-E325-11CE-BFC1-08002BE10318}
+Class = Display
+ClassVer = 2.0
+Provider=%ManufacturerName%
+CatalogFile=ekranvd.cat
+DriverVer= ; stampinf ile yazilir
+
+[Manufacturer]
+%ManufacturerName%=Standard,NT$ARCH$
+
+[Standard.NT$ARCH$]
+%DeviceName%=EkranVD_Install, Root\EKRAN\VirtualDisplay
+
+[SourceDisksFiles]
+EkranVD.dll=1
+
+[SourceDisksNames]
+1 = %DiskName%
+
+; =================== UMDF aygiti ==================================
+
+[EkranVD_Install.NT]
+CopyFiles=UMDriverCopy
+
+[EkranVD_Install.NT.hw]
+AddReg = EkranVD_HardwareDeviceSettings
+
+[EkranVD_HardwareDeviceSettings]
+HKR,, "UpperFilters",  %REG_MULTI_SZ%, "IndirectKmd"
+HKR, "WUDF", "DeviceGroupId", %REG_SZ%, "EkranVDGroup"
+; Tam erisim: SYSTEM ve Yoneticiler. Okuma/yazma (monitor ekle/cikar): yalnizca oturum acmis kullanicilar (IU).
+HKR,, "Security",, "D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;IU)"
+
+[EkranVD_Install.NT.Services]
+AddService=WUDFRd,0x000001fa,WUDFRD_ServiceInstall
+
+[EkranVD_Install.NT.Wdf]
+UmdfService=EkranVD,EkranVD_Install
+UmdfServiceOrder=EkranVD
+UmdfKernelModeClientPolicy = AllowKernelModeClients
+
+[EkranVD_Install]
+UmdfLibraryVersion=$UMDFVERSION$
+ServiceBinary=%12%\UMDF\EkranVD.dll
+UmdfExtensions = IddCx0102
+
+[WUDFRD_ServiceInstall]
+DisplayName = %WudfRdDisplayName%
+ServiceType = 1
+StartType = 3
+ErrorControl = 1
+ServiceBinary = %12%\WUDFRd.sys
+
+[DestinationDirs]
+UMDriverCopy=12,UMDF
+
+[UMDriverCopy]
+EkranVD.dll
+
+; =================== Metinler ==================================
+
+[Strings]
+ManufacturerName="EKRAN"
+DiskName = "EKRAN Sanal Ekran Kurulum Diski"
+DeviceName="EKRAN Sanal Ekran"
+WudfRdDisplayName="Windows Driver Foundation - User-mode Driver Framework Reflector"
+
+REG_MULTI_SZ  = 0x00010000
+REG_SZ        = 0x00000000

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>EKRAN gecikme sayacı</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #fff; font-family: Consolas, monospace; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4vh; }
+  #ms { font-size: 18vw; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  #bar { position: relative; width: 90vw; height: 6vh; border: 2px solid #444; }
+  #dot { position: absolute; top: 0; width: 2%; height: 100%; background: #0f0; }
+  p { color: #888; font-size: 2vw; max-width: 80vw; text-align: center; }
+</style>
+</head>
+<body>
+<div id="ms">0000</div>
+<div id="bar"><div id="dot"></div></div>
+<p>Yansıtma açıkken PC ekranını ve tableti aynı fotoğrafta çekin.
+İki sayı arasındaki fark uçtan uca gecikmedir (ms).</p>
+<script>
+  const ms = document.getElementById('ms');
+  const dot = document.getElementById('dot');
+  const t0 = performance.now();
+  function frame(now) {
+    const t = Math.floor(now - t0);
+    ms.textContent = String(t % 100000).padStart(5, '0');
+    dot.style.left = ((t % 1000) / 1000 * 98) + '%';
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+</script>
+</body>
+</html>
