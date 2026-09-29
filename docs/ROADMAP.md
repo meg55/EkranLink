@@ -166,7 +166,17 @@ Yapılanlar:
 - [ ] AOA ile tak-çalıştır (tablette ayar yok, uygulama kendiliğinden açılır)
 - [ ] Kendi IddCx sürücümüz: cihaz başına tak-çıkar, cihaza özel EDID (Windows yerleşimi hatırlar),
       fiziksel boyut → doğru DPI
-- [ ] Windows servisi: oturum açma ekranı ve UAC; açılışta başlama
+- [x] Windows hizmeti (tepsi → "Oturum açılmadan önce başlat"): açılışta, oturum açılmadan başlar. Hizmet
+      (Oturum 0) ekrandaki oturumda SYSTEM yetkili bir ajan başlatır; ajan giriş masaüstünü (Default ↔
+      Winlogon) izleyerek kilit ekranını, şifre ekranını ve Ctrl+Alt+Del'i yakalar, dokunmayı oraya iletir.
+      Ayarlar/durum HKLM'de (tepsi yalnızca arayüz), eşleşmeler yalnızca SYSTEM'in okuyabildiği bölümde;
+      kilitliyken yeni tablet eşleştirilmez. Kullanıcının adb anahtarı taşınır (tablet yeniden izin sormaz).
+      Ölçüldü (S6000, USB, tablet ana ekran): kilit ekranı tablette görünür, yukarı kaydırınca şifre ekranı
+      açılır, dokunma iletilir. Not: Windows kilit ekranını yalnızca **ana** monitörde çizer (ekransız mini
+      PC'de tablet zaten ana ekran; masaüstünde "Tek ekran" ya da tableti ana ekran yapmak gerekir).
+      UAC güvenli masaüstü aynı yoldan geçer ama bu PC'de UAC sormadan yükselttiği için denenemedi
+- [ ] Oturum açılmadan Wi-Fi: tablet uygulaması açık ve eşleşmiş olmalı (bugün de öyle); ilk açılışta
+      tabletin bağlanması için USB önerilir
 - [x] Tek ekran modu (tepsi → Görüntü → Tek ekran, `--tek-ekran`): tablet bağlanınca diğer monitörler kapanır,
       tablet ana ekran olur; ayrılınca eski düzen geri yüklenir. Düzen Windows'un veritabanına kaydedilmez:
       program çökerse sürücünün bekçi köpeği monitörü kaldırır, Windows kayıtlı (tabletsiz) düzene döner

@@ -4,12 +4,11 @@
 
 #include <vector>
 
+#include "config.h"
+
 namespace ekran::pairing {
 
 namespace {
-
-const wchar_t* kRoot = L"Software\\EKRAN";
-const wchar_t* kPairs = L"Software\\EKRAN\\Pairs";
 
 std::wstring widen(const std::string& s) {
     int n = MultiByteToWideChar(CP_UTF8, 0, s.data(), int(s.size()), nullptr, 0);
@@ -18,14 +17,15 @@ std::wstring widen(const std::string& s) {
     return w;
 }
 
-bool readBinary(const wchar_t* key, const wchar_t* name, void* out, DWORD size) {
+bool readBinary(const std::wstring& key, const wchar_t* name, void* out, DWORD size) {
     DWORD n = size;
-    return RegGetValueW(HKEY_CURRENT_USER, key, name, RRF_RT_REG_BINARY, nullptr, out, &n) == 0 && n == size;
+    return RegGetValueW(config::secretRoot(), key.c_str(), name, RRF_RT_REG_BINARY, nullptr, out, &n) == 0 &&
+           n == size;
 }
 
-void writeBinary(const wchar_t* key, const wchar_t* name, const void* data, DWORD size) {
+void writeBinary(const std::wstring& key, const wchar_t* name, const void* data, DWORD size) {
     HKEY k;
-    if (RegCreateKeyExW(HKEY_CURRENT_USER, key, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &k, nullptr) == 0) {
+    if (RegCreateKeyExW(config::secretRoot(), key.c_str(), 0, nullptr, 0, KEY_SET_VALUE, nullptr, &k, nullptr) == 0) {
         RegSetValueExW(k, name, 0, REG_BINARY, static_cast<const BYTE*>(data), size);
         RegCloseKey(k);
     }
@@ -35,9 +35,9 @@ void writeBinary(const wchar_t* key, const wchar_t* name, const void* data, DWOR
 
 std::array<uint8_t, 16> pcId() {
     std::array<uint8_t, 16> id{};
-    if (!readBinary(kRoot, L"PcId", id.data(), 16)) {
+    if (!readBinary(config::secretPath(), L"PcId", id.data(), 16)) {
         crypto::random(id.data(), 16);
-        writeBinary(kRoot, L"PcId", id.data(), 16);
+        writeBinary(config::secretPath(), L"PcId", id.data(), 16);
     }
     return id;
 }
@@ -53,21 +53,21 @@ std::string pcName() {
 }
 
 bool load(const std::string& deviceId, crypto::Bytes32& key) {
-    return readBinary(kPairs, widen(deviceId).c_str(), key.data(), 32);
+    return readBinary(config::pairsPath(), widen(deviceId).c_str(), key.data(), 32);
 }
 
 void save(const std::string& deviceId, const crypto::Bytes32& key) {
-    writeBinary(kPairs, widen(deviceId).c_str(), key.data(), 32);
+    writeBinary(config::pairsPath(), widen(deviceId).c_str(), key.data(), 32);
 }
 
 void forget(const std::string& deviceId) {
     HKEY k;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, kPairs, 0, KEY_SET_VALUE, &k) == 0) {
+    if (RegOpenKeyExW(config::secretRoot(), config::pairsPath().c_str(), 0, KEY_SET_VALUE, &k) == 0) {
         RegDeleteValueW(k, widen(deviceId).c_str());
         RegCloseKey(k);
     }
 }
 
-void forgetAll() { RegDeleteTreeW(HKEY_CURRENT_USER, kPairs); }
+void forgetAll() { RegDeleteTreeW(config::secretRoot(), config::pairsPath().c_str()); }
 
 }  // namespace ekran::pairing

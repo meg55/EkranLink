@@ -39,6 +39,10 @@ tools/          Geliştirme ve ölçüm betikleri
 Tablet Windows'a çoklu dokunmatik ekran olarak bağlanır: kaydırma, iki parmakla yakınlaştırma, basılı tutunca sağ tık.
 Üç parmakla dokunmak ölçümleri gösterir/gizler.
 
+**Ekransız mini PC:** simge > *Oturum açılmadan önce başlat* (bir kez yönetici izni ister). EKRAN Windows
+hizmeti olarak açılışta başlar; kilit ekranı ve şifre ekranı tablette görünür, tabletten açılır (kilit
+perdesini yukarı kaydırın). Windows kilit ekranını yalnızca ana monitörde gösterir.
+
 Görüntü modları (simge > *Görüntü*): **İkinci ekran**, **Tek ekran** (tablet bağlıyken diğer monitörler
 kapanır, tablet ayrılınca geri gelir) ve **Yansıtma**. Windows ekranı kapatınca tablet de kararır.
 

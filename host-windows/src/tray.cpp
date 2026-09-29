@@ -16,8 +16,11 @@
 
 #include "adb.h"
 #include "apkserver.h"
+#include "config.h"
 #include "log.h"
+#include "pair_prompt.h"
 #include "pairing.h"
+#include "service.h"
 #include "streamer.h"
 #include "virtual_display.h"
 
@@ -45,11 +48,11 @@ enum MenuId : UINT {
     kMenuMouse,
     kMenuBalanced,
     kMenuLowLatency,
+    kMenuService,
     kMenuExit,
     kMenuOutputBase = 200,
 };
 
-const wchar_t* kRegKey = L"Software\\EKRAN";
 const wchar_t* kRunKey = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 
 struct StateMsg {
@@ -67,31 +70,15 @@ bool g_connected = false;
 std::wstring g_device, g_link, g_stats;
 std::wstring g_logPath;
 ApkServer g_apkServer;
-FILE* g_log = nullptr;
+// Hizmet kuruluysa yayını hizmet (ajan) yapar; tepsi yalnızca arayüzdür: ayarları HKLM'e yazar,
+// durumu oradan okur. Değilse yayını tepsi kendisi yapar (ayarlar HKCU).
+bool g_serviceMode = false;
+HANDLE g_statusQuit = nullptr;
+std::thread g_statusWatcher;
 
-std::wstring widen(const std::string& s) {
-    if (s.empty()) return {};
-    int n = MultiByteToWideChar(CP_UTF8, 0, s.data(), int(s.size()), nullptr, 0);
-    std::wstring w(size_t(n), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, s.data(), int(s.size()), w.data(), n);
-    return w;
-}
+// --- Ayarlar (config.h: kullanıcı ya da makine deposu) ---
 
-// --- Ayarlar (HKCU\Software\EKRAN) ---
-
-DWORD regGet(const wchar_t* name, DWORD def) {
-    DWORD v = def, size = sizeof v;
-    RegGetValueW(HKEY_CURRENT_USER, kRegKey, name, RRF_RT_REG_DWORD, nullptr, &v, &size);
-    return v;
-}
-
-void regSet(const wchar_t* name, DWORD v) {
-    HKEY k;
-    if (RegCreateKeyExW(HKEY_CURRENT_USER, kRegKey, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &k, nullptr) == 0) {
-        RegSetValueExW(k, name, 0, REG_DWORD, reinterpret_cast<const BYTE*>(&v), sizeof v);
-        RegCloseKey(k);
-    }
-}
+void regSet(const wchar_t* name, DWORD v) { config::set(name, v); }
 
 std::wstring exePath() {
     wchar_t p[MAX_PATH];
@@ -126,17 +113,7 @@ void openLog() {
     std::wstring d = std::wstring(dir) + L"\\EKRAN";
     CreateDirectoryW(d.c_str(), nullptr);
     g_logPath = d + L"\\ekran.log";
-    WIN32_FILE_ATTRIBUTE_DATA fa;
-    const bool big = GetFileAttributesExW(g_logPath.c_str(), GetFileExInfoStandard, &fa) && fa.nFileSizeLow > 1 << 20;
-    g_log = _wfopen(g_logPath.c_str(), big ? L"w" : L"a");  // 1 MB'ı geçince baştan başla
-    setLogSink([](const std::string& s) {
-        if (!g_log) return;
-        std::time_t t = std::time(nullptr);
-        char ts[32];
-        std::strftime(ts, sizeof ts, "%Y-%m-%d %H:%M:%S", std::localtime(&t));
-        std::fprintf(g_log, "%s  %s\n", ts, s.c_str());
-        std::fflush(g_log);
-    });
+    logToFile(g_logPath);
 }
 
 // --- Simge: kodla çizilmiş küçük monitör ---
@@ -200,46 +177,52 @@ void notify(const std::wstring& title, const std::wstring& text) {
     Shell_NotifyIconW(NIM_MODIFY, &n);
 }
 
-// Eşleştirme sorusu: tablet reddederse (cancel) pencere kendiliğinden "Hayır" ile kapanır.
-struct PairAsk {
-    std::wstring text;
-    int result = IDNO;
-};
-
-DWORD WINAPI pairAskThread(void* p) {
-    auto* a = static_cast<PairAsk*>(p);
-    a->result = MessageBoxW(nullptr, a->text.c_str(), L"EKRAN — eşleştirme",
-                            MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND);
-    return 0;
+// Hizmet modunda: ajanın yazdığı durumu izle (kayıt defteri bildirimi; yoklama yok)
+void startStatusWatcher() {
+    g_statusQuit = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    g_statusWatcher = std::thread([] {
+        HKEY k = nullptr;
+        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, config::kStatusKey, 0, KEY_NOTIFY | KEY_QUERY_VALUE, &k) != 0) return;
+        HANDLE ev = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        bool last = false;
+        bool first = true;
+        for (;;) {
+            RegNotifyChangeKeyValue(k, FALSE, REG_NOTIFY_CHANGE_LAST_SET, ev, TRUE);
+            bool c = false;
+            std::wstring dev, link;
+            if (config::readStatus(c, dev, link) && (first || c != last)) {
+                auto narrow = [](const std::wstring& w) {
+                    int n = WideCharToMultiByte(CP_UTF8, 0, w.data(), int(w.size()), nullptr, 0, nullptr, nullptr);
+                    std::string s(size_t(n), '\0');
+                    WideCharToMultiByte(CP_UTF8, 0, w.data(), int(w.size()), s.data(), n, nullptr, nullptr);
+                    return s;
+                };
+                if (!first || c) PostMessageW(g_wnd, WM_STATE, 0, reinterpret_cast<LPARAM>(new StateMsg{c, narrow(dev), narrow(link)}));
+                last = c;
+                first = false;
+            }
+            HANDLE hs[2] = {ev, g_statusQuit};
+            if (WaitForMultipleObjects(2, hs, FALSE, INFINITE) != WAIT_OBJECT_0) break;
+        }
+        CloseHandle(ev);
+        RegCloseKey(k);
+    });
 }
 
-BOOL CALLBACK closeDialog(HWND w, LPARAM) {
-    wchar_t cls[16];
-    if (GetClassNameW(w, cls, 16) && wcscmp(cls, L"#32770") == 0) PostMessageW(w, WM_COMMAND, IDNO, 0);
-    return TRUE;
+void stopStatusWatcher() {
+    if (!g_statusQuit) return;
+    SetEvent(g_statusQuit);
+    if (g_statusWatcher.joinable()) g_statusWatcher.join();
+    CloseHandle(g_statusQuit);
+    g_statusQuit = nullptr;
 }
 
-bool askPairing(const std::wstring& device, const std::wstring& code, HANDLE cancel) {
-    PairAsk a;
-    a.text = L"\"" + device + L"\" bu bilgisayarla eşleşmek istiyor.\n\n"
-             L"Tablette görünen kod:\n\n        " + code +
-             L"\n\nKodlar aynıysa Evet'e basın ve tablette de onaylayın.\n"
-             L"Farklıysa Hayır'a basın: ağda başka biri araya girmeye çalışıyor olabilir.";
-    DWORD tid = 0;
-    HANDLE th = CreateThread(nullptr, 0, pairAskThread, &a, 0, &tid);
-    HANDLE hs[2] = {th, cancel};
-    if (WaitForMultipleObjects(2, hs, FALSE, INFINITE) == WAIT_OBJECT_0 + 1) {
-        logf("Tablet eşleştirmeyi reddetti; soru kapatılıyor");
-        for (int i = 0; i < 50 && WaitForSingleObject(th, 100) == WAIT_TIMEOUT; i++)
-            EnumThreadWindows(tid, closeDialog, 0);
-        a.result = IDNO;
+void startStreamer() {
+    if (g_serviceMode) {
+        startStatusWatcher();
+        return;
     }
-    WaitForSingleObject(th, INFINITE);
-    CloseHandle(th);
-    return a.result == IDYES;
-}
-
-void startStreamer() {    StreamerEvents ev;
+    StreamerEvents ev;
     ev.onState = [](bool connected, const std::string& device, const std::string& link) {
         PostMessageW(g_wnd, WM_STATE, 0, reinterpret_cast<LPARAM>(new StateMsg{connected, device, link}));
     };
@@ -257,6 +240,7 @@ void startStreamer() {    StreamerEvents ev;
 }
 
 void stopStreamer() {
+    stopStatusWatcher();
     if (g_streamer) g_streamer->stop();
     if (g_worker.joinable()) g_worker.join();
     g_streamer.reset();
@@ -264,6 +248,7 @@ void stopStreamer() {
 }
 
 void restartStreamer() {
+    if (g_serviceMode) return;  // ajan kayıt defterindeki değişikliği görüp kendisi yeniden başlar
     stopStreamer();
     startStreamer();
     updateTray();
@@ -336,6 +321,12 @@ void showMenu() {
     AppendMenuW(m, MF_POPUP, reinterpret_cast<UINT_PTR>(perf), L"Performans");
     AppendMenuW(m, MF_STRING, kMenuInstall, L"Tablete uygulamayı kur…");
     AppendMenuW(m, MF_STRING | (autostartEnabled() ? MF_CHECKED : 0), kMenuAutostart, L"Windows ile başlat");
+    {
+        const bool stale = g_serviceMode && service::installedVersion() != config::kVersion;
+        std::wstring label = L"Oturum açılmadan önce başlat (kilit ekranı, UAC)";
+        if (stale) label += L" — güncelle";
+        AppendMenuW(m, MF_STRING | (g_serviceMode ? MF_CHECKED : 0), kMenuService, label.c_str());
+    }
     AppendMenuW(m, MF_STRING, kMenuForget, L"Eşleşmeleri unut");
     AppendMenuW(m, MF_STRING, kMenuLog, L"Günlüğü aç");
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
@@ -402,13 +393,48 @@ void onCommand(UINT id) {
         case kMenuForget:
             if (MessageBoxW(nullptr, L"Tüm eşleşmiş tabletler unutulsun mu?\nWi-Fi ile bağlanırken yeniden kod onayı istenir.",
                             L"EKRAN", MB_YESNO | MB_ICONQUESTION) == IDYES) {
-                pairing::forgetAll();
-                logf("Tüm eşleşmeler silindi");
+                if (g_serviceMode) {
+                    config::set(L"ForgetPairs", 1);  // eşleşmeleri hizmet tutar (kullanıcı okuyamaz)
+                } else {
+                    pairing::forgetAll();
+                    logf("Tüm eşleşmeler silindi");
+                }
             }
             break;
         case kMenuLog:
-            ShellExecuteW(nullptr, L"open", g_logPath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+            ShellExecuteW(nullptr, L"open", (g_serviceMode ? service::agentLogPath() : g_logPath).c_str(), nullptr,
+                          nullptr, SW_SHOWNORMAL);
             break;
+        case kMenuService: {
+            const bool stale = g_serviceMode && service::installedVersion() != config::kVersion;
+            const bool remove = g_serviceMode && !stale;
+            if (remove && MessageBoxW(nullptr,
+                                      L"EKRAN hizmeti kaldırılsın mı?\n\nOturum açma ekranı ve UAC pencereleri artık "
+                                      L"tablette görünmez; yayını yine bu uygulama yapar.",
+                                      L"EKRAN", MB_YESNO | MB_ICONQUESTION) != IDYES)
+                break;
+            // Kurulumda tablete aynı anda iki yayıncı bağlanmasın: önce kendi yayınımızı durdur
+            stopStreamer();
+            DWORD code = 1;
+            const bool ran = service::runElevated(remove ? L"--hizmet-kaldir" : L"--hizmet-kur", code);
+            g_serviceMode = service::installed();
+            config::useMachineStore(g_serviceMode);
+            g_opt = config::loadOptions();
+            if (!ran) {
+                logf("Hizmet işlemi iptal edildi");
+            } else if (code != 0) {
+                logf("Hizmet işlemi başarısız (%lu)", code);
+                MessageBoxW(nullptr, L"Hizmet kurulamadı/kaldırılamadı. Ayrıntı: C:\\ProgramData\\EKRAN\\hizmet.log",
+                            L"EKRAN", MB_OK | MB_ICONWARNING);
+            } else {
+                logf(g_serviceMode ? "Hizmet kuruldu: yayını artık hizmet yapıyor" : "Hizmet kaldırıldı");
+                notify(L"EKRAN", g_serviceMode ? L"Tablet artık oturum açma ekranını da gösterecek."
+                                               : L"Hizmet kaldırıldı; yayını bu uygulama yapıyor.");
+            }
+            startStreamer();
+            updateTray();
+            break;
+        }
         case kMenuExit:
             DestroyWindow(g_wnd);
             break;
@@ -468,6 +494,18 @@ LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
+    // Aynı exe'nin diğer rolleri (service.h)
+    {
+        int argc = 0;
+        wchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+        const std::wstring role = argc > 1 ? argv[1] : L"";
+        LocalFree(argv);
+        if (role == L"--hizmet") return service::runService();
+        if (role == L"--ajan") return service::runAgent();
+        if (role == L"--hizmet-kur") return service::install();
+        if (role == L"--hizmet-kaldir") return service::uninstall();
+    }
+
     HANDLE single = CreateMutexW(nullptr, TRUE, L"EKRAN-tepsi");
     if (GetLastError() == ERROR_ALREADY_EXISTS) return 0;  // zaten çalışıyor
 
@@ -479,12 +517,10 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
     openLog();
     logf("EKRAN tepsi uygulaması başladı");
 
-    g_opt.mode = LinkMode(regGet(L"Mode", DWORD(LinkMode::Auto)));
-    g_opt.output = int(regGet(L"Output", 0));
-    g_opt.extend = regGet(L"Mirror", 0) == 0;
-    g_opt.onlyTablet = regGet(L"OnlyTablet", 0) != 0;
-    g_opt.touchAsMouse = regGet(L"TouchAsMouse", 0) != 0;
-    g_opt.lowLatency = regGet(L"LowLatency", 0) != 0;
+    g_serviceMode = service::installed();
+    config::useMachineStore(g_serviceMode);
+    g_opt = config::loadOptions();
+    if (g_serviceMode) logf("EKRAN hizmeti kurulu: yayını hizmet yapıyor, bu uygulama yalnızca ayar ve durum");
 
     WNDCLASSW wc{};
     wc.lpfnWndProc = wndProc;
@@ -515,7 +551,6 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
     stopStreamer();
     g_apkServer.stop();
     logf("EKRAN kapandı");
-    if (g_log) std::fclose(g_log);
     WSACleanup();
     MFShutdown();
     CoUninitialize();

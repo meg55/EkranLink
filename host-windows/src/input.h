@@ -38,6 +38,7 @@ private:
     POINT toScreen(int x, int y) const;
     // Tüm etkin parmakları tek çerçevede gönderir; `changed` parmağına `changedFlags` uygulanır.
     void injectLocked(int changed, UINT32 changedFlags);
+    void dropContactsLocked();
     void keepAlive();
     void mouse(uint8_t action, uint8_t pointerId, POINT pt);
 

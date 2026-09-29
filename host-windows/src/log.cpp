@@ -2,7 +2,10 @@
 
 #include <cstdarg>
 #include <cstdio>
+#include <ctime>
 #include <mutex>
+
+#include <windows.h>
 
 namespace ekran {
 
@@ -14,6 +17,21 @@ std::function<void(const std::string&)> g_sink;
 void setLogSink(std::function<void(const std::string&)> sink) {
     std::lock_guard<std::mutex> lock(g_mutex);
     g_sink = std::move(sink);
+}
+
+bool logToFile(const std::wstring& path) {
+    WIN32_FILE_ATTRIBUTE_DATA fa;
+    const bool big = GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &fa) && fa.nFileSizeLow > 1 << 20;
+    FILE* f = _wfopen(path.c_str(), big ? L"w" : L"a");
+    if (!f) return false;
+    setLogSink([f](const std::string& s) {
+        std::time_t t = std::time(nullptr);
+        char ts[32];
+        std::strftime(ts, sizeof ts, "%Y-%m-%d %H:%M:%S", std::localtime(&t));
+        std::fprintf(f, "%s  %s\n", ts, s.c_str());
+        std::fflush(f);
+    });
+    return true;
 }
 
 void logf(const char* fmt, ...) {

@@ -89,6 +89,11 @@ GÖRÜNTÜ MODLARI (simge > Görüntü)
   derlenip kurulabiliyor (driver\README.md); sürücü yoksa EKRAN yansıtır.
   Windows ekranı kapatınca tablet de kapanır, açınca birlikte uyanır.
 
+EKRANSIZ MINI PC (oturum açma ekranı)
+  Simge > "Oturum açılmadan önce başlat" (bir kez yönetici izni ister). EKRAN Windows hizmeti olarak
+  C:\Program Files\EKRAN'a kurulur ve açılışta başlar; kilit ve şifre ekranı tablette görünür.
+  Kilit perdesini tablette yukarı kaydırın. Windows kilit ekranını yalnızca ana monitörde gösterir.
+
 SORUN OLURSA
   Simge > "Günlüğü aç" (%LOCALAPPDATA%\EKRAN\ekran.log)
   Ayrıntılı ölçümler için konsol sürümü: ekran-host.exe

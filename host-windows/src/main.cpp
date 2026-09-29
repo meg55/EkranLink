@@ -100,6 +100,18 @@ int main(int argc, char** argv) {
         if (!std::fgets(buf, sizeof buf, stdin)) return false;
         return buf[0] == 'e' || buf[0] == 'E' || buf[0] == 'y' || buf[0] == 'Y';
     };
+    // Hizmet çalışıyorsa tablete iki yayıncı bağlanmaya çalışmasın
+    if (SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT)) {
+        SERVICE_STATUS st{};
+        SC_HANDLE svc = OpenServiceW(scm, L"EKRAN", SERVICE_QUERY_STATUS);
+        const bool running = svc && QueryServiceStatus(svc, &st) && st.dwCurrentState != SERVICE_STOPPED;
+        if (svc) CloseServiceHandle(svc);
+        CloseServiceHandle(scm);
+        if (running) {
+            logf("EKRAN hizmeti çalışıyor; yayını o yapıyor. Konsol için önce durdurun: sc stop EKRAN");
+            return 1;
+        }
+    }
     Streamer streamer(opt, ev);
     g_streamer = &streamer;
     SetConsoleCtrlHandler(onCtrl, TRUE);

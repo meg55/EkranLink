@@ -12,6 +12,7 @@
 #include "adb.h"
 #include "capture.h"
 #include "com.h"
+#include "desktop.h"
 #include "discovery.h"
 #include "encoder.h"
 #include "input.h"
@@ -203,6 +204,7 @@ void Streamer::runSession(const std::string& host, const std::string& link, cons
     const std::string modeName = target.empty() ? "yansıtma" : only ? "tek ekran" : "ikinci ekran";
     logMemory("el sıkışma sonrası");
 
+    followInputDesktop();  // ajan: kilit ekranındaysak oraya bağlan
     GpuDevice gpu;
     DesktopCapture cap;
     Scaler scaler;
@@ -357,7 +359,12 @@ void Streamer::runSession(const std::string& host, const std::string& link, cons
             // UAC / kilit ekranı / çözünürlük, yön ya da yerleşim değişimi: yakalamayı yeniden kur.
             // Akış boyutu aynı kalır; yalnızca yerleşim ve eşleme tazelenir, bağlantı kopmaz.
             const int w0 = cap.width(), h0 = cap.height(), r0 = cap.orientation().rotation;
-            while (!stop_ && conn.alive() && !cap.init(gpu)) Sleep(250);
+            // Ajan: kilit ekranı / UAC / oturum açma ayrı masaüstü; yakalama oraya geçerek sürer
+            while (!stop_ && conn.alive()) {
+                followInputDesktop();
+                if (cap.init(gpu)) break;
+                Sleep(250);
+            }
             if (stop_ || !conn.alive()) break;
             scaler = Scaler();
             if (!scaler.init(gpu.device.get(), gpu.context.get(), cap.desk(), cap.width(), cap.height(), W, H)) break;

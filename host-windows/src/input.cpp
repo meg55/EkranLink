@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 
+#include "desktop.h"
 #include "log.h"
 #include "protocol.h"
 
@@ -66,6 +67,7 @@ POINT TouchInjector::toScreen(int x, int y) const {
 
 void TouchInjector::onTouch(uint8_t action, uint8_t pointerId, int x, int y, int pressure) {
     std::lock_guard<std::mutex> lock(m_);
+    if (followInputDesktop()) dropContactsLocked();  // ajan: kilit ekranına / UAC'ye de dokunulabilsin
     const POINT pt = toScreen(x, y);
     if (mode_ == Mode::Mouse) {
         mouse(action, pointerId, pt);
@@ -132,6 +134,14 @@ void TouchInjector::injectLocked(int changed, UINT32 changedFlags) {
     }
 }
 
+// Giriş masaüstü değişti (ör. kilit perdesi kaydırılınca şifre ekranı): o anda ekrandaki parmaklar yeni
+// masaüstünde hiç basılmadı, hareketlerinin kalanı geçersiz olur. Bırakılmış say; sonraki dokunma temiz başlar.
+void TouchInjector::dropContactsLocked() {
+    for (auto& c : contacts_) c.active = false;
+    activeCount_ = 0;
+    mouseDown_ = false;
+}
+
 // Parmak hareketsiz dururken de Windows'a düzenli güncelleme gerekir (gerçek dokunmatik ekranlar da
 // sürekli rapor eder; aksi halde basılı tutma / sağ tık algılanmaz). Yalnızca dokunulurken çalışır.
 void TouchInjector::keepAlive() {
@@ -142,7 +152,10 @@ void TouchInjector::keepAlive() {
             continue;
         }
         cv_.wait_for(lock, std::chrono::milliseconds(100));
-        if (!stop_ && activeCount_ > 0) injectLocked(-1, 0);
+        if (!stop_ && activeCount_ > 0) {
+            if (followInputDesktop()) dropContactsLocked();
+            else injectLocked(-1, 0);
+        }
     }
 }
 
