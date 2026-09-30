@@ -24,6 +24,7 @@ enum Msg : uint8_t {
     kOrientation = 11,  // T→P: tabletin tutuluş yönü (u16 derece)
     kDisplayPower = 12, // P→T: Windows ekranları açık mı (u8)
     kKeyRequest = 13,   // T→P: çözücü yeniden kuruldu, anahtar kare gönder
+    kVideoVisible = 14, // T→P: tablet uygulaması önde mi (u8); arka plandayken görüntü üretilmez
     // Anahtar değişimi / eşleştirme (şifresiz çerçeveler, kPairResult hariç)
     kPcHello = 20,
     kTabletKey = 21,

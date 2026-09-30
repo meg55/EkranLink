@@ -76,6 +76,7 @@ sonraki bağlantıda yeniden eşleştirme ister.
 | 11 | Orientation | T→P | `u16 derece` (0, 90, 270) — tabletin tutuluş yönü, yatay ekrana göre saat yönünde. Yalnızca tabletin otomatik döndürmesi açıkken, bağlanınca ve yön değişince gönderilir |
 | 12 | DisplayPower | P→T | `u8 açık` — Windows ekranları kapattı (0) / açtı (1). Tablet kararır ve ekranının kendi zaman aşımıyla kapanmasına izin verir; bağlantı sürer. Açılınca tablet ekranını yakar |
 | 13 | KeyRequest | T→P | (boş) — tablet çözücüsünü yeniden kurdu (yüzeyi yok olup geri geldi); PC anahtar kare gönderir ve onay sayacını sıfırlar |
+| 14 | VideoVisible | T→P | `u8 önde` — tablet uygulaması arka plana alındı (0) / öne geldi (1). Arkadayken PC yakalama ve kodlamayı durdurur, bağlantı sürer; öne gelince tablet `KeyRequest` gönderir. Arkadayken PC tablet ekranını kapatmaz |
 | 20–23 | PcHello, TabletKey, Mode, PairResult | | yukarıda |
 
 Tablet ilk 4 bayt `"EKRN"` değilse akışı ham H.264 Annex-B kabul eder (tanı modu, `tools/faz0.ps1`).
@@ -85,6 +86,15 @@ Tablet ilk 4 bayt `"EKRN"` değilse akışı ham H.264 Annex-B kabul eder (tanı
 Kaynak ekran (ör. 1920×1080) oranı korunarak akışa (ör. 1280×752) yerleştirilir; kalan kısım siyah.
 `içerik*` bu yerleşimi akış pikseli cinsinden verir. Tablet imleci buna göre konumlar/ölçekler,
 PC dokunmayı bunun tersine göre masaüstüne çevirir.
+
+### USB'de otomatik açılma
+
+PC, adb ile tablete sorar: `am broadcast -f 32 -n org.ekran.android/.AutoStartReceiver`. Sonuç kodu
+tabletin kararıdır: **1** izin var (PC uygulamayı `am start` ile başlatır; Android 10+ arka plandan ekran
+açmaya izin vermediği için başlatan PC'dir), **2** reddedildi ("bilgisayara takılınca otomatik aç" kapalı ya
+da kullanıcı bağlantıyı tabletten kesti — kablo 30 sn çıkarılana ya da uygulama elle açılana kadar),
+**3** uygulama zaten açık (PC bağlanır). PC'de de "otomatik bağlan" ayarı vardır: ikisi de açıksa tablet
+takılınca kendiliğinden ekran olur.
 
 ### Döndürme
 

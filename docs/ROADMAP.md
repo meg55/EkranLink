@@ -175,6 +175,13 @@ Yapılanlar:
       açılır, dokunma iletilir. Not: Windows kilit ekranını yalnızca **ana** monitörde çizer (ekransız mini
       PC'de tablet zaten ana ekran; masaüstünde "Tek ekran" ya da tableti ana ekran yapmak gerekir).
       UAC güvenli masaüstü aynı yoldan geçer ama bu PC'de UAC sormadan yükselttiği için denenemedi
+- [x] Otomatik bağlanma iki tarafta ayarlanır: PC (tepsi → Bağlantı → Otomatik bağlan / Şimdi bağlan) ve
+      tablet (karşılama ekranı → Bilgisayara takılınca otomatik aç); ikisi açıksa takınca kendiliğinden olur
+- [x] Arka plan: tablet uygulaması alta alınınca bağlantı ve Windows'taki monitör sürer (ön plan hizmeti +
+      bildirim); arkadayken PC görüntü üretmez (ajan %0 işlemci), öne gelince anahtar kareyle anında döner.
+      Bağlantıyı kesmek: bildirim ya da ölçüm kartındaki "Bağlantıyı kes"
+- [x] USB takılma bildirimi (CM_Register_Notification, ADB arabirimi): tablet takılı değilken adb hiç
+      çalıştırılmaz; kurulum denetimi aygıt başına bir kez
 - [ ] Oturum açılmadan Wi-Fi: tablet uygulaması açık ve eşleşmiş olmalı (bugün de öyle); ilk açılışta
       tabletin bağlanması için USB önerilir
 - [x] Tek ekran modu (tepsi → Görüntü → Tek ekran, `--tek-ekran`): tablet bağlanınca diğer monitörler kapanır,

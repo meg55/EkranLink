@@ -23,6 +23,7 @@ struct Options {
     int output = 0;       // yansıtılacak PC ekranı (yansıtma modunda)
     bool extend = true;   // ikinci ekran: sürücü kuruluysa tablet için sanal monitör aç, yoksa yansıt
     bool onlyTablet = false;  // tek ekran: tablet bağlıyken diğer monitörler kapanır (yalnızca ikinci ekranda)
+    bool autoConnect = true;    // tablet bulununca kendiliğinden bağlan (kapalıysa yalnızca connectNow ile)
     bool touchAsMouse = false;  // dokunma = fare (varsayılan: gerçek çoklu dokunma)
     int fps = 60;         // en yüksek kare hızı (tabletin ekranı)
     bool lowLatency = false;  // düşük gecikme: itici kareler hareket sırasında da (tablet ~2 kat çalışır)
@@ -53,9 +54,12 @@ public:
 
     // Çalışırken bağlantı türünü değiştir (mevcut oturum kapanır, yenisiyle aranır).
     void setMode(LinkMode m);
+    // Otomatik bağlanma kapalıyken: 30 sn içinde bulunan tablete bir kez bağlan
+    void connectNow();
 
 private:
-    void runSession(const std::string& host, const std::string& link, const std::wstring& adbPath = {});
+    // Tablete bağlanıp oturum bitene kadar yayın yapar. El sıkışma başarılıysa true.
+    bool runSession(const std::string& host, const std::string& link, const std::wstring& adbPath = {});
     void sleepInterruptible(int ms);
 
     Options opt_;
@@ -67,7 +71,8 @@ private:
     HANDLE wake_;
     // Eşleştirmesi reddedilen tabletlere bir süre tekrar sorma (cihaz kimliği → µs)
     std::map<std::string, int64_t> rejectedUntil_;
-    DisplayPower displayPower_;  // Windows ekranı kapatınca tablet de kapansın
+    DisplayPower displayPower_;
+    std::atomic<int64_t> manualUntilUs_{0};  // "Şimdi bağlan" süresi  // Windows ekranı kapatınca tablet de kapansın
 };
 
 }  // namespace ekran

@@ -114,9 +114,11 @@ bool run(const std::wstring& adbPath, const std::wstring& args, std::string* out
     return code == 0;
 }
 
-bool hasDevice(const std::wstring& adbPath) {
+std::string serial(const std::wstring& adbPath) {
     std::string out;
-    return run(adbPath, L"get-state", &out, 3000) && out.find("device") != std::string::npos;
+    if (!run(adbPath, L"get-serialno", &out, 3000)) return {};
+    while (!out.empty() && (out.back() == '\n' || out.back() == '\r' || out.back() == ' ')) out.pop_back();
+    return out == "unknown" ? std::string() : out;
 }
 
 void screenOff(const std::wstring& adbPath, int sdk) {
@@ -131,18 +133,15 @@ void screenOff(const std::wstring& adbPath, int sdk) {
         run(adbPath, L"shell input keyevent 26");
 }
 
-bool prepareUsb(const std::wstring& adbPath, unsigned port) {
+bool prepareUsb(const std::wstring& adbPath, unsigned port, bool checkInstall) {
     std::string out;
-    if (!run(adbPath, L"get-state", &out) || out.find("device") == std::string::npos) {
-        logf("USB: adb cihaz görmüyor (USB hata ayıklama açık mı?)");
-        return false;
-    }
     wchar_t fwd[64];
     swprintf(fwd, 64, L"forward tcp:%u tcp:%u", port, port);
     if (!run(adbPath, fwd, &out)) {
         logf("USB: adb forward başarısız: %s", out.c_str());
         return false;
     }
+    if (!checkInstall) return true;
     // Uygulama yoksa veya paketteki sürümden eskiyse kur (USB hata ayıklama açık olduğu için onay gerekmez).
     const std::wstring apk = bundledApk();
     if (!apk.empty()) {
@@ -157,12 +156,25 @@ bool prepareUsb(const std::wstring& adbPath, unsigned port) {
             }
         }
     }
-    // Ekran kapalıysa uyandır (KEYCODE_WAKEUP 4.4 öncesinde yok; güç tuşu).
+    return true;
+}
+
+Launch requestLaunch(const std::wstring& adbPath) {
+    // Açık bileşene yayın; -f 32 (FLAG_INCLUDE_STOPPED_PACKAGES): hiç açılmamış uygulamaya da ulaşsın.
+    // Sonuç kodu tabletin kararı (AutoStartReceiver): 1 izin var, 2 otomatik açma kapalı, 3 zaten açık.
+    // Uygulamayı tablet değil biz başlatırız: Android 10+ arka plandan ekran açılmasına izin vermez, adb verir.
+    std::string out;
+    if (!run(adbPath, L"shell am broadcast -f 32 -n org.ekran.android/.AutoStartReceiver", &out)) return Launch::Failed;
+    const size_t p = out.find("result=");
+    const int r = p == std::string::npos ? -1 : std::atoi(out.c_str() + p + 7);
+    if (r == 2) return Launch::Declined;
+    if (r == 3) return Launch::AlreadyOpen;
+    // 1 ya da eski sürüm (alıcı yok): ekranı uyandır (KEYCODE_WAKEUP 4.4 öncesinde yok) ve başlat
     if (run(adbPath, L"shell dumpsys power", &out) &&
         (out.find("mScreenOn=false") != std::string::npos || out.find("Display Power: state=OFF") != std::string::npos))
         run(adbPath, L"shell input keyevent 26");
     run(adbPath, L"shell am start -n org.ekran.android/.MainActivity");
-    return true;
+    return Launch::Started;
 }
 
 }  // namespace ekran::adb

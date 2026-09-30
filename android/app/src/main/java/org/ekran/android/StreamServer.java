@@ -34,10 +34,10 @@ final class StreamServer extends Thread {
     private Socket client;
     private volatile Session session;
 
-    StreamServer(Surface surface, Stats stats, Session.Host host) {
+    StreamServer(Surface surface, boolean headless, Stats stats, Session.Host host) {
         super("ekran-server");
         this.surface = surface;
-        this.headless = surface == null;
+        this.headless = headless;
         this.stats = stats;
         this.host = host;
     }

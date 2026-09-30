@@ -27,6 +27,13 @@ final class InfoLayer extends ViewGroup {
         int pairCount();
 
         void forgetPairs();
+
+        boolean autoOpen();
+
+        void setAutoOpen(boolean on);
+
+        /** Bağlantıyı kes ve uygulamayı kapat. */
+        void disconnect();
     }
 
     private static final int BG = 0xFF0B0E13;
@@ -52,6 +59,7 @@ final class InfoLayer extends ViewGroup {
     private final View welcomeDot;
     private final TextView welcomeStatus, wifiText, footer, forget;
     private boolean forgetArmed;
+    private TextView autoToggle;
 
     private final View statsCard;
     private final View statsDot;
@@ -92,7 +100,31 @@ final class InfoLayer extends ViewGroup {
                 "Kabloyu takın. Bilgisayarda EKRAN açık, tablette USB hata ayıklama açık olmalı.", 15, TEXT, false)),
                 wide(0, dp(20), 0, 0));
         wifiText = text(ctx, "", 15, TEXT, false);
-        col.addView(step(ctx, "Wi-Fi", wifiText), wide(0, dp(16), 0, dp(20)));
+        col.addView(step(ctx, "Wi-Fi", wifiText), wide(0, dp(16), 0, 0));
+
+        // Bilgisayara takılınca otomatik aç (PC'nin "Otomatik bağlan" ayarıyla birlikte)
+        LinearLayout autoRow = row(ctx);
+        LinearLayout autoText = new LinearLayout(ctx);
+        autoText.setOrientation(LinearLayout.VERTICAL);
+        autoText.addView(text(ctx, "Bilgisayara takılınca otomatik aç", 15, TEXT, false));
+        autoText.addView(text(ctx, "Bilgisayarda da \"Otomatik bağlan\" açık olmalı", 13, MUTED, false));
+        autoRow.addView(autoText, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
+        autoToggle = text(ctx, "", 14, TEXT, true);
+        autoToggle.setGravity(Gravity.CENTER);
+        autoToggle.setMinWidth(dp(84));
+        autoToggle.setPadding(dp(14), dp(8), dp(14), dp(8));
+        autoToggle.setClickable(true);
+        autoToggle.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                InfoLayer.this.actions.setAutoOpen(!InfoLayer.this.actions.autoOpen());
+                refreshAutoToggle();
+            }
+        });
+        autoRow.addView(autoToggle, margins(dp(16), 0, 0, 0));
+        col.addView(autoRow, wide(0, dp(18), 0, dp(20)));
+        refreshAutoToggle();
+
         col.addView(divider(ctx), new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 1));
 
         LinearLayout footerRow = row(ctx);
@@ -134,6 +166,17 @@ final class InfoLayer extends ViewGroup {
             card.addView(r, margins(0, dp(3), 0, dp(3)));
         }
         card.addView(text(ctx, "Gizlemek için üç parmakla dokunun", 12, MUTED, false), margins(0, dp(10), 0, 0));
+        // Kart dokunmaları geçirir (arkadaki masaüstüne); yalnızca bu düğme tutar
+        TextView cut = button(ctx, "Bağlantıyı kes", 0x00000000, 0x33FF5A52, RED);
+        cut.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        cut.setPadding(dp(14), dp(8), dp(14), dp(8));
+        cut.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                InfoLayer.this.actions.disconnect();
+            }
+        });
+        card.addView(cut, margins(0, dp(12), 0, 0));
         statsCard = card;
         FrameLayout.LayoutParams cardLp = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT,
                 LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START);
@@ -278,6 +321,13 @@ final class InfoLayer extends ViewGroup {
         if (r != null) {
             r.run();
         }
+    }
+
+    private void refreshAutoToggle() {
+        boolean on = actions.autoOpen();
+        autoToggle.setText(on ? "Açık" : "Kapalı");
+        autoToggle.setTextColor(on ? 0xFFFFFFFF : MUTED);
+        autoToggle.setBackground(round(on ? ACCENT : 0x22FFFFFF, 16));
     }
 
     // --- Eşleşmeleri unut: yanlışlıkla dokunmaya karşı iki adımlı ---

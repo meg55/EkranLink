@@ -33,6 +33,7 @@ final class Session implements H264Decoder.FrameListener {
     static final int MSG_ORIENTATION = 11;
     static final int MSG_DISPLAY_POWER = 12;
     static final int MSG_KEY_REQUEST = 13;
+    static final int MSG_VIDEO_VISIBLE = 14;
     static final int MSG_PC_HELLO = 20;
     static final int MSG_TABLET_KEY = 21;
     static final int MSG_MODE = 22;
@@ -82,6 +83,8 @@ final class Session implements H264Decoder.FrameListener {
     private Crypto.DirectionKey tx, rx;
     private long txSeq, rxSeq;
     private int pendingAcks; // onayı henüz gönderilmemiş çizilen kare sayısı
+    private volatile boolean helloSent;
+    private volatile boolean videoVisible = true; // uygulama önde: PC görüntü üretsin
     private byte[] buf = new byte[256 * 1024];
 
     Session(DataInputStream in, OutputStream out, boolean localLink, Surface surface, Stats stats, Host host) {
@@ -220,7 +223,8 @@ final class Session implements H264Decoder.FrameListener {
             if (!pcAccepted && prompt != null) {
                 prompt.dismiss();
             }
-            boolean accepted = pcAccepted && (prompt == null || prompt.await());
+            // USB'de soru yok (kablo güvenilir); Wi-Fi'de soru gösterilemediyse (arayüz yok) reddedilir
+            boolean accepted = pcAccepted && (localLink || (prompt != null && prompt.await()));
             writeFrameNow(new byte[]{(byte) MSG_PAIR_RESULT, (byte) (accepted ? 1 : 0)});
             out.flush();
             if (!accepted) {
@@ -379,17 +383,31 @@ final class Session implements H264Decoder.FrameListener {
         sendQueue.offer(msg);
     }
 
-    /** Ekran kapandı: çözücüyü bırak, bağlantı sürer. */
+    /** Yüzey yok (uygulama arka planda ya da ekran kapalı): çözücüyü bırak, bağlantı sürer, PC görüntüyü durdurur. */
     void suspendVideo() {
         decoder.suspend();
+        videoVisible = false;
+        sendVisible();
     }
 
-    /** Ekran açıldı: yeni yüzeyle devam et, PC'den anahtar kare iste. */
+    /** Yüzey geri geldi: yeni yüzeyle devam et, PC'den anahtar kare iste. */
     void resumeVideo(Surface surface) {
         decoder.resume(surface);
-        if (!closed) {
+        videoVisible = true;
+        sendVisible();
+        if (!closed && helloSent) {
             sendQueue.offer(body(MSG_KEY_REQUEST, 0));
         }
+    }
+
+    // Hello'dan önce kuyruğa girmesin (PC ilk mesaj olarak Hello bekler); sendHello sonra gönderir
+    private void sendVisible() {
+        if (closed || !helloSent) {
+            return;
+        }
+        byte[] msg = body(MSG_VIDEO_VISIBLE, 1);
+        msg[1] = (byte) (videoVisible ? 1 : 0);
+        sendQueue.offer(msg);
     }
 
     /** Tabletin tutuluş yönü (0, 90, 270): yatay ekrana göre saat yönünde dönüş. PC sanal monitörü döndürür. */
@@ -420,6 +438,10 @@ final class Session implements H264Decoder.FrameListener {
         String dec = H264Decoder.findDecoderName();
         d.writeUTF(dec != null ? dec : "-");
         sendQueue.offer(bos.toByteArray());
+        helloSent = true;
+        if (!videoVisible) {
+            sendVisible(); // arka plandayken bağlanıldı
+        }
     }
 
     void close() {

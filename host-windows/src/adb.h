@@ -11,14 +11,18 @@ std::wstring find();
 // Komutu pencere açmadan çalıştırır; çıktıyı döndürür. Başarısızsa false.
 bool run(const std::wstring& adbPath, const std::wstring& args, std::string* output = nullptr, int timeoutMs = 10000);
 
-// USB'de hata ayıklaması açık bir cihaz bağlı mı? (sessiz; otomatik modda yoklama için)
-bool hasDevice(const std::wstring& adbPath);
+// USB'de hata ayıklaması açık cihazın seri numarası; yoksa boş (sessiz; tek adb çağrısı)
+std::string serial(const std::wstring& adbPath);
 
 // Paketle gelen (exe'nin yanındaki) ya da geliştirme derlemesindeki APK; yoksa boş.
 std::wstring bundledApk();
 
-// Port yönlendir, ekranı uyandır, EKRAN uygulamasını başlat.
-bool prepareUsb(const std::wstring& adbPath, unsigned port);
+// Port yönlendir; checkInstall ise uygulama yoksa ya da paketteki sürümden eskiyse kur (aygıt başına bir kez).
+bool prepareUsb(const std::wstring& adbPath, unsigned port, bool checkInstall);
+
+// Tableti ekran olmaya davet et: kararı tablet verir ("bilgisayara takılınca otomatik aç" ayarı).
+enum class Launch { Started, AlreadyOpen, Declined, Failed };
+Launch requestLaunch(const std::wstring& adbPath);
 
 // Tablet ekranını hemen kapat (Windows ekranları kapatınca). Tablet "USB takılıyken uyanık kal"
 // ayarındaysa kendi zaman aşımı hiç işlemez; bu yüzden USB'de PC kapatır. Uyandırmayı tablet yapar.

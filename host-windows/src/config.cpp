@@ -60,6 +60,7 @@ Options loadOptions() {
     o.onlyTablet = get(L"OnlyTablet", 0) != 0;
     o.touchAsMouse = get(L"TouchAsMouse", 0) != 0;
     o.lowLatency = get(L"LowLatency", 0) != 0;
+    o.autoConnect = get(L"AutoConnect", 1) != 0;
     return o;
 }
 

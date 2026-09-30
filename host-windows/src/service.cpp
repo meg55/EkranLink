@@ -344,7 +344,7 @@ int runAgent() {
 
     auto same = [](const Options& a, const Options& b) {
         return a.mode == b.mode && a.output == b.output && a.extend == b.extend && a.onlyTablet == b.onlyTablet &&
-               a.touchAsMouse == b.touchAsMouse && a.lowLatency == b.lowLatency;
+               a.touchAsMouse == b.touchAsMouse && a.lowLatency == b.lowLatency && a.autoConnect == b.autoConnect;
     };
 
     bool quit = false;
@@ -367,6 +367,7 @@ int runAgent() {
         if (config::get(L"Tani", 0))
             ev.onStats = [](const std::string& line) { logf("%s  [%ls]", line.c_str(), inputDesktopName().c_str()); };
         Streamer streamer(opt, ev);
+        DWORD lastConnectNow = config::get(L"ConnectNow", 0);
         std::thread worker([&] {
             CoInitializeEx(nullptr, COINIT_MULTITHREADED);  // STA gizli pencere açar; masaüstü değişemezdi
             streamer.run();
@@ -383,6 +384,13 @@ int runAgent() {
             }
             if (w != WAIT_OBJECT_0) continue;
             if (handleForget()) continue;
+            // Tepsideki "Şimdi bağlan": sayaç artar (kullanıcı HKLM'e yalnızca ayar yazabilir)
+            const DWORD cn = config::get(L"ConnectNow", 0);
+            if (cn != lastConnectNow) {
+                lastConnectNow = cn;
+                streamer.connectNow();
+                continue;
+            }
             if (!same(opt, config::loadOptions())) {
                 logf("Ayarlar değişti; yayın yeniden başlıyor");
                 break;

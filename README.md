@@ -43,6 +43,14 @@ Tablet Windows'a çoklu dokunmatik ekran olarak bağlanır: kaydırma, iki parma
 hizmeti olarak açılışta başlar; kilit ekranı ve şifre ekranı tablette görünür, tabletten açılır (kilit
 perdesini yukarı kaydırın). Windows kilit ekranını yalnızca ana monitörde gösterir.
 
+**Otomatik bağlanma:** PC'de simge > *Bağlantı* > *Otomatik bağlan*, tablette karşılama ekranındaki
+*Bilgisayara takılınca otomatik aç*. İkisi de açıksa tableti takmanız yeterli; biri kapalıysa PC'de
+*Şimdi bağlan*'a tıklayın ya da tablette EKRAN'ı açın.
+
+**Arka plan:** Tabletteki uygulamayı alta alıp başka uygulama kullanabilirsiniz; Windows'taki monitör
+kopmaz, dönünce görüntü kaldığı yerden sürer. Bağlantıyı kesmek için bildirimdeki ya da ölçüm kartındaki
+(üç parmak) *Bağlantıyı kes*.
+
 Görüntü modları (simge > *Görüntü*): **İkinci ekran**, **Tek ekran** (tablet bağlıyken diğer monitörler
 kapanır, tablet ayrılınca geri gelir) ve **Yansıtma**. Windows ekranı kapatınca tablet de kararır.
 

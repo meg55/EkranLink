@@ -49,6 +49,8 @@ enum MenuId : UINT {
     kMenuBalanced,
     kMenuLowLatency,
     kMenuService,
+    kMenuAutoConnect,
+    kMenuConnectNow,
     kMenuExit,
     kMenuOutputBase = 200,
 };
@@ -289,6 +291,11 @@ void showMenu() {
     AppendMenuW(link, MF_STRING, kMenuWifi, L"Sadece Wi-Fi");
     const UINT sel = g_opt.mode == LinkMode::Usb ? kMenuUsb : g_opt.mode == LinkMode::Wifi ? kMenuWifi : kMenuAuto;
     CheckMenuRadioItem(link, kMenuAuto, kMenuWifi, sel, MF_BYCOMMAND);
+    AppendMenuW(link, MF_SEPARATOR, 0, nullptr);
+    // Tablet takılınca/bulununca kendiliğinden bağlan. Tabletin de kendi "otomatik aç" ayarı var: ikisi açıksa olur.
+    AppendMenuW(link, MF_STRING | (g_opt.autoConnect ? MF_CHECKED : 0), kMenuAutoConnect,
+                L"Otomatik bağlan (tablet takılınca)");
+    AppendMenuW(link, MF_STRING | (g_opt.autoConnect || g_connected ? MF_GRAYED : 0), kMenuConnectNow, L"Şimdi bağlan");
     AppendMenuW(m, MF_POPUP, reinterpret_cast<UINT_PTR>(link), L"Bağlantı");
 
     HMENU outs = CreatePopupMenu();
@@ -347,6 +354,15 @@ void onCommand(UINT id) {
             g_opt.mode = id == kMenuUsb ? LinkMode::Usb : id == kMenuWifi ? LinkMode::Wifi : LinkMode::Auto;
             regSet(L"Mode", DWORD(g_opt.mode));
             if (g_streamer) g_streamer->setMode(g_opt.mode);
+            break;
+        case kMenuAutoConnect:
+            g_opt.autoConnect = !g_opt.autoConnect;
+            regSet(L"AutoConnect", g_opt.autoConnect ? 1 : 0);
+            restartStreamer();
+            break;
+        case kMenuConnectNow:
+            if (g_serviceMode) config::set(L"ConnectNow", config::get(L"ConnectNow", 0) + 1);  // ajan izliyor
+            else if (g_streamer) g_streamer->connectNow();
             break;
         case kMenuAutostart:
             setAutostart(!autostartEnabled());

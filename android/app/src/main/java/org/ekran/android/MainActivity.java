@@ -1,17 +1,15 @@
 package org.ekran.android;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
-import android.graphics.Point;
-import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.DisplayMetrics;
 import android.util.Log;
-import android.view.Display;
 import android.view.MotionEvent;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -24,28 +22,26 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.Collections;
 
-/** Tam ekran yüzey + yerel imleç + bilgi katmanı. */
-public class MainActivity extends Activity implements SurfaceHolder.Callback, Session.Host {
-    private final Stats stats = new Stats();
+/**
+ * Tam ekran yüzey + yerel imleç + bilgi katmanı. Bağlantıyı {@link EkranService} tutar: uygulama arka plana
+ * alınınca bağlantı sürer, yalnızca görüntü duraklar; öne gelince kaldığı yerden devam eder.
+ */
+public class MainActivity extends Activity implements SurfaceHolder.Callback, EkranService.Ui {
     private final Handler handler = new Handler();
-    private SurfaceView surfaceView;
     private CursorView cursorView;
     private InfoLayer info;
-    private StreamServer server;
-    private WifiManager.WifiLock wifiLock;
-    private volatile int surfaceW, surfaceH;
+    private EkranService service;
+    private Surface surface;          // hizmet hazır olmadan gelen yüzey
+    private int surfaceW, surfaceH;
     private volatile Session.Config config;
-    private boolean statsPinned; // kullanıcı üç parmakla ölçüm kartını açtı
-    private boolean suppressTouch; // üç parmak hareketi sürerken PC'ye dokunma gönderme
-    private DiscoveryResponder discovery;
-    private String deviceId;
-    private PairStore pairStore;
-    private WifiManager.MulticastLock broadcastLock;
+    private boolean statsPinned;      // kullanıcı üç parmakla ölçüm kartını açtı
+    private boolean suppressTouch;    // üç parmak hareketi sürerken PC'ye dokunma gönderme
     private OrientationWatcher orientationWatcher;
     // Uyku eşitleme: Windows ekranları kapattı. Tablet ekranı kendi zaman aşımıyla kapanır, bağlantı sürer.
     private boolean sleeping;
-    private boolean surfaceReady;
-    private boolean resumed;
+    private boolean started, resumed;
+    private boolean connected;
+    private boolean closing;          // kullanıcı "Bağlantıyı kes" dedi: hizmet yeniden başlatılmaz
     private android.os.PowerManager.WakeLock sleepLock; // ekran kapalıyken işlemci + ağ ayakta
 
     private final Runnable tick = new Runnable() {
@@ -53,14 +49,36 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Se
         public void run() {
             // Katman gizliyken hiçbir şey yapma (ağ arayüzü taraması, metin düzeni, günlük)
             boolean welcome = info.welcomeVisible(), card = info.statsVisible() && !sleeping;
-            if (welcome || card) {
-                Stats.Snapshot snap = stats.snapshot();
+            EkranService s = service;
+            if (s != null && (welcome || card)) {
+                Stats.Snapshot snap = s.stats.snapshot();
                 info.update(snap, welcome ? localAddresses() : null);
                 if (card) {
                     Log.i("EkranStats", snap.logLine());
                 }
             }
             handler.postDelayed(this, 1000);
+        }
+    };
+
+    // Hizmetin onCreate'i ana iş parçacığında bizden sonra çalışır: hazır olana dek bekle
+    private final Runnable attachService = new Runnable() {
+        @Override
+        public void run() {
+            EkranService s = EkranService.get();
+            if (s == null) {
+                handler.postDelayed(this, 20);
+                return;
+            }
+            service = s;
+            s.setUiVisible(started);
+            if (surfaceW > 0) {
+                s.setSurfaceSize(surfaceW, surfaceH);
+            }
+            s.setSurface(surface);
+            s.attach(MainActivity.this);
+            handler.removeCallbacks(tick);
+            handler.post(tick);
         }
     };
 
@@ -80,7 +98,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Se
         FrameLayout.LayoutParams full = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
 
-        surfaceView = new SurfaceView(this);
+        SurfaceView surfaceView = new SurfaceView(this);
         surfaceView.getHolder().addCallback(this);
         surfaceView.setOnTouchListener(new View.OnTouchListener() {
             @Override
@@ -94,33 +112,47 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Se
         cursorView = new CursorView(this);
         root.addView(cursorView, full);
 
-        String androidId = android.provider.Settings.Secure.getString(getContentResolver(),
-                android.provider.Settings.Secure.ANDROID_ID);
-        deviceId = androidId != null ? androidId : Build.SERIAL;
-        pairStore = new PairStore(this);
-
         String version = "?";
         try {
             version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (PackageManager.NameNotFoundException ignored) {
         }
+        final PairStore pairs = new PairStore(this);
         info = new InfoLayer(this, Build.MANUFACTURER + " " + Build.MODEL, version, new InfoLayer.Actions() {
             @Override
             public int pairCount() {
-                return pairStore.count();
+                return pairs.count();
             }
 
             @Override
             public void forgetPairs() {
-                pairStore.forgetAll();
+                pairs.forgetAll();
+            }
+
+            @Override
+            public boolean autoOpen() {
+                return AutoStart.enabled(MainActivity.this);
+            }
+
+            @Override
+            public void setAutoOpen(boolean on) {
+                AutoStart.setEnabled(MainActivity.this, on);
+            }
+
+            @Override
+            public void disconnect() {
+                // Kullanıcı bitirdi: PC kablo takılı kaldıkça uygulamayı yeniden açmasın
+                closing = true;
+                EkranService s = service;
+                if (s != null) {
+                    s.disconnect();
+                }
+                finish();
             }
         });
         root.addView(info, full);
-
         setContentView(root);
 
-        discovery = new DiscoveryResponder(Build.MANUFACTURER + " " + Build.MODEL, deviceId);
-        discovery.start();
         orientationWatcher = new OrientationWatcher(this, handler, new OrientationWatcher.Listener() {
             @Override
             public void onOrientation(int degrees) {
@@ -128,6 +160,10 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Se
                 sendOrientation(degrees);
             }
         });
+
+        // Kullanıcı uygulamayı kendisi açtı: "bağlantıyı kestim, yeniden açma" bekletmesi biter
+        AutoStart.clearHold(this);
+        EkranService.headless = getIntent().getBooleanExtra("yuzeysiz", false);
 
         if (getIntent().getBooleanExtra("sifre-olcum", false)) {
             new Thread(new Runnable() {
@@ -142,10 +178,21 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Se
         root.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE);
     }
 
+    /** Hizmeti başlat (zaten çalışıyorsa yalnızca bağlan). */
+    private void connectService() {
+        startService(new Intent(this, EkranService.class));
+        handler.removeCallbacks(attachService);
+        handler.post(attachService);
+    }
+
+    private Session session() {
+        EkranService s = service;
+        return s != null ? s.session() : null;
+    }
+
     private void onTouchEvent(View v, MotionEvent e) {
         int action = e.getActionMasked();
-        StreamServer srv = server;
-        Session ses = srv != null ? srv.session() : null;
+        Session ses = session();
         Session.Config c = config;
         // Üç parmak: ölçüm kartını aç/kapat. PC'deki yarım kalan dokunmalar iptal edilir ve
         // tüm parmaklar kalkana kadar hiçbir şey gönderilmez.
@@ -204,16 +251,26 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Se
     }
 
     private void sendOrientation(int degrees) {
-        StreamServer srv = server;
-        Session ses = srv != null ? srv.session() : null;
+        Session ses = session();
         if (ses != null) {
             ses.sendOrientation(degrees);
         }
     }
 
     @Override
-    protected void onNewIntent(android.content.Intent intent) {
+    public void onBackPressed() {
+        // Bağlıyken Geri de uygulamayı alta alır (bağlantı sürer); kesmek için bildirimdeki "Bağlantıyı kes"
+        if (connected) {
+            moveTaskToBack(true);
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        AutoStart.clearHold(this);
         // Tanı: `am start ... --ei yon 90` tableti çevirmeden dikey monitörü dener
         if (intent.hasExtra("yon")) {
             int deg = intent.getIntExtra("yon", 0);
@@ -228,8 +285,8 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Se
 
     /** Windows ekranları kapattı: kararıp ekranın kapanmasına izin ver; bağlantı ve ağ ayakta kalır. */
     private void enterSleep() {
-        if (sleeping) {
-            return;
+        if (sleeping || !resumed) {
+            return; // arka plandayken tablette başka bir uygulama kullanılıyor: ekrana dokunma
         }
         sleeping = true;
         info.setSleeping(true);
@@ -268,55 +325,43 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Se
         if (sleepLock != null) {
             sleepLock.release();
         }
-        if (!wake && !resumed && wifiLock != null) {
-            wifiLock.release(); // uykuda tutulmuştu
-        }
-        if (!surfaceReady && !wake && server != null) {
-            server.shutdown(); // ekran kapalı ve bağlantı yok: eskisi gibi, açılınca yeniden başlar
-            server = null;
-        }
         Log.i("EkranUyku", wake ? "Bilgisayar ekranı açtı" : "Uyku bitti (bağlantı yok)");
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        started = true;
+        EkranService s = service;
+        if (s != null) {
+            s.setUiVisible(true);
+        } else {
+            connectService();
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        started = false;
+        EkranService s = service;
+        if (s != null) {
+            s.setUiVisible(false); // bağlantı yoksa hizmet kapanır (onServiceGone)
+        }
+        super.onStop();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         resumed = true;
-        if (!sleeping) {
+        EkranService s = service;
+        if (s != null && connected && !s.pcDisplayOn()) {
+            enterSleep(); // arkadayken Windows ekranı kapatmıştı
+        } else if (!sleeping) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         orientationWatcher.setActive(true);
         handler.post(tick);
-        // Wi-Fi güç tasarrufu radyoyu aralıklı uyutur (ping ~100 ms); ekran olarak çalışırken kapat.
-        if (wifiLock == null) {
-            WifiManager wm = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
-            if (wm != null) {
-                wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ekran");
-                wifiLock.setReferenceCounted(false);
-            }
-        }
-        if (wifiLock != null) {
-            wifiLock.acquire();
-        }
-        // Bazı cihazlar Wi-Fi sürücüsünde yayın paketlerini süzer; bulunabilmek için izin iste.
-        if (broadcastLock == null) {
-            WifiManager wm = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
-            if (wm != null) {
-                broadcastLock = wm.createMulticastLock("ekran");
-                broadcastLock.setReferenceCounted(false);
-            }
-        }
-        if (broadcastLock != null) {
-            broadcastLock.acquire();
-        }
-    }
-
-    @Override
-    protected void onDestroy() {
-        if (discovery != null) {
-            discovery.shutdown();
-        }
-        super.onDestroy();
     }
 
     @Override
@@ -324,70 +369,59 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Se
         resumed = false;
         orientationWatcher.setActive(false);
         handler.removeCallbacks(tick);
-        // Uykuda Wi-Fi bağlantısı sürmeli (Windows ekranı açınca tablet de uyansın)
-        if (wifiLock != null && !sleeping) {
-            wifiLock.release();
-        }
-        if (broadcastLock != null) {
-            broadcastLock.release();
-        }
         super.onPause();
     }
 
     @Override
-    public void surfaceCreated(SurfaceHolder holder) {
-        surfaceReady = true;
-        if (server != null) {
-            server.setSurface(holder.getSurface()); // uykudan dönüş: bağlantı kopmadan görüntü sürer
-            return;
+    protected void onDestroy() {
+        handler.removeCallbacks(attachService);
+        handler.removeCallbacks(tick);
+        EkranService s = service;
+        if (s != null) {
+            s.detach(this);
         }
-        // Tanı modu: `am start ... --ez yuzeysiz true` ile çözücü yüzeye çizmeden çalışır.
-        boolean noSurface = getIntent().getBooleanExtra("yuzeysiz", false);
-        server = new StreamServer(noSurface ? null : holder.getSurface(), stats, this);
-        server.start();
+        if (sleepLock != null) {
+            sleepLock.release();
+        }
+        super.onDestroy();
+    }
+
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        surface = holder.getSurface();
+        EkranService s = service;
+        if (s != null) {
+            s.setSurface(surface); // uygulama öne geldi / ekran açıldı: görüntü kaldığı yerden sürer
+        }
     }
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
         surfaceW = width;
         surfaceH = height;
-        stats.setSurface(width, height);
+        EkranService s = service;
+        if (s != null) {
+            s.setSurfaceSize(width, height);
+        }
     }
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
-        surfaceReady = false;
-        if (server == null) {
-            return;
-        }
-        if (sleeping) {
-            server.setSurface(null); // Windows ekranı kapalı: bağlantı sürer, çözücü bırakılır
-        } else {
-            server.shutdown(); // uygulamadan çıkıldı
-            server = null;
+        surface = null;
+        EkranService s = service;
+        if (s != null) {
+            s.setSurface(null); // arka plana alındı ya da ekran kapandı: bağlantı sürer, çözücü bırakılır
         }
     }
 
-    // --- Session.Host (ağ iş parçacığından çağrılır) ---
+    // --- EkranService.Ui ---
 
     @Override
-    public int surfaceWidth() {
-        return surfaceW;
-    }
-
-    @Override
-    public int surfaceHeight() {
-        return surfaceH;
-    }
-
-    @Override
-    public void displayInfo(Point realSize, DisplayMetrics metrics) {
-        Display d = getWindowManager().getDefaultDisplay();
-        d.getMetrics(metrics);
-        if (Build.VERSION.SDK_INT >= 17) {
-            d.getRealSize(realSize);
-        } else {
-            realSize.set(metrics.widthPixels, metrics.heightPixels);
+    public void onServiceGone() {
+        // Ana iş parçacığı (hizmetin onDestroy'u). Bu arada uygulama öne geldiyse hizmeti yeniden başlat.
+        service = null;
+        if (started && !closing) {
+            connectService();
         }
     }
 
@@ -403,7 +437,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Se
     }
 
     @Override
-    public void onCursorShape(final int w, final int h, int hotX, int hotY, final int[] argb) {
+    public void onCursorShape(final int w, final int h, final int[] argb) {
         handler.post(new Runnable() {
             @Override
             public void run() {
@@ -420,16 +454,6 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Se
                 cursorView.setPosition(x, y, visible);
             }
         });
-    }
-
-    @Override
-    public String deviceId() {
-        return deviceId;
-    }
-
-    @Override
-    public PairStore pairStore() {
-        return pairStore;
     }
 
     @Override
@@ -496,15 +520,11 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Se
     }
 
     @Override
-    public void onSessionActive(final boolean active, final boolean encrypted) {
-        if (active) {
-            stats.setStatus(Stats.CONNECTED, encrypted ? "Bağlı · Wi-Fi, şifreli" : "Bağlı · USB");
-        } else {
-            stats.setStatus(Stats.WAITING, "Bilgisayar bekleniyor");
-        }
+    public void onSessionActive(final boolean active) {
         handler.post(new Runnable() {
             @Override
             public void run() {
+                connected = active;
                 if (!active) {
                     config = null;
                     cursorView.clear();

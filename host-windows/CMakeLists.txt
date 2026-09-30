@@ -23,6 +23,7 @@ add_library(ekran_core STATIC
   src/apkserver.cpp
   src/virtual_display.cpp
   src/display_power.cpp
+  src/usb_watch.cpp
   src/desktop.cpp
   src/config.cpp
   src/pair_prompt.cpp
@@ -34,7 +35,7 @@ target_compile_definitions(ekran_core PUBLIC
   WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE
   _WIN32_WINNT=0x0A00 WINVER=0x0A00 NTDDI_VERSION=0x0A000006)
 target_link_libraries(ekran_core PUBLIC
-  d3d11 dxgi mfplat mfuuid mf ole32 oleaut32 ws2_32 iphlpapi user32 bcrypt advapi32 setupapi psapi shell32)
+  d3d11 dxgi mfplat mfuuid mf ole32 oleaut32 ws2_32 iphlpapi user32 bcrypt advapi32 setupapi psapi shell32 cfgmgr32)
 
 # ekran-host.exe: konsol (geliştirme / tanı)
 add_executable(ekran-host src/main.cpp)
