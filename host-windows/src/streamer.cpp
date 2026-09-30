@@ -269,9 +269,29 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
             if (!gpuOk) Sleep(100);
         }
     }
-    if (W <= 0 || H <= 0 || !gpuOk ||
-        !scaler.init(gpu.device.get(), gpu.context.get(), cap.desk(), cap.width(), cap.height(), W, H) ||
-        !makeNv12Pool(gpu.device.get(), W, H, pool)) {
+    // Tablete giden görüntünün yönü ve boyutu. Yakalanan görüntü panel yönündedir (orientation.h):
+    //  - ikinci ekran: olduğu gibi gider (döndürme tabletin tutuluşundan; tablet paneli de öyle döner)
+    //  - yansıtma: PC monitörü dik kullanılıyorsa video işlemcide düzeltilir, tablette dik görünür
+    Orientation sent;
+    int srcW = 0, srcH = 0;
+    auto initScaler = [&] {
+        const Orientation& o = cap.orientation();
+        scaler = Scaler();
+        if (!scaler.init(gpu.device.get(), gpu.context.get(), cap.desk(), cap.width(), cap.height(), W, H,
+                         target.empty() ? o.rotation : 0))
+            return false;
+        if (scaler.rotated()) {
+            sent = Orientation{0, o.deskW, o.deskH};
+            srcW = o.deskW;
+            srcH = o.deskH;
+        } else {
+            sent = o;
+            srcW = cap.width();
+            srcH = cap.height();
+        }
+        return true;
+    };
+    if (W <= 0 || H <= 0 || !gpuOk || !initScaler() || !makeNv12Pool(gpu.device.get(), W, H, pool)) {
         detach();
         return false;
     }
@@ -283,8 +303,8 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
         w.u16(uint16_t(W));
         w.u16(uint16_t(H));
         w.u8(1);  // H.264
-        w.u16(uint16_t(cap.width()));
-        w.u16(uint16_t(cap.height()));
+        w.u16(uint16_t(srcW));
+        w.u16(uint16_t(srcH));
         w.u16(uint16_t(content.left));
         w.u16(uint16_t(content.top));
         w.u16(uint16_t(content.right - content.left));
@@ -294,7 +314,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
     sendConfig();
 
     TouchInjector touch(opt_.touchAsMouse ? TouchInjector::Mode::Mouse : TouchInjector::Mode::Touch);
-    touch.setMapping(gpu.desktopRect, content, cap.width(), cap.height(), cap.orientation());
+    touch.setMapping(gpu.desktopRect, content, srcW, srcH, sent);
 
     Stats stats;
     std::atomic<int> inFlight{0};
@@ -423,7 +443,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
         if (res == DesktopCapture::Result::Lost || res == DesktopCapture::Result::Error) {
             // UAC / kilit ekranı / çözünürlük, yön ya da yerleşim değişimi: yakalamayı yeniden kur.
             // Akış boyutu aynı kalır; yalnızca yerleşim ve eşleme tazelenir, bağlantı kopmaz.
-            const int w0 = cap.width(), h0 = cap.height(), r0 = cap.orientation().rotation;
+            const int w0 = srcW, h0 = srcH, r0 = sent.rotation;
             // Ajan: kilit ekranı / UAC / oturum açma ayrı masaüstü; yakalama oraya geçerek sürer
             while (!stop_ && conn.alive()) {
                 followInputDesktop();
@@ -431,13 +451,12 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
                 Sleep(250);
             }
             if (stop_ || !conn.alive()) break;
-            scaler = Scaler();
-            if (!scaler.init(gpu.device.get(), gpu.context.get(), cap.desk(), cap.width(), cap.height(), W, H)) break;
+            if (!initScaler()) break;
             content = scaler.content();
-            if (cap.width() != w0 || cap.height() != h0) sendConfig();
-            touch.setMapping(gpu.desktopRect, content, cap.width(), cap.height(), cap.orientation());
-            if (cap.orientation().rotation != r0) {
-                logf("Yön: %d°", cap.orientation().rotation);
+            if (srcW != w0 || srcH != h0) sendConfig();
+            touch.setMapping(gpu.desktopRect, content, srcW, srcH, sent);
+            if (sent.rotation != r0 || srcW != w0) {
+                logf("Yön: %d°%s", cap.orientation().rotation, scaler.rotated() ? " (görüntü düzeltildi)" : "");
                 // İmleç yeni yöne çevrilerek yeniden gönderilir (henüz resim gelmediyse yalnızca konum)
                 cursor.shapeChanged = cursor.w > 0 && cursor.h > 0;
                 cursor.posChanged = true;
@@ -451,7 +470,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
         }
 
         // İmleç masaüstü yönünde gelir; tablete yakalanan görüntünün (panel) yönünde gönderilir.
-        const Orientation& orient = cap.orientation();
+        const Orientation& orient = sent;
         if (cursor.shapeChanged && (cursor.w <= 0 || cursor.h <= 0)) cursor.shapeChanged = false;
         if (cursor.shapeChanged) {
             int w = cursor.w, h = cursor.h, hx = cursor.hotX, hy = cursor.hotY;

@@ -3,7 +3,7 @@
 namespace ekran {
 
 bool Scaler::init(ID3D11Device* device, ID3D11DeviceContext* context, ID3D11Texture2D* src, int srcW, int srcH,
-                  int dstW, int dstH) {
+                  int dstW, int dstH, int rotation) {
     if (!check(device->QueryInterface(__uuidof(ID3D11VideoDevice), reinterpret_cast<void**>(vdev_.put())),
                "ID3D11VideoDevice"))
         return false;
@@ -26,10 +26,22 @@ bool Scaler::init(ID3D11Device* device, ID3D11DeviceContext* context, ID3D11Text
     if (!check(vdev_->CreateVideoProcessorInputView(src, enum_.get(), &ivd, inView_.put()), "VP giriş görünümü"))
         return false;
 
-    // Oranı koru (letterbox). NV12 için çift koordinat.
+    rotated_ = false;
+    if (rotation != 0) {
+        D3D11_VIDEO_PROCESSOR_CAPS caps{};
+        if (SUCCEEDED(enum_->GetVideoProcessorCaps(&caps)) &&
+            (caps.FeatureCaps & D3D11_VIDEO_PROCESSOR_FEATURE_CAPS_ROTATION)) {
+            vctx_->VideoProcessorSetStreamRotation(vp_.get(), 0, TRUE,
+                                                   D3D11_VIDEO_PROCESSOR_ROTATION((rotation / 90) & 3));
+            rotated_ = true;
+        }
+    }
+    // Oranı koru (letterbox): çevrildiyse çevrilmiş boyuta göre. NV12 için çift koordinat.
+    const bool swap = rotated_ && (rotation == 90 || rotation == 270);
+    const int sw = swap ? srcH : srcW, sh = swap ? srcW : srcH;
     int w = dstW, h = dstH;
-    if (int64_t(srcW) * dstH > int64_t(dstW) * srcH) h = int(int64_t(dstW) * srcH / srcW);
-    else w = int(int64_t(dstH) * srcW / srcH);
+    if (int64_t(sw) * dstH > int64_t(dstW) * sh) h = int(int64_t(dstW) * sh / sw);
+    else w = int(int64_t(dstH) * sw / sh);
     w &= ~1;
     h &= ~1;
     content_.left = ((dstW - w) / 2) & ~1;

@@ -130,8 +130,8 @@ MSVC + WDK ile derlenip yerel sertifikayla imzalanıyor.
       en yavaş hızda (200 ms) açılır. Yön/çözünürlük/yerleşim değişiminde bağlantı artık kopmaz.
 - [x] Tablet bilgi katmanı yenilendi (karşılama ekranı, ölçüm kartı, eşleştirme onayı) ve tabletin tutuluşuna göre
       döner; Android iletişim kutuları çevrilemediği için eşleştirme ve "eşleşmeleri unut" onayı da bu katmanda
-- [ ] Yansıtmada dikey çevrilmiş PC monitörü tablette yan görünür (dokunma ve imleç doğru); video işlemcide
-      döndürmeyle düzeltilebilir
+- [x] Yansıtmada dikey çevrilmiş PC monitörü video işlemcide düz çevrilir (desteklemeyen kartta yan kalır;
+      dokunma ve imleç her iki durumda doğru)
 - [ ] Görüntüyü DXGI yakalama yerine doğrudan sürücüden almak (bir kopya daha az, oturum açma ekranı)
 - [ ] Dağıtım imzası (SignPath Foundation veya EV + Microsoft) — şu an sürücü yalnızca derlendiği bilgisayarda kurulabiliyor
 
