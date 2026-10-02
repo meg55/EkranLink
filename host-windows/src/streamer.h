@@ -41,6 +41,8 @@ struct StreamerEvents {
     std::function<bool(const std::string& device, const std::string& code, HANDLE cancel)> onPairRequest;
     // Saniyelik ölçüm satırı
     std::function<void(const std::string& line)> onStats;
+    // Kullanıcının bir şey yapması gereken durum (ör. tablette uygulama yok); bildirim olarak gösterilir
+    std::function<void(const std::string& title, const std::string& text)> onNotice;
 };
 
 class Streamer {
@@ -61,6 +63,7 @@ private:
     // Tablete bağlanıp oturum bitene kadar yayın yapar. El sıkışma başarılıysa true.
     bool runSession(const std::string& host, const std::string& link, const std::wstring& adbPath = {});
     void sleepInterruptible(int ms);
+    void notice(const std::string& title, const std::string& text);
 
     Options opt_;
     StreamerEvents ev_;
@@ -71,8 +74,12 @@ private:
     HANDLE wake_;
     // Eşleştirmesi reddedilen tabletlere bir süre tekrar sorma (cihaz kimliği → µs)
     std::map<std::string, int64_t> rejectedUntil_;
-    DisplayPower displayPower_;
-    std::atomic<int64_t> manualUntilUs_{0};  // "Şimdi bağlan" süresi  // Windows ekranı kapatınca tablet de kapansın
+    DisplayPower displayPower_;  // Windows ekranı kapatınca tablet de kapansın
+    std::atomic<int64_t> manualUntilUs_{0};  // "Şimdi bağlan" süresi
+    std::string lastNotice_;
+    std::string incompatibleHost_;  // sürümü uyuşmayan tablet (adres) ve yeniden deneme zamanı
+    int64_t incompatibleUntilUs_ = 0;
+    int64_t lastNoticeUs_ = 0;
 };
 
 }  // namespace ekran

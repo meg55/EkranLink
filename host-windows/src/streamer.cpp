@@ -101,6 +101,16 @@ void Streamer::setMode(LinkMode m) {
     if (conn_) conn_->close();
 }
 
+void Streamer::notice(const std::string& title, const std::string& text) {
+    // Bağlantı birkaç saniyede bir yeniden denenir: aynı uyarı 10 dakikada bir
+    const int64_t now = nowUs();
+    if (text == lastNotice_ && now < lastNoticeUs_ + 600'000'000) return;
+    lastNotice_ = text;
+    lastNoticeUs_ = now;
+    logf("%s: %s", title.c_str(), text.c_str());
+    if (ev_.onNotice) ev_.onNotice(title, text);
+}
+
 void Streamer::sleepInterruptible(int ms) { WaitForSingleObject(wake_, DWORD(ms)); }
 
 void Streamer::connectNow() {
@@ -112,7 +122,7 @@ void Streamer::run() {
     if (!displayPower_.start()) logf("Ekran güç bildirimi alınamıyor; uyku eşitleme kapalı");
     UsbWatch usb;
     std::wstring adbPath;
-    std::string prepared;  // uygulama kurulumu denetlenmiş aygıt (her takılışta bir kez)
+    std::string prepared;  // uygulaması bulunup port yönlendirilmiş aygıt (her takılışta bir kez)
     int64_t nextAdbLookupUs = 0, nextUsbPollUs = 0, usbBurstUntilUs = 0;
     bool warnedNoAdb = false, declinedLogged = false, manualLogged = false;
 
@@ -146,7 +156,11 @@ void Streamer::run() {
                 if (dev.empty()) {
                     prepared.clear();
                     declinedLogged = false;
-                } else if (!adb::prepareUsb(adbPath, proto::kPort, dev != prepared)) {
+                } else if (dev != prepared && adb::appState(adbPath) == adb::App::Missing) {
+                    notice("Tablette EKRAN uygulaması yok",
+                           "EKRAN'ın Android uygulamasını (APK) tablete indirip kurun. Kurulunca bağlantı kendiliğinden kurulur.");
+                    nextUsbPollUs = nowUs() + 10'000'000;  // kurulmasını bekle
+                } else if (!adb::prepareUsb(adbPath, proto::kPort)) {
                     nextUsbPollUs = nowUs() + 3'000'000;  // ör. tablette "USB hata ayıklamaya izin ver" bekleniyor
                 } else {
                     prepared = dev;
@@ -160,7 +174,8 @@ void Streamer::run() {
                         if (l == adb::Launch::Started) sleepInterruptible(1500);  // tablet sunucusunu açsın
                         tried = true;
                         connected = runSession("127.0.0.1", "USB", adbPath);
-                        nextUsbPollUs = 0;  // bağlantı bitince hemen yeniden bak
+                        // bağlantı bitince hemen yeniden bak; sürüm uyuşmuyorsa bir süre bekle
+                        nextUsbPollUs = incompatibleHost_ == "127.0.0.1" ? incompatibleUntilUs_ : 0;
                     }
                 }
             }
@@ -178,6 +193,7 @@ void Streamer::run() {
                     break;
                 }
             }
+            if (ip == incompatibleHost_ && nowUs() < incompatibleUntilUs_) ip.clear();
             if (!ip.empty()) {
                 tried = true;
                 connected = runSession(ip, "Wi-Fi " + ip);
@@ -208,6 +224,18 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
     if (!conn.connect(host, proto::kPort, 2000)) return false;
     if (!conn.handshake(usb, hooks, hello)) {
         if (conn.pairingRejected()) rejectedUntil_[conn.deviceId()] = nowUs() + 60'000'000;  // 1 dk sorma
+        if (conn.peerVersion()) {
+            // Tablet protokol sürümümüzü desteklemiyor: hangi tarafın güncelleneceğini söyle;
+            // güncellenene kadar 30 sn'de bir dene (USB'de tablet yeniden takılınca hemen)
+            incompatibleHost_ = host;
+            incompatibleUntilUs_ = nowUs() + 30'000'000;
+            const bool tabletOld = conn.peerVersion() < proto::kVersion;
+            notice(tabletOld ? "Tabletteki EKRAN eski" : "Bu bilgisayardaki EKRAN eski",
+                   tabletOld ? "Tablete EKRAN'ın Android uygulamasının yeni sürümünü (APK) kurun."
+                             : "Bilgisayara EKRAN'ın yeni sürümünü kurun (tablette " + conn.peerAppVersion() + " var).");
+            logf("Sürüm uyuşmuyor: tablet protokol %u (uygulama %s), PC %u", conn.peerVersion(),
+                 conn.peerAppVersion().c_str(), proto::kVersion);
+        }
         return false;
     }
     {

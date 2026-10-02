@@ -20,7 +20,6 @@ add_library(ekran_core STATIC
   src/input.cpp
   src/adb.cpp
   src/discovery.cpp
-  src/apkserver.cpp
   src/virtual_display.cpp
   src/display_power.cpp
   src/usb_watch.cpp

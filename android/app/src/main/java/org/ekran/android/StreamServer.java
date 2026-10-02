@@ -30,7 +30,8 @@ final class StreamServer extends Thread {
     private final Stats stats;
     private final Session.Host host;
     private volatile boolean stopped;
-    private ServerSocket serverSocket;
+    private boolean incompatible; // son bağlantı sürüm uyuşmazlığıyla bitti (yalnızca sunucu iş parçacığı)
+    private volatile ServerSocket serverSocket;
     private Socket client;
     private volatile Session session;
 
@@ -61,18 +62,37 @@ final class StreamServer extends Thread {
 
     @Override
     public void run() {
-        try {
-            serverSocket = new ServerSocket();
-            serverSocket.setReuseAddress(true);
-            serverSocket.bind(new InetSocketAddress(PORT));
-        } catch (IOException e) {
-            stats.setStatus(Stats.ERROR, "Port açılamadı: " + e.getMessage());
-            Log.e(TAG, "bind", e);
+        // Port başka bir uygulamadaysa (ya da eski süreç henüz kapanmadıysa) boşalana kadar dene
+        while (!stopped) {
+            try {
+                ServerSocket ss = new ServerSocket();
+                ss.setReuseAddress(true);
+                try {
+                    ss.bind(new InetSocketAddress(PORT));
+                } catch (IOException e) {
+                    closeQuietly(ss);
+                    throw e;
+                }
+                serverSocket = ss;
+                break;
+            } catch (IOException e) {
+                stats.setStatus(Stats.ERROR, "Port " + PORT + " başka bir uygulamada; o kapanınca bağlanılır");
+                Log.w(TAG, "bind", e);
+                try {
+                    Thread.sleep(3000);
+                } catch (InterruptedException ie) {
+                    return;
+                }
+            }
+        }
+        if (serverSocket == null) {
             return;
         }
 
         while (!stopped) {
-            stats.setStatus(Stats.WAITING, "Bilgisayar bekleniyor");
+            if (!incompatible) {
+                stats.setStatus(Stats.WAITING, "Bilgisayar bekleniyor");
+            }
             Socket s;
             try {
                 s = serverSocket.accept();
@@ -96,7 +116,9 @@ final class StreamServer extends Thread {
     private void handle(Socket s) {
         String peer = String.valueOf(s.getRemoteSocketAddress());
         stats.resetSession();
-        stats.setStatus(Stats.CONNECTING, "Bağlanıyor…");
+        if (!incompatible) {
+            stats.setStatus(Stats.CONNECTING, "Bağlanıyor…");
+        }
         Log.i(TAG, "Bağlandı: " + peer);
         try {
             s.setTcpNoDelay(true);
@@ -117,11 +139,17 @@ final class StreamServer extends Thread {
                 if (now != sf && now != null) {
                     ses.resumeVideo(now); // bu arada ekran açıldı
                 }
+                incompatible = false;
                 ses.run();
             } else {
                 runRaw(new SequenceInputStream(new ByteArrayInputStream(head), in));
             }
+        } catch (Session.IncompatibleException e) {
+            // PC birkaç saniyede bir yeniden dener: uyarı ekranda kalsın
+            incompatible = true;
+            stats.setStatus(Stats.ERROR, e.getMessage());
         } catch (Exception e) {
+            incompatible = false;
             if (!stopped) {
                 Log.w(TAG, "Akış hatası", e);
                 stats.setStatus(Stats.ERROR, "Bağlantı koptu");
@@ -158,6 +186,7 @@ final class StreamServer extends Thread {
         synchronized (this) {
             closeQuietly(client);
         }
+        interrupt(); // port beklerken uyuyorsa
         try {
             join(1000);
         } catch (InterruptedException ignored) {

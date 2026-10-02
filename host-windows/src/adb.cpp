@@ -28,37 +28,13 @@ std::wstring exeDir() {
     return s.substr(0, s.find_last_of(L'\\'));
 }
 
-// ekran-android.version: paketleme betiğinin yazdığı versionCode
-int bundledVersion() {
-    FILE* f = _wfopen((exeDir() + L"\\ekran-android.version").c_str(), L"r");
-    if (!f) return 0;
-    int v = 0;
-    if (std::fscanf(f, "%d", &v) != 1) v = 0;
-    std::fclose(f);
-    return v;
-}
-
-// Tabletteki EKRAN sürümü; kurulu değilse -1
-int installedVersion(const std::wstring& adbPath) {
-    std::string out;
-    if (!run(adbPath, L"shell pm list packages org.ekran.android", &out) ||
-        out.find("package:org.ekran.android") == std::string::npos)
-        return -1;
-    if (!run(adbPath, L"shell dumpsys package org.ekran.android", &out)) return 0;
-    size_t p = out.find("versionCode=");
-    return p == std::string::npos ? -1 : std::atoi(out.c_str() + p + 12);
-}
-
 }  // namespace
 
-// Paketle gelen APK (dağıtım) ya da geliştirme derlemesi
-std::wstring bundledApk() {
-    const std::wstring dir = exeDir();
-    for (const wchar_t* rel : {L"\\ekran-android.apk", L"\\..\\..\\android\\app\\build\\outputs\\apk\\debug\\app-debug.apk"}) {
-        std::wstring p = dir + rel;
-        if (exists(p)) return p;
-    }
-    return {};
+App appState(const std::wstring& adbPath) {
+    // adb başarısızsa (ör. tablette "USB hata ayıklamaya izin ver" bekleniyor) bilinmiyor
+    std::string out;
+    if (!run(adbPath, L"shell pm list packages org.ekran.android", &out)) return App::Unknown;
+    return out.find("package:org.ekran.android") != std::string::npos ? App::Installed : App::Missing;
 }
 
 std::wstring find() {
@@ -133,28 +109,13 @@ void screenOff(const std::wstring& adbPath, int sdk) {
         run(adbPath, L"shell input keyevent 26");
 }
 
-bool prepareUsb(const std::wstring& adbPath, unsigned port, bool checkInstall) {
+bool prepareUsb(const std::wstring& adbPath, unsigned port) {
     std::string out;
     wchar_t fwd[64];
     swprintf(fwd, 64, L"forward tcp:%u tcp:%u", port, port);
     if (!run(adbPath, fwd, &out)) {
         logf("USB: adb forward başarısız: %s", out.c_str());
         return false;
-    }
-    if (!checkInstall) return true;
-    // Uygulama yoksa veya paketteki sürümden eskiyse kur (USB hata ayıklama açık olduğu için onay gerekmez).
-    const std::wstring apk = bundledApk();
-    if (!apk.empty()) {
-        const int have = installedVersion(adbPath), want = bundledVersion();
-        if (have < 0 || (want > 0 && have < want)) {
-            logf("USB: tablete EKRAN %s…", have < 0 ? "kuruluyor" : "güncelleniyor");
-            if (run(adbPath, L"install -r \"" + apk + L"\"", &out, 120000) && out.find("Success") != std::string::npos) {
-                logf("USB: kurulum tamam");
-            } else {
-                // Farklı imzalı eski sürüm varsa (INSTALL_FAILED_UPDATE_INCOMPATIBLE) kullanıcı kaldırmalı.
-                logf("USB: kurulum başarısız: %s", out.c_str());
-            }
-        }
     }
     return true;
 }

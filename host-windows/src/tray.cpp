@@ -14,8 +14,6 @@
 #include <thread>
 #include <vector>
 
-#include "adb.h"
-#include "apkserver.h"
 #include "config.h"
 #include "log.h"
 #include "pair_prompt.h"
@@ -31,6 +29,7 @@ namespace {
 constexpr UINT WM_TRAY = WM_APP + 1;
 constexpr UINT WM_STATE = WM_APP + 2;   // lParam: StateMsg*
 constexpr UINT WM_STATS = WM_APP + 3;   // lParam: std::string*
+constexpr UINT WM_NOTICE = WM_APP + 4;  // lParam: Notice*
 constexpr UINT kTrayId = 1;
 
 enum MenuId : UINT {
@@ -40,7 +39,6 @@ enum MenuId : UINT {
     kMenuAutostart,
     kMenuLog,
     kMenuForget,
-    kMenuInstall,
     kMenuExtend,
     kMenuOnly,
     kMenuMirror,
@@ -57,6 +55,10 @@ enum MenuId : UINT {
 
 const wchar_t* kRunKey = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 
+struct Notice {
+    std::wstring title, text;
+};
+
 struct StateMsg {
     bool connected;
     std::string device, link;
@@ -71,7 +73,6 @@ std::thread g_worker;
 bool g_connected = false;
 std::wstring g_device, g_link, g_stats;
 std::wstring g_logPath;
-ApkServer g_apkServer;
 // Hizmet kuruluysa yayını hizmet (ajan) yapar; tepsi yalnızca arayüzdür: ayarları HKLM'e yazar,
 // durumu oradan okur. Değilse yayını tepsi kendisi yapar (ayarlar HKCU).
 bool g_serviceMode = false;
@@ -170,12 +171,12 @@ void updateTray() {
     Shell_NotifyIconW(NIM_MODIFY, &g_nid);
 }
 
-void notify(const std::wstring& title, const std::wstring& text) {
+void notify(const std::wstring& title, const std::wstring& text, DWORD icon = NIIF_INFO) {
     NOTIFYICONDATAW n = g_nid;
     n.uFlags = NIF_INFO;
     wcsncpy(n.szInfoTitle, title.c_str(), ARRAYSIZE(n.szInfoTitle) - 1);
     wcsncpy(n.szInfo, text.c_str(), ARRAYSIZE(n.szInfo) - 1);
-    n.dwInfoFlags = NIIF_INFO | NIIF_NOSOUND;
+    n.dwInfoFlags = icon | NIIF_NOSOUND;
     Shell_NotifyIconW(NIM_MODIFY, &n);
 }
 
@@ -188,8 +189,14 @@ void startStatusWatcher() {
         HANDLE ev = CreateEventW(nullptr, FALSE, FALSE, nullptr);
         bool last = false;
         bool first = true;
+        DWORD lastNotice = config::noticeId();  // açılıştan önceki uyarılar gösterilmez
         for (;;) {
             RegNotifyChangeKeyValue(k, FALSE, REG_NOTIFY_CHANGE_LAST_SET, ev, TRUE);
+            if (config::noticeId() != lastNotice) {
+                auto* n = new Notice;
+                lastNotice = config::readNotice(n->title, n->text);
+                PostMessageW(g_wnd, WM_NOTICE, 0, reinterpret_cast<LPARAM>(n));
+            }
             bool c = false;
             std::wstring dev, link;
             if (config::readStatus(c, dev, link) && (first || c != last)) {
@@ -232,6 +239,9 @@ void startStreamer() {
         return askPairing(widen(device), widen(code), cancel);
     };    ev.onStats = [](const std::string& line) {
         PostMessageW(g_wnd, WM_STATS, 0, reinterpret_cast<LPARAM>(new std::string(line)));
+    };
+    ev.onNotice = [](const std::string& title, const std::string& text) {
+        PostMessageW(g_wnd, WM_NOTICE, 0, reinterpret_cast<LPARAM>(new Notice{widen(title), widen(text)}));
     };
     g_streamer = std::make_unique<Streamer>(g_opt, ev);
     g_worker = std::thread([] {
@@ -326,7 +336,6 @@ void showMenu() {
     AppendMenuW(perf, MF_STRING, kMenuLowLatency, L"Düşük gecikme (tablet daha çok çalışır)");
     CheckMenuRadioItem(perf, kMenuBalanced, kMenuLowLatency, g_opt.lowLatency ? kMenuLowLatency : kMenuBalanced, MF_BYCOMMAND);
     AppendMenuW(m, MF_POPUP, reinterpret_cast<UINT_PTR>(perf), L"Performans");
-    AppendMenuW(m, MF_STRING, kMenuInstall, L"Tablete uygulamayı kur…");
     AppendMenuW(m, MF_STRING | (autostartEnabled() ? MF_CHECKED : 0), kMenuAutostart, L"Windows ile başlat");
     {
         const bool stale = g_serviceMode && service::installedVersion() != config::kVersion;
@@ -367,24 +376,6 @@ void onCommand(UINT id) {
         case kMenuAutostart:
             setAutostart(!autostartEnabled());
             break;
-        case kMenuInstall: {
-            const std::wstring apk = adb::bundledApk();
-            if (apk.empty() || !g_apkServer.start(apk, ApkServer::kPort, 10)) {
-                MessageBoxW(nullptr, L"Uygulama dosyası (ekran-android.apk) bulunamadı ya da sunulamadı.\nGünlüğe bakın.",
-                            L"EKRAN", MB_OK | MB_ICONWARNING);
-                break;
-            }
-            std::wstring text =
-                L"1) Tableti bu bilgisayarla aynı Wi-Fi ağına bağlayın.\n"
-                L"2) Tablette tarayıcıyı açıp şu adrese gidin:\n\n";
-            for (const auto& u : g_apkServer.urls()) text += L"        " + widen(u) + L"\n";
-            text += L"\n3) Sayfadaki talimatla EKRAN'ı indirip kurun.\n\n"
-                    L"Sayfa 10 dakika açık kalır.\n"
-                    L"USB hata ayıklaması açık bir tableti USB ile takarsanız EKRAN kendiliğinden kurulur.";
-            // Pencere menü döngüsünü bekletmesin
-            std::thread([text] { MessageBoxW(nullptr, text.c_str(), L"EKRAN — tablete kur", MB_OK | MB_ICONINFORMATION); }).detach();
-            break;
-        }
         case kMenuExtend:
         case kMenuOnly:
         case kMenuMirror:
@@ -482,6 +473,11 @@ LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             notify(g_connected ? L"Tablet bağlandı" : L"Tablet ayrıldı", g_device + L" (" + g_link + L")");
             return 0;
         }
+        case WM_NOTICE: {
+            std::unique_ptr<Notice> n(reinterpret_cast<Notice*>(l));
+            notify(n->title, n->text, NIIF_WARNING);
+            return 0;
+        }
         case WM_STATS: {
             std::unique_ptr<std::string> s(reinterpret_cast<std::string*>(l));
             // Tepsi ipucu için kısa özet: "PC→çizim 21.5 ms · 7.3 Mbit/s"
@@ -565,7 +561,6 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
     }
 
     stopStreamer();
-    g_apkServer.stop();
     logf("EKRAN kapandı");
     WSACleanup();
     MFShutdown();

@@ -39,6 +39,10 @@ P→T  Mode      u8 eşleşmiş, u8 şifreli
 T→P  Hello ...
 ```
 
+Tablet PC'nin sürümünü desteklemiyorsa `TabletKey` yerine `Incompatible` (24) gönderir:
+`u16 tabletinSürümü, str uygulamaSürümü` (şifresiz çerçeve) ve bağlantıyı kapatır. İki taraf da
+kullanıcıya hangi uygulamanın güncelleneceğini söyler (PC tablete uygulama kurmaz; ikisi ayrı indirilir).
+
 - `ecdh*`: geçici ECDH P-256 açık anahtarı (`04 || X || Y`), her bağlantıda yenisi üretilir.
   Tablet gelen noktanın eğri üzerinde olduğunu doğrular; Windows CNG içe aktarırken doğrular.
 - `Z` = ECDH ortak sırrı (X koordinatı, 32 bayt, big-endian).
@@ -77,7 +81,7 @@ sonraki bağlantıda yeniden eşleştirme ister.
 | 12 | DisplayPower | P→T | `u8 açık` — Windows ekranları kapattı (0) / açtı (1). Tablet kararır ve ekranının kendi zaman aşımıyla kapanmasına izin verir; bağlantı sürer. Açılınca tablet ekranını yakar |
 | 13 | KeyRequest | T→P | (boş) — tablet çözücüsünü yeniden kurdu (yüzeyi yok olup geri geldi); PC anahtar kare gönderir ve onay sayacını sıfırlar |
 | 14 | VideoVisible | T→P | `u8 önde` — tablet uygulaması arka plana alındı (0) / öne geldi (1). Arkadayken PC yakalama ve kodlamayı durdurur, bağlantı sürer; öne gelince tablet `KeyRequest` gönderir. Arkadayken PC tablet ekranını kapatmaz |
-| 20–23 | PcHello, TabletKey, Mode, PairResult | | yukarıda |
+| 20–24 | PcHello, TabletKey, Mode, PairResult, Incompatible | | yukarıda |
 
 Tablet ilk 4 bayt `"EKRN"` değilse akışı ham H.264 Annex-B kabul eder (tanı modu, `tools/faz0.ps1`).
 

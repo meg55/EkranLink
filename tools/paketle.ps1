@@ -1,10 +1,11 @@
 ﻿<#
 .SYNOPSIS
-    Taşınabilir Windows paketi üretir: dist\EKRAN-<sürüm>-windows.zip
+    İki ayrı indirme üretir: dist\EKRAN-<sürüm>-windows.zip ve dist\EKRAN-<sürüm>-android.apk
 
 .DESCRIPTION
-    İçerik: ekran.exe (bildirim alanı), ekran-host.exe (konsol), ekran-android.apk (+ sürüm dosyası),
-    adb\ (Android SDK platform-tools'tan), BENIOKU.txt. Kurulum gerektirmez; zip'i açıp ekran.exe'yi çalıştırın.
+    Windows paketi: ekran.exe (bildirim alanı), ekran-host.exe (konsol), adb\ (Android SDK platform-tools'tan),
+    BENIOKU.txt. Kurulum gerektirmez; zip'i açıp ekran.exe'yi çalıştırın.
+    Tablet uygulaması pakette yok: PC tablete uygulama kurmaz, APK ayrıca indirilip tablete kurulur.
 
     Not: APK şimdilik hata ayıklama anahtarıyla imzalı. GitHub sürümleri için kalıcı bir sürüm anahtarı
     gerekecek (yoksa farklı makinede derlenen sürüm eskisinin üstüne kurulamaz).
@@ -19,6 +20,8 @@ $gradle = Get-Content (Join-Path $kok 'android\app\build.gradle') -Raw
 $versionCode = [regex]::Match($gradle, 'versionCode\s+(\d+)').Groups[1].Value
 $versionName = [regex]::Match($gradle, "versionName\s+'([^']+)'").Groups[1].Value
 Write-Host "EKRAN $versionName (Android versionCode $versionCode)" -ForegroundColor Cyan
+$kVersion = [regex]::Match((Get-Content (Join-Path $kok 'host-windows\src\config.h') -Raw), 'kVersion = L"([^"]+)"').Groups[1].Value
+if ($kVersion -ne $versionName) { throw "Sürümler farklı: build.gradle $versionName, config.h $kVersion" }
 
 # --- Android ---
 if (-not $env:JAVA_HOME) {
@@ -57,8 +60,6 @@ if (Test-Path $hedef) { Remove-Item -Recurse -Force $hedef }
 New-Item -ItemType Directory -Force (Join-Path $hedef 'adb') | Out-Null
 
 Copy-Item (Join-Path $hostBuild 'ekran.exe'), (Join-Path $hostBuild 'ekran-host.exe') $hedef
-Copy-Item $apk (Join-Path $hedef 'ekran-android.apk')
-Set-Content (Join-Path $hedef 'ekran-android.version') $versionCode -Encoding ascii -NoNewline
 foreach ($f in 'adb.exe', 'AdbWinApi.dll', 'AdbWinUsbApi.dll', 'NOTICE.txt') {
     Copy-Item (Join-Path $pt $f) (Join-Path $hedef 'adb')
 }
@@ -70,10 +71,11 @@ EKRAN $versionName — eski tabletleri bilgisayar ekranı yapın
 
 Kurulum gerekmez. ekran.exe'yi çalıştırın; saatin yanında bir monitör simgesi belirir.
 
-TABLETE UYGULAMAYI KURMAK
-  USB:   Tablette Geliştirici seçenekleri > USB hata ayıklama açıksa tableti takmanız yeterli;
-         EKRAN uygulamayı kendisi kurar ve açar.
-  Wi-Fi: Simgeye tıklayın > "Tablete uygulamayı kur…", çıkan adresi tabletin tarayıcısında açın.
+TABLET UYGULAMASI (ayrı indirilir)
+  Tablete EKRAN-$versionName-android.apk dosyasını kurun: tabletin tarayıcısıyla indirip açın ya da
+  USB ile tablete kopyalayıp dosya yöneticisinden açın. Tablet "bilinmeyen kaynaklardan yükleme"
+  izni isteyebilir. İki uygulamanın sürümü uyuşmazsa ikisi de hangisinin güncelleneceğini söyler.
+  USB ile bağlanmak için tablette Geliştirici seçenekleri > USB hata ayıklama açık olmalı.
 
 KULLANIM
   Tablette EKRAN açıkken bilgisayar tableti kendiliğinden bulur (önce USB, yoksa Wi-Fi).
@@ -105,3 +107,7 @@ $zip = Join-Path $dist "$ad.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }
 Compress-Archive -Path $hedef -DestinationPath $zip
 '{0}  ({1:N1} MB)' -f $zip, ((Get-Item $zip).Length / 1MB)
+
+$apkHedef = Join-Path $dist "EKRAN-$versionName-android.apk"
+Copy-Item -Force $apk $apkHedef
+'{0}  ({1:N1} MB)' -f $apkHedef, ((Get-Item $apkHedef).Length / 1MB)

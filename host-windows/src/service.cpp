@@ -354,6 +354,7 @@ int runAgent() {
         ev.onState = [](bool connected, const std::string& device, const std::string& link) {
             config::writeStatus(connected, device, link);
         };
+        ev.onNotice = [](const std::string& title, const std::string& text) { config::writeNotice(title, text); };
         ev.onPairRequest = [](const std::string& device, const std::string& code, HANDLE cancel) {
             // Oturum açılmadan (kilit ekranı) yeni tablet eşleştirilmez: kilit ekranı yabancıya gitmesin
             const std::wstring desk = inputDesktopName();
@@ -443,13 +444,11 @@ int install() {
     if (svc) stopAndWait(svc);
 
     // 1) Dosyalar: C:\Program Files\EKRAN (hizmet sabit bir yoldan çalışmalı; zip klasörü silinebilir)
-    const std::wstring dir = installDir(), src = dirOf(selfPath());
+    const std::wstring dir = installDir();
     CreateDirectoryW(dir.c_str(), nullptr);
     if (!copyFile(selfPath(), dir + L"\\ekran.exe")) return 2;
-    const std::wstring apk = adb::bundledApk();
-    if (!apk.empty()) copyFile(apk, dir + L"\\ekran-android.apk");
-    if (exists(src + L"\\ekran-android.version"))
-        copyFile(src + L"\\ekran-android.version", dir + L"\\ekran-android.version");
+    // Eski sürümün kopyaladığı tablet uygulaması: PC artık tablete uygulama kurmuyor
+    for (const wchar_t* f : {L"\\ekran-android.apk", L"\\ekran-android.version"}) DeleteFileW((dir + f).c_str());
     const std::wstring adbPath = adb::find();
     if (!adbPath.empty()) {
         CreateDirectoryW((dir + L"\\adb").c_str(), nullptr);

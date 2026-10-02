@@ -29,10 +29,10 @@ tools/          Geliştirme ve ölçüm betikleri
 
 1. `dist\EKRAN-<sürüm>-windows.zip` dosyasını açın, `ekran.exe`'yi çalıştırın (kurulum gerekmez).
    Saatin yanında bir monitör simgesi belirir.
-2. Tablete uygulamayı kurun:
-   - **USB:** Tablette *Geliştirici seçenekleri > USB hata ayıklama* açıksa tableti takmanız yeterli;
-     EKRAN uygulamayı kendisi kurar ve açar.
-   - **Wi-Fi:** Simge > *Tablete uygulamayı kur…*, çıkan adresi tabletin tarayıcısında açın.
+2. Tablet uygulaması ayrı indirilir: `EKRAN-<sürüm>-android.apk` dosyasını tablete kurun (tabletin
+   tarayıcısıyla indirip açın ya da USB ile kopyalayıp dosya yöneticisinden açın). PC tablete uygulama
+   kurmaz. İki uygulamanın sürümü uyuşmazsa ikisi de hangisinin güncelleneceğini söyler.
+   USB ile bağlanmak için tablette *Geliştirici seçenekleri > USB hata ayıklama* açık olmalı.
 3. Tablette EKRAN açıkken bilgisayar tableti kendiliğinden bulur (önce USB, yoksa Wi-Fi).
    Wi-Fi ile ilk bağlantıda iki cihazda aynı 6 haneli kod görünür; ikisinde de onaylayın.
 
@@ -65,7 +65,7 @@ Gerekenler: JDK 17+ ve Android SDK (Android Studio ile gelir), MinGW-w64 GCC + C
 ```powershell
 .\tools\paketle.ps1                          # her şeyi derler, testleri çalıştırır, zip üretir
 .\host-windows\build.ps1                     # yalnızca Windows tarafı
-.\host-windows\build\ekran-host.exe          # konsol sürümü, saniyelik ölçümlerle (--usb / --wifi / --ip / --apk-sun)
+.\host-windows\build\ekran-host.exe          # konsol sürümü, saniyelik ölçümlerle (--usb / --wifi / --ip)
 .\host-windows\build\ekran-test.exe          # şifreleme test vektörleri (RFC 8439)
 ```
 

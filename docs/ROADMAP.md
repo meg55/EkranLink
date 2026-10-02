@@ -78,10 +78,10 @@ Derleme için Visual Studio gerekmez: MinGW-w64 (GCC) yeterli.
 - [x] PC'deki eşleştirme sorusu, tablet reddedince kendiliğinden kapanır
 - [x] Tablette "Eşleşmeleri unut" düğmesi (yalnızca bağlı değilken görünür)
 - [x] Bildirim alanı uygulaması `ekran.exe`: durum, bağlantı türü, ekran seçimi, Windows ile başlat, günlük
-- [x] USB'de otomatik kurulum/güncelleme: uygulama yoksa ya da paketteki sürümden eskiyse adb ile kurulur
-- [x] Wi-Fi'den kurulum: menüden 10 dakikalık indirme sayfası (Android 4.2 tarayıcısında denendi).
-      QR kod yok: eski tabletlerin çoğunda QR okuyucu bulunmuyor
-- [x] Taşınabilir paket: `tools\paketle.ps1` → `dist\EKRAN-<sürüm>-windows.zip` (exe'ler + APK + adb, 3,6 MB)
+- [x] Ayrı indirmeler (0.3.1): PC tablete uygulama kurmaz/sunmaz. `tools\paketle.ps1` →
+      `dist\EKRAN-<sürüm>-windows.zip` (exe'ler + adb) ve `dist\EKRAN-<sürüm>-android.apk`.
+      USB'de uygulama yoksa PC bildirimle söyler; protokol sürümü uyuşmazsa tablet `Incompatible`
+      gönderir, iki taraf da hangi uygulamanın güncelleneceğini gösterir
 - [ ] Kalıcı APK sürüm anahtarı (GitHub sürümleri için; şu an hata ayıklama anahtarı)
 - [ ] USB yoklamasını `adb get-state` yerine Windows cihaz bildirimleriyle yapma
 - [ ] Yazılım kodlayıcı yedeği (donanım kodlayıcısı olmayan PC'ler)

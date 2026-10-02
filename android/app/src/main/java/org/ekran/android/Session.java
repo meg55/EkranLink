@@ -38,6 +38,7 @@ final class Session implements H264Decoder.FrameListener {
     static final int MSG_TABLET_KEY = 21;
     static final int MSG_MODE = 22;
     static final int MSG_PAIR_RESULT = 23;
+    static final int MSG_INCOMPATIBLE = 24;
 
     static final int TOUCH_DOWN = 0, TOUCH_MOVE = 1, TOUCH_UP = 2, TOUCH_CANCEL = 3;
 
@@ -58,6 +59,8 @@ final class Session implements H264Decoder.FrameListener {
         /** Fiziksel ekran boyutu ve yoğunluğu. */
         void displayInfo(android.graphics.Point realSize, android.util.DisplayMetrics metrics);
         String deviceId();
+        /** Uygulama sürümü (versionName); sürüm uyuşmazlığında PC'ye bildirilir. */
+        String appVersion();
         PairStore pairStore();
         /** Wi-Fi'de ilk eşleştirme: kodu gösteren pencereyi aç (engellemez). */
         PairPrompt showPairing(String pcName, String code, Runnable onReject);
@@ -100,7 +103,7 @@ final class Session implements H264Decoder.FrameListener {
     void run() throws IOException {
         int peerVersion = in.readUnsignedShort();
         if (peerVersion != VERSION) {
-            throw new IOException("Desteklenmeyen PC protokol sürümü " + peerVersion + " (beklenen " + VERSION + ")");
+            rejectVersion(peerVersion);
         }
         try {
             handshake();
@@ -129,6 +132,33 @@ final class Session implements H264Decoder.FrameListener {
             decoder.release();
             host.onSessionActive(false, false);
         }
+    }
+
+    /** Sürüm uyuşmazlığı: kullanıcıya hangi uygulamanın güncelleneceği söylenir. */
+    static final class IncompatibleException extends IOException {
+        IncompatibleException(String message) {
+            super(message);
+        }
+    }
+
+    /** PC'nin protokol sürümünü desteklemiyoruz: kendi sürümümüzü bildirip kapat (PC de kullanıcıyı uyarır). */
+    private void rejectVersion(int peerVersion) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        DataOutputStream d = new DataOutputStream(bos);
+        d.writeByte(MSG_INCOMPATIBLE);
+        d.writeShort(VERSION);
+        d.writeUTF(String.valueOf(host.appVersion()));
+        writeFrameNow(bos.toByteArray());
+        out.flush();
+        // PC mesajı okuyup kapatana kadar bekle: okunmamış veriyle kapatılan soket mesajı yolda düşürebilir
+        int drained = 0;
+        int n;
+        while (drained < 64 * 1024 && (n = in.read(buf, 0, buf.length)) > 0) {
+            drained += n;
+        }
+        throw new IncompatibleException(peerVersion > VERSION
+                ? "Bilgisayardaki EKRAN daha yeni: tablete EKRAN'ın yeni sürümünü kurun"
+                : "Bilgisayardaki EKRAN eski: bilgisayara EKRAN'ın yeni sürümünü kurun");
     }
 
     // --- Anahtar değişimi ve eşleştirme ---

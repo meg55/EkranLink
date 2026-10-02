@@ -89,6 +89,29 @@ bool readStatus(bool& connected, std::wstring& device, std::wstring& link) {
     return true;
 }
 
+void writeNotice(const std::string& title, const std::string& text) {
+    HKEY k;
+    if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, kStatusKey, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &k, nullptr) != 0) return;
+    setString(k, L"NoticeTitle", widen(title));
+    setString(k, L"NoticeText", widen(text));
+    const DWORD id = noticeId() + 1;  // en son: okuyan taraf metni hazır bulsun
+    RegSetValueExW(k, L"NoticeId", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&id), sizeof id);
+    RegCloseKey(k);
+}
+
+DWORD noticeId() {
+    DWORD id = 0, size = sizeof id;
+    RegGetValueW(HKEY_LOCAL_MACHINE, kStatusKey, L"NoticeId", RRF_RT_REG_DWORD, nullptr, &id, &size);
+    return id;
+}
+
+DWORD readNotice(std::wstring& title, std::wstring& text) {
+    const DWORD id = noticeId();
+    title = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"NoticeTitle");
+    text = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"NoticeText");
+    return id;
+}
+
 std::wstring programDataDir() {
     // SHGetKnownFolderPath değil: FOLDERID_* sabitleri libuuid'in 80 KB'lık nesnesini exe'ye çeker
     wchar_t p[MAX_PATH] = L"C:\\ProgramData";

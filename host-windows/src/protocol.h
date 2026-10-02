@@ -30,6 +30,9 @@ enum Msg : uint8_t {
     kTabletKey = 21,
     kMode = 22,
     kPairResult = 23,  // şifreli
+    // T→P, kPcHello yerine: tablet PC'nin protokol sürümünü desteklemiyor (u16 tablet sürümü, str uygulama sürümü).
+    // Ardından tablet bağlantıyı kapatır; PC kullanıcıya hangi tarafın güncelleneceğini söyler.
+    kIncompatible = 24,
 };
 
 enum PcHelloFlags : uint8_t {

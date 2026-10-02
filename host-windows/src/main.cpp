@@ -8,8 +8,6 @@
 #include <cstdlib>
 #include <string>
 
-#include "adb.h"
-#include "apkserver.h"
 #include "log.h"
 #include "streamer.h"
 
@@ -39,11 +37,8 @@ void usage() {
         "  --dusuk-gecikme   Hareket sırasında da itici kare (gecikme ~20 ms, tablet ~2 kat daha çok çalışır)\n"
         "  --bitrate KBPS    Bit hızı (varsayılan 8000)\n"
         "  --itici N         Değişimden sonraki itici kare sayısı (varsayılan 3, 0 = kapalı)\n"
-        "  --itici-ara MS    İtici kareler arası süre (varsayılan 8)\n"
-        "  --apk-sun         Tablete uygulamayı Wi-Fi'dan kurmak için 10 dk indirme sayfası aç\n");
+        "  --itici-ara MS    İtici kareler arası süre (varsayılan 8)\n");
 }
-
-bool g_serveApk = false;
 
 bool parse(int argc, char** argv, Options& o) {
     for (int i = 1; i < argc; i++) {
@@ -61,7 +56,6 @@ bool parse(int argc, char** argv, Options& o) {
         else if (a == "--bitrate") { if (!next(o.kbps)) return false; }
         else if (a == "--itici") { if (!next(o.pushers)) return false; }
         else if (a == "--itici-ara") { if (!next(o.pusherMs)) return false; }
-        else if (a == "--apk-sun") g_serveApk = true;
         else if (a == "--yansit") o.extend = false;
         else if (a == "--tek-ekran") o.onlyTablet = true;
         else if (a == "--fare") o.touchAsMouse = true;
@@ -119,13 +113,6 @@ int main(int argc, char** argv) {
     const char* mode = opt.mode == LinkMode::Usb ? "USB" : opt.mode == LinkMode::Wifi ? "Wi-Fi" : "otomatik";
     logf("EKRAN sunucusu — %s%s%s. Tablet bekleniyor... (Ctrl+C: çıkış)", mode, opt.ip.empty() ? "" : " ",
          opt.ip.c_str());
-    ApkServer apkServer;
-    if (g_serveApk) {
-        const std::wstring apk = adb::bundledApk();
-        if (apk.empty()) logf("APK bulunamadı (ekran-android.apk exe'nin yanında olmalı)");
-        else if (apkServer.start(apk, ApkServer::kPort, 10))
-            for (const auto& u : apkServer.urls()) logf("Tabletin tarayıcısında açın: %s", u.c_str());
-    }
     streamer.run();
     g_streamer = nullptr;
 

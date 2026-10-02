@@ -14,7 +14,7 @@
 
 namespace ekran::config {
 
-constexpr const wchar_t* kVersion = L"0.3.0";
+constexpr const wchar_t* kVersion = L"0.3.1";
 
 constexpr const wchar_t* kUserKey = L"Software\\EKRAN";
 constexpr const wchar_t* kMachineKey = L"SOFTWARE\\EKRAN";
@@ -38,6 +38,10 @@ std::wstring pairsPath();    // cihaz kimliği → anahtar
 // Durum (ajan yazar, tepsi okur)
 void writeStatus(bool connected, const std::string& device, const std::string& link);
 bool readStatus(bool& connected, std::wstring& device, std::wstring& link);
+// Kullanıcıya gösterilecek uyarı (ajan yazar, tepsi bildirim olarak gösterir). Her yazışta numara artar.
+void writeNotice(const std::string& title, const std::string& text);
+DWORD noticeId();
+DWORD readNotice(std::wstring& title, std::wstring& text);  // numarayı döndürür
 
 // %ProgramData%\EKRAN
 std::wstring programDataDir();

@@ -39,6 +39,9 @@ public:
     bool encrypted() const { return tx_ != nullptr; }
     const std::string& deviceId() const { return deviceId_; }
     bool pairingRejected() const { return pairingRejected_; }
+    // El sıkışmayı tablet sürüm uyuşmazlığıyla reddettiyse tabletin protokol ve uygulama sürümü; yoksa 0
+    uint16_t peerVersion() const { return peerVersion_; }
+    const std::string& peerAppVersion() const { return peerAppVersion_; }
 
 private:
     // Gövde = tür + yük. Şifreli bağlantıda gövde şifrelenir ve 16 bayt etiket eklenir.
@@ -54,6 +57,8 @@ private:
     std::vector<uint8_t> txBuf_;
     std::string deviceId_;
     bool pairingRejected_ = false;
+    uint16_t peerVersion_ = 0;
+    std::string peerAppVersion_;
 };
 
 }  // namespace ekran

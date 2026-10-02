@@ -222,6 +222,15 @@ public final class EkranService extends Service implements Session.Host {
     }
 
     @Override
+    public String appVersion() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            return "?";
+        }
+    }
+
+    @Override
     public PairStore pairStore() {
         return pairStore;
     }

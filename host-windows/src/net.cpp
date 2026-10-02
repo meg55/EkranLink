@@ -86,8 +86,15 @@ bool Connection::handshake(bool trustedLink, const PairingHooks& hooks, proto::H
     // 2) Tablet → PC: geçici anahtar + kimlik + "bu PC'yi tanıyorum" bilgisi
     uint8_t type = 0;
     std::vector<uint8_t> payload;
-    if (!readMessage(type, payload) || type != proto::kTabletKey) return false;
+    if (!readMessage(type, payload)) return false;
     proto::Reader r(payload.data(), payload.size());
+    if (type == proto::kIncompatible) {
+        peerVersion_ = r.u16();
+        peerAppVersion_ = r.str();
+        if (!r.ok()) peerVersion_ = 0;
+        return false;
+    }
+    if (type != proto::kTabletKey) return false;
     uint8_t tPub[65], tNonce[16];
     for (auto& x : tPub) x = r.u8();
     for (auto& x : tNonce) x = r.u8();
