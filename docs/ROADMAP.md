@@ -101,7 +101,7 @@ Derleme için Visual Studio gerekmez: MinGW-w64 (GCC) yeterli.
       (hizmet modunda yalnızca pencere açıkken aktarılır), çözülene kadar kalan uyarılar, Windows ekran ayarları kısayolu
 - [x] Yön / çözünürlük Windows'un kaydına da yazılır (0.4.3, tek ekranda değil): monitör bir sonraki bağlanışta
       doğrudan doğru modla açılır, fazladan mod değişimi olmaz
-- [x] Birden çok adb cihazı takılıyken: hazırlanmış olan, yoksa EKRAN'ı kurulu olan cihaz seçilir; tüm adb komutları `-s`ile
+- [x] Birden çok adb cihazı takılıyken: hazırlanmış olan, yoksa EKRAN'ı kurulu olan cihaz seçilir; tüm adb komutları `-s` ile
       o cihaza gider (tam çoklu cihaz yol haritasında)
 - [x] Güvenilir Wi-Fi keşfi: arayüz başına soket, 3 kez yineleme, bilinen tablet adreslerine doğrudan soru
       (yayın güvenlik duvarıyla engellenip denendi: 1,2 sn'de bağlandı). Tablet UDP/TCP portu boşalana kadar dener
