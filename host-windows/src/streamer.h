@@ -25,7 +25,6 @@ struct Options {
     bool onlyTablet = false;  // tek ekran: tablet bağlıyken diğer monitörler kapanır (yalnızca ikinci ekranda)
     bool autoConnect = true;    // tablet bulununca kendiliğinden bağlan (kapalıysa yalnızca connectNow ile)
     int rotation = -1;          // ikinci ekranın yönü: -1 tabletle birlikte döner, yoksa sabit (0/90/180/270)
-    int resolution = 100;       // ikinci ekranın çözünürlüğü, tabletinkinin yüzdesi (50, 75, 100, 125, 150)
     bool touchAsMouse = false;  // dokunma = fare (varsayılan: gerçek çoklu dokunma)
     int fps = 60;         // en yüksek kare hızı (tabletin ekranı)
     bool lowLatency = false;  // düşük gecikme: itici kareler hareket sırasında da (tablet ~2 kat çalışır)
@@ -34,9 +33,6 @@ struct Options {
     int pusherMs = 8;     // itici kareler arası süre
     int maxInFlight = 12; // onaysız en fazla kare (çözücüde bekleyenler + toplu onay dahil)
 };
-
-// Sürücünün sunduğu, tabletin en-boy oranını koruyan çözünürlükler (yüzde)
-constexpr int kResolutions[] = {50, 75, 100, 125, 150};
 
 // Görüntü modu (bağlıyken gerçekte kullanılan)
 enum class DisplayMode { Extend = 0, Only = 1, Mirror = 2 };
@@ -47,8 +43,10 @@ enum class Notice { AppMissing = 1, TabletOutdated = 2, PcOutdated = 3 };
 struct SessionState {
     bool connected = false;
     std::string device, link;   // tablet adı; "USB" / "Wi-Fi 192.168.1.5"
+    std::string deviceId;       // cihaz kimliği (cihaza özel ayarlar: çözünürlük)
     DisplayMode mode = DisplayMode::Extend;
-    int width = 0, height = 0;  // tabletin ekranı (akış boyutu)
+    int width = 0, height = 0;  // tabletin ekranı (akış boyutu) = önerilen çözünürlük
+    std::wstring gdiName;       // ikinci ekranda sanal monitörün Windows adı (\\.\DISPLAYn), yansıtmada boş
 };
 
 struct StreamerEvents {
@@ -75,7 +73,8 @@ public:
     void run();
     void stop();
 
-    // Ayarlar değişti: bağlantı kopmadan uygulanır. Dokunma, performans, yön, çözünürlük ve ikinci ekran ↔
+    // Ayarlar değişti: bağlantı kopmadan uygulanır. Dokunma, performans, yön, çözünürlük (cihaza özel, config.h)
+    // ve ikinci ekran ↔
     // tek ekran anında; yansıtma ↔ ikinci ekran ve yansıtılan ekran görüntü yeniden kurularak (bağlantı sürer).
     // Bağlantı yalnızca bağlantı türü şimdiki bağlantıyı dışarıda bırakırsa (ör. USB'deyken "sadece Wi-Fi") kapanır.
     void update(const Options& o);
@@ -97,7 +96,7 @@ private:
     std::atomic<int> display_{0};  // istenen DisplayMode
     std::atomic<int> output_{0};
     std::atomic<int> fixedRotation_{-1};
-    std::atomic<int> resolution_{100};
+    std::atomic<int> settingsGen_{0};  // her update()'te artar: cihaza özel ayarlar yeniden okunur
     std::atomic<int> currentLink_{-1};  // şimdiki bağlantı: -1 yok, 0 Wi-Fi, 1 USB
     std::mutex connMutex_;
     Connection* conn_ = nullptr;

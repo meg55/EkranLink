@@ -10,6 +10,7 @@
 
 #include <objbase.h>
 
+#include <atomic>
 #include <string>
 #include <thread>
 #include <vector>
@@ -350,6 +351,7 @@ int runAgent() {
     };
     applyLanguage();
 
+    std::atomic<bool> statsToUi{config::get(L"Izle", 0) != 0}, statsToLog{config::get(L"Tani", 0) != 0};
     bool quit = false;
     while (!quit) {
         const Options opt = config::loadOptions();
@@ -365,9 +367,11 @@ int runAgent() {
             }
             return askPairing(widen(device), widen(code), cancel);
         };
-        // Tanı (Ayarlar\Tani = 1): saniyelik ölçümü günlüğe yaz
-        if (config::get(L"Tani", 0))
-            ev.onStats = [](const std::string& line) { logf("%s  [%ls]", line.c_str(), inputDesktopName().c_str()); };
+        // Saniyelik ölçüm: ayar penceresi açıkken (Izle = 1) tepsiye, tanıda (Tani = 1) günlüğe
+        ev.onStats = [&](const std::string& line) {
+            if (statsToUi) config::writeStats(line);
+            if (statsToLog) logf("%s  [%ls]", line.c_str(), inputDesktopName().c_str());
+        };
         Streamer streamer(opt, ev);
         DWORD lastConnectNow = config::get(L"ConnectNow", 0);
         std::thread worker([&] {
@@ -395,6 +399,8 @@ int runAgent() {
             }
             // Ayarlar bağlantıyı koparmadan uygulanır (Streamer::update)
             streamer.update(config::loadOptions());
+            statsToUi = config::get(L"Izle", 0) != 0;
+            statsToLog = config::get(L"Tani", 0) != 0;
             applyLanguage();
         }
         streamer.stop();

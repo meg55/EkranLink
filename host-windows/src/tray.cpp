@@ -8,7 +8,9 @@
 #include <mfapi.h>
 #include <shellapi.h>
 
+#include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <ctime>
 #include <memory>
 #include <string>
@@ -55,9 +57,17 @@ Options g_opt;
 std::unique_ptr<Streamer> g_streamer;
 std::thread g_worker;
 bool g_connected = false;
-std::wstring g_device, g_link, g_stats;
+std::wstring g_device, g_link;
+std::wstring g_latency, g_data, g_fps;  // son ölçüm (bağlıyken)
 DisplayMode g_mode = DisplayMode::Extend;
-int g_width = 0, g_height = 0;  // bağlı tabletin ekranı
+int g_width = 0, g_height = 0;  // bağlı cihazın ekranı (önerilen çözünürlük)
+std::string g_deviceId;
+std::wstring g_gdi;              // ikinci ekranda sanal monitörün Windows adı
+std::vector<ui::Resolution> g_modes;
+ui::Resolution g_current;
+int g_rotation = 0;
+Notice g_notice = Notice(0);     // çözülene kadar pencerede kalan uyarı
+std::wstring g_noticeArg;
 std::wstring g_logPath;
 // Hizmet kuruluysa yayını hizmet (ajan) yapar; tepsi yalnızca arayüzdür: ayarları HKLM'e yazar,
 // durumu oradan okur. Değilse yayını tepsi kendisi yapar (ayarlar HKCU).
@@ -165,7 +175,7 @@ void updateTray() {
     g_nid.hIcon = g_connected ? g_iconOn : g_iconIdle;
     std::wstring tip = g_connected ? L"EKRAN — " + g_device + L" (" + g_link + L")"
                                    : std::wstring(L"EKRAN — ") + W(i18n::Waiting);
-    if (g_connected && !g_stats.empty()) tip += L"\n" + g_stats;
+    if (g_connected && !g_latency.empty()) tip += L"\n" + std::wstring(W(i18n::Latency)) + L" " + g_latency + L" · " + g_data;
     wcsncpy(g_nid.szTip, tip.c_str(), ARRAYSIZE(g_nid.szTip) - 1);
     g_nid.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE;
     Shell_NotifyIconW(NIM_MODIFY, &g_nid);
@@ -204,6 +214,7 @@ void startStatusWatcher() {
         HANDLE ev = CreateEventW(nullptr, FALSE, FALSE, nullptr);
         DWORD lastSeq = 0;
         bool first = true;
+        std::string lastStats;
         DWORD lastNotice = config::noticeId();  // açılıştan önceki uyarılar gösterilmez
         for (;;) {
             RegNotifyChangeKeyValue(k, FALSE, REG_NOTIFY_CHANGE_LAST_SET, ev, TRUE);
@@ -212,6 +223,11 @@ void startStatusWatcher() {
                 auto* arg = new std::string;
                 lastNotice = config::readNotice(code, *arg);
                 PostMessageW(g_wnd, WM_NOTICE, WPARAM(code), reinterpret_cast<LPARAM>(arg));
+            }
+            const std::string stats = config::readStats();
+            if (stats != lastStats) {
+                lastStats = stats;
+                if (!stats.empty()) PostMessageW(g_wnd, WM_STATS, 0, reinterpret_cast<LPARAM>(new std::string(stats)));
             }
             const DWORD seq = config::statusSeq();
             SessionState st;
@@ -297,8 +313,40 @@ std::vector<std::wstring> listOutputs() {
     return out;
 }
 
+// Sanal monitörün Windows'taki modları: Windows ekran ayarlarındaki listenin aynısı (yatay yöndeki boyutlarla)
+void readDisplayModes() {
+    g_modes.clear();
+    g_current = {};
+    g_rotation = 0;
+    if (!g_connected || g_gdi.empty()) return;
+    DEVMODEW cur{};
+    cur.dmSize = sizeof cur;
+    if (!EnumDisplaySettingsExW(g_gdi.c_str(), ENUM_CURRENT_SETTINGS, &cur, 0)) return;
+    const bool portrait = cur.dmDisplayOrientation & 1;
+    g_rotation = int(cur.dmDisplayOrientation) * 90;
+    auto land = [portrait](const DEVMODEW& d) {
+        return portrait ? ui::Resolution{int(d.dmPelsHeight), int(d.dmPelsWidth)}
+                        : ui::Resolution{int(d.dmPelsWidth), int(d.dmPelsHeight)};
+    };
+    g_current = land(cur);
+    DEVMODEW dm{};
+    dm.dmSize = sizeof dm;
+    for (DWORD i = 0; EnumDisplaySettingsExW(g_gdi.c_str(), i, &dm, 0); i++) {
+        if (dm.dmBitsPerPel != cur.dmBitsPerPel) continue;
+        const ui::Resolution r = land(dm);
+        bool dup = false;
+        for (const auto& e : g_modes) dup |= e.width == r.width && e.height == r.height;
+        if (!dup) g_modes.push_back(r);
+    }
+    std::sort(g_modes.begin(), g_modes.end(), [](const ui::Resolution& a, const ui::Resolution& b) {
+        return a.width != b.width ? a.width > b.width : a.height > b.height;
+    });
+}
+
 // Pencerenin gösterdiği, sık değişmeyen bilgiler
 void reloadCaches() {
+    applyLanguage();  // dil başka yerden (ör. hizmet kurulumu) değişmiş olabilir
+    readDisplayModes();
     g_opt = config::loadOptions();
     g_outputs = listOutputs();
     g_driver = VirtualDisplay::driverAvailable();
@@ -340,10 +388,17 @@ public:
         m.connected = g_connected;
         m.device = g_device;
         m.link = g_link;
-        m.stats = g_stats;
+        m.latency = g_latency;
+        m.data = g_data;
+        m.fps = g_fps;
         m.activeMode = g_mode;
-        m.tabletWidth = g_width;
-        m.tabletHeight = g_height;
+        m.deviceWidth = g_width;
+        m.deviceHeight = g_height;
+        m.modes = g_modes;
+        m.current = g_current;
+        m.currentRotation = g_rotation;
+        m.notice = g_notice;
+        m.noticeArg = g_noticeArg;
         m.driver = g_driver;
         m.serviceMode = g_serviceMode;
         m.serviceStale = g_serviceStale;
@@ -357,6 +412,12 @@ public:
         switch (a) {
             case ui::Act::Reload:
                 reloadCaches();
+                break;
+            case ui::Act::Closed:
+                if (g_serviceMode) config::set(L"Izle", 0);  // ajan ölçüm yazmayı bıraksın
+                return;
+            case ui::Act::OpenDisplaySettings:
+                ShellExecuteW(nullptr, L"open", L"ms-settings:display", nullptr, nullptr, SW_SHOWNORMAL);
                 break;
             case ui::Act::Link:
                 g_opt.mode = LinkMode(v);
@@ -390,9 +451,11 @@ public:
                 applyOptions();
                 break;
             case ui::Act::Resolution:
-                g_opt.resolution = v;
-                config::saveResolution(v);
-                applyOptions();
+                // Cihaza özel kaydedilir; bağlıyken hemen uygulanır (ajan / yayın değişikliği görür)
+                if (v >= 0 && v < int(g_modes.size()) && !g_deviceId.empty()) {
+                    config::saveResolution(g_deviceId, g_modes[size_t(v)].width, g_modes[size_t(v)].height);
+                    applyOptions();
+                }
                 break;
             case ui::Act::Touch:
                 g_opt.touchAsMouse = v != 0;
@@ -437,6 +500,7 @@ public:
 AppHost g_host;
 
 void openUi() {
+    if (g_serviceMode && !ui::window()) config::set(L"Izle", 1);  // pencere açıkken ajan ölçümleri yazsın
     reloadCaches();
     ui::show(&g_host, g_connected ? g_iconOn : g_iconIdle);
 }
@@ -446,7 +510,10 @@ void showMenu() {
     std::wstring status = g_connected ? std::wstring(W(i18n::Connected)) + L": " + g_device + L" (" + g_link + L")"
                                       : W(i18n::Waiting);
     AppendMenuW(m, MF_STRING | MF_GRAYED, 0, status.c_str());
-    if (g_connected && !g_stats.empty()) AppendMenuW(m, MF_STRING | MF_GRAYED, 0, g_stats.c_str());
+    if (g_connected && !g_latency.empty()) {
+        const std::wstring stats = std::wstring(W(i18n::Latency)) + L" " + g_latency + L" · " + g_data;
+        AppendMenuW(m, MF_STRING | MF_GRAYED, 0, stats.c_str());
+    }
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(m, MF_STRING | MF_DEFAULT, kMenuOpen, W(i18n::MenuOpen));
     if (!g_connected && !g_opt.autoConnect) AppendMenuW(m, MF_STRING, kMenuConnectNow, W(i18n::ConnectNow));
@@ -479,24 +546,24 @@ void onCommand(UINT id) {
     }
 }
 
-// Ölçüm satırından kısa özet: "gecikme 21.5 ms · 7.3 Mbit/s"
-std::wstring shortStats(const std::string& line) {
-    const std::wstring full = widen(line);
-    std::wstring out;
-    const size_t lat = full.find(L"PC→çizim");
-    if (lat != std::wstring::npos) {
-        const size_t b = full.find_first_not_of(L' ', lat + 8);
-        const size_t e = full.find(L' ', b);
-        if (b != std::wstring::npos) out = std::wstring(W(i18n::Latency)) + L" " + full.substr(b, e - b) + L" ms";
+// Ölçüm satırı (streamer.cpp): "%3d kare +%3d itici  %6.2f Mbit/s  RTT %5.1f ms  PC→çizim %5.1f ms  ..."
+void parseStats(const std::string& line) {
+    int frames = 0, pushers = 0;
+    float mbps = 0, rtt = 0, e2e = 0;
+    if (std::sscanf(line.c_str(), "%d kare +%d itici %f Mbit/s RTT %f ms", &frames, &pushers, &mbps, &rtt) != 4) return;
+    const size_t p = line.find("PC→çizim");
+    if (p == std::string::npos || std::sscanf(line.c_str() + p + std::strlen("PC→çizim"), "%f", &e2e) != 1) return;
+    wchar_t buf[64];
+    if (e2e > 0) {
+        swprintf(buf, 64, L"%.0f ms", double(e2e));
+        g_latency = buf;
+    } else {
+        g_latency.clear();  // ekran değişmiyorsa ölçülecek kare yok
     }
-    const size_t mb = full.find(L"Mbit/s");
-    if (mb != std::wstring::npos && mb > 1) {
-        const size_t e = full.find_last_not_of(L' ', mb - 1);
-        const size_t b = full.find_last_of(L' ', e);
-        if (!out.empty()) out += L" · ";
-        out += full.substr(b + 1, e - b) + L" Mbit/s";
-    }
-    return out;
+    swprintf(buf, 64, L"%.1f Mbit/s", double(mbps));
+    g_data = buf;
+    swprintf(buf, 64, L"%d fps", frames);
+    g_fps = buf;
 }
 
 LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
@@ -521,25 +588,35 @@ LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             g_mode = s->mode;
             g_width = s->width;
             g_height = s->height;
+            g_deviceId = s->deviceId;
+            g_gdi = s->gdiName;
             if (changed) {
-                g_stats.clear();
+                g_latency.clear();
+                g_data.clear();
+                g_fps.clear();
+                if (g_connected) g_notice = Notice(0);  // bağlandı: uyarının konusu çözüldü
                 notify(W(g_connected ? i18n::NotifyConnected : i18n::NotifyDisconnected), g_device + L" (" + g_link + L")");
             }
+            readDisplayModes();
             updateTray();
             return 0;
         }
         case WM_NOTICE: {
             std::unique_ptr<std::string> arg(reinterpret_cast<std::string*>(l));
-            showNotice(Notice(w), *arg);
+            g_notice = Notice(w);
+            g_noticeArg = widen(*arg);
+            showNotice(g_notice, *arg);
+            updateTray();
             return 0;
         }
         case WM_SETTINGS:
             g_opt = config::loadOptions();
+            readDisplayModes();
             ui::refresh();
             return 0;
         case WM_STATS: {
             std::unique_ptr<std::string> s(reinterpret_cast<std::string*>(l));
-            g_stats = shortStats(*s);
+            if (g_connected) parseStats(*s);
             updateTray();
             return 0;
         }
@@ -615,6 +692,8 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
     wcsncpy(g_nid.szTip, (std::wstring(L"EKRAN — ") + W(i18n::Waiting)).c_str(), ARRAYSIZE(g_nid.szTip) - 1);
     Shell_NotifyIconW(NIM_ADD, &g_nid);
 
+    // Önceki tepsi pencere açıkken kapanmış (çökmüş) olabilir: ajan boşuna ölçüm yazmasın
+    if (g_serviceMode && config::get(L"Izle", 0)) config::set(L"Izle", 0);
     startStreamer();
     if (!background) openUi();
 
@@ -625,6 +704,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
     }
 
     stopStreamer();
+    if (g_serviceMode) config::set(L"Izle", 0);
     logf("EKRAN kapandı");
     WSACleanup();
     MFShutdown();

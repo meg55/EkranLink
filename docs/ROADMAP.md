@@ -93,8 +93,12 @@ Derleme için Visual Studio gerekmez: MinGW-w64 (GCC) yeterli.
       otomatik bağlan, yön, çözünürlük, ikinci ekran ↔ tek ekran anında; yansıtma ↔ ikinci ekran ve yansıtılan
       ekran yalnızca görüntü boru hattı yeniden kurularak (bağlantı ve tablet çözücüsü sürer). Tek ekrandan
       çıkarken tabletin o anki çözünürlüğü/yönü korunur
-- [x] Çözünürlük seçimi: tabletinkinin %50/75/100/125/150'si (sürücünün sunduğu modlar), Windows'tan yapılan
-      değişiklik de kaydedilir (`Resolution`)
+- [x] Çözünürlük seçimi (0.4.2): Windows'un o monitör için sunduğu modların aynısı, aynı biçimde
+      ("1600 × 940", cihazınki "(Önerilen)"); cihaz başına kaydedilir (`Cozunurluk-<cihaz>`), Windows'tan
+      yapılan değişiklik de
+- [x] Ayar penceresi sayfalı (0.4.2): sol menü (Durum, Bağlantı, Görüntü, Dokunma ve performans, Genel), kaydırma
+      yok; 1–5 / ↑↓ / Ctrl+Tab ile geçiş. Durum sayfası: bağlantı, mod, ekran, gecikme / veri / kare hızı
+      (hizmet modunda yalnızca pencere açıkken aktarılır), çözülene kadar kalan uyarılar, Windows ekran ayarları kısayolu
 - [x] Güvenilir Wi-Fi keşfi: arayüz başına soket, 3 kez yineleme, bilinen tablet adreslerine doğrudan soru
       (yayın güvenlik duvarıyla engellenip denendi: 1,2 sn'de bağlandı). Tablet UDP/TCP portu boşalana kadar dener
 - [ ] Kalıcı APK sürüm anahtarı (GitHub sürümleri için; şu an hata ayıklama anahtarı)

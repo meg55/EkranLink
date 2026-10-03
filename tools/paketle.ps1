@@ -69,8 +69,8 @@ Copy-Item (Join-Path $kok 'LICENSE') $hedef
 EKRAN $versionName — eski tabletleri bilgisayar ekranı yapın
 ===========================================================
 
-Kurulum gerekmez. ekran.exe'yi çalıştırın: ayar penceresi açılır, saatin yanında bir monitör simgesi
-belirir. Pencereyi kapatmak EKRAN'ı kapatmaz; simgeye tıklayınca yeniden açılır (sağ tık: menü, çıkış).
+Kurulum gerekmez. ekran.exe'yi çalıştırın: ayar penceresi açılır (soldaki menü: Durum, Bağlantı,
+Görüntü, Dokunma ve performans, Genel), saatin yanında bir monitör simgesi belirir. Pencereyi kapatmak EKRAN'ı kapatmaz; simgeye tıklayınca yeniden açılır (sağ tık: menü, çıkış).
 Dil: pencerede Genel > Dil (Sistem / Türkçe / English). Tablet ve telefon cihazın dilini kullanır.
 
 TABLET UYGULAMASI (ayrı indirilir)
@@ -94,8 +94,8 @@ GÖRÜNTÜ MODLARI (pencerede Görüntü)
   Monitör yönü: Otomatik'te tableti dik çevirmek monitörü de dikey yapar (tablette "Otomatik döndür"
   açık olmalı). Yatay / Dikey / ters seçilebilir. Seçim ve Windows ekran ayarlarından yapılan
   değişiklik hatırlanır.
-  Çözünürlük: tabletinkinin %50-150'si (yüksek = daha çok alan, küçük yazı). Windows ekran
-  ayarlarından yapılan değişiklik de hatırlanır.
+  Ekran çözünürlüğü: Windows Ayarlar > Ekran'daki listenin aynısı; cihazın kendi çözünürlüğü
+  "(Önerilen)". Seçim cihaz başına hatırlanır; Windows'tan yapılan değişiklik de.
   Ayarlar bağlantıyı koparmadan uygulanır; tablet bağlı kalır.
 
 EKRANSIZ MINI PC (oturum açma ekranı)

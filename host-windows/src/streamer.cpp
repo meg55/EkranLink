@@ -104,7 +104,7 @@ void Streamer::update(const Options& o) {
     display_ = int(!o.extend ? DisplayMode::Mirror : o.onlyTablet ? DisplayMode::Only : DisplayMode::Extend);
     output_ = o.output;
     fixedRotation_ = o.rotation;
-    resolution_ = o.resolution;
+    settingsGen_++;
     setMode(o.mode);
 }
 
@@ -341,6 +341,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
     state.link = link;
     state.width = W;
     state.height = H;
+    state.deviceId = conn.deviceId();
     bool reported = false;
 
     CursorState cursor;
@@ -348,7 +349,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
     int appliedRotation = 0;
     int tabletApplied = -1;  // en son uygulanan tablet bildirimi
     int lastFixed = -2;      // ayar değişimini fark etmek için (-2: monitör yeni)
-    int appliedRes = 0;      // uygulanan çözünürlük yüzdesi (0: henüz yok)
+    int appliedGen = -1;     // cihaza özel ayarların okunduğu update() sayısı (-1: monitör yeni)
     int expectW = 0, expectH = 0;  // beklenen çözünürlük (yatay yön): farklıysa Windows'tan değiştirildi
     bool tabletAwake = true;  // tablet ekranı açık başlar
     // Kare hızı sınırı: tabletin ekranı 60 Hz; daha fazlası iki cihazı da boşuna yorar.
@@ -377,7 +378,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
             }
             lastFixed = -2;  // yeni monitör: yön ve çözünürlük yeniden uygulanır
             tabletApplied = -1;
-            appliedRes = 0;
+            appliedGen = -1;
         } else if (!extend && vdisp.added()) {
             vdisp.remove();  // tek ekrandaysa önce diğer monitörler geri gelir
             target.clear();
@@ -389,6 +390,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
             only = want == DisplayMode::Only;
         }
         state.mode = target.empty() ? DisplayMode::Mirror : only ? DisplayMode::Only : DisplayMode::Extend;
+        state.gdiName = target;
         logMemory("el sıkışma sonrası");
 
         // --- Görüntü boru hattı ---
@@ -525,12 +527,14 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
                     appliedRotation = rot;
                     if (vdisp.setRotation(rot) && fixed < 0) config::saveLastRotation(rot);
                 }
-                const int res = resolution_;
-                if (res != appliedRes) {
-                    appliedRes = res;
-                    // Sürücünün modlarıyla aynı hesap (tamsayı): W × yüzde / 100
-                    const int rw = W * res / 100, rh = H * res / 100;
-                    if (vdisp.setResolution(rw, rh)) {
+                const int gen = settingsGen_;
+                if (gen != appliedGen) {
+                    // Bu cihaz için seçilmiş çözünürlük (yoksa cihazın kendisi = sürücünün önerdiği mod)
+                    appliedGen = gen;
+                    int rw = W, rh = H;
+                    config::resolutionFor(conn.deviceId(), rw, rh);
+                    int cw = 0, ch = 0;
+                    if (vdisp.resolution(cw, ch) && (cw != rw || ch != rh) && vdisp.setResolution(rw, rh)) {
                         expectW = rw;
                         expectH = rh;
                     }
@@ -605,20 +609,9 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
                 if (!target.empty() && vdisp.resolution(cw, ch) && (cw != expectW || ch != expectH)) {
                     expectW = cw;
                     expectH = ch;
-                    int pct = 0;
-                    for (int p : kResolutions)
-                        if (W * p / 100 == cw && H * p / 100 == ch) pct = p;
-                    if (pct) {
-                        appliedRes = pct;
-                        resolution_ = pct;
-                        config::saveResolution(pct);
-                        saved = true;
-                        logf("Çözünürlük Windows ayarlarından değişti: %dx%d (%%%d, kaydedildi)", cw, ch, pct);
-                    } else {
-                        // Tabletin oranına uymayan bir mod: bu bağlantıda kalır, kaydedilmez
-                        appliedRes = resolution_;
-                        logf("Çözünürlük Windows ayarlarından değişti: %dx%d (oran farklı; kaydedilmedi)", cw, ch);
-                    }
+                    config::saveResolution(conn.deviceId(), cw, ch);
+                    saved = true;
+                    logf("Çözünürlük Windows ayarlarından değişti: %dx%d (kaydedildi)", cw, ch);
                 }
                 if (saved && ev_.onSettingsChanged) ev_.onSettingsChanged();
                 if (sent.rotation != r0 || srcW != w0) {

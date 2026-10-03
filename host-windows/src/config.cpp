@@ -3,6 +3,8 @@
 #include <shlobj.h>
 
 #include <atomic>
+#include <cctype>
+#include <cwchar>
 
 namespace ekran::config {
 
@@ -63,13 +65,33 @@ Options loadOptions() {
     o.autoConnect = get(L"AutoConnect", 1) != 0;
     const DWORD r = get(L"Orientation", 0);
     o.rotation = r >= 1 && r <= 4 ? int(r - 1) * 90 : -1;
-    const int res = int(get(L"Resolution", 100));
-    for (int p : kResolutions)
-        if (p == res) o.resolution = res;
     return o;
 }
 
-void saveResolution(int percent) { set(L"Resolution", DWORD(percent)); }
+namespace {
+std::wstring resolutionValue(const std::string& deviceId) {
+    std::wstring name = L"Cozunurluk-";
+    for (char c : deviceId.substr(0, 32))
+        if (std::isalnum(static_cast<unsigned char>(c))) name += wchar_t(c);
+    return name;
+}
+}  // namespace
+
+bool resolutionFor(const std::string& deviceId, int& width, int& height) {
+    const std::wstring v = getString(settingsRoot(), settingsPath(), resolutionValue(deviceId).c_str());
+    return std::swscanf(v.c_str(), L"%dx%d", &width, &height) == 2 && width > 0 && height > 0;
+}
+
+void saveResolution(const std::string& deviceId, int width, int height) {
+    int w = 0, h = 0;
+    if (resolutionFor(deviceId, w, h) && w == width && h == height) return;
+    HKEY k;
+    if (RegCreateKeyExW(settingsRoot(), settingsPath(), 0, nullptr, 0, KEY_SET_VALUE, nullptr, &k, nullptr) != 0) return;
+    wchar_t v[32];
+    swprintf(v, 32, L"%dx%d", width, height);
+    setString(k, resolutionValue(deviceId).c_str(), v);
+    RegCloseKey(k);
+}
 
 void saveRotation(int degrees) { set(L"Orientation", degrees < 0 ? 0 : DWORD(degrees / 90 % 4 + 1)); }
 
@@ -121,6 +143,8 @@ void writeStatus(const SessionState& s) {
     // Önce ayrıntılar, en son "Seq": okuyan taraf tek bildirimde tutarlı değerleri görsün
     setString(k, L"Device", widen(s.device));
     setString(k, L"Link", widen(s.link));
+    setString(k, L"DeviceId", widen(s.deviceId));
+    setString(k, L"Gdi", s.gdiName);
     dword(L"Display", DWORD(s.mode));
     dword(L"Width", DWORD(s.width));
     dword(L"Height", DWORD(s.height));
@@ -155,7 +179,24 @@ bool readStatus(SessionState& s) {
     };
     s.device = narrow(dev);
     s.link = narrow(link);
+    s.deviceId = narrow(getString(HKEY_LOCAL_MACHINE, kStatusKey, L"DeviceId"));
+    s.gdiName = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"Gdi");
     return true;
+}
+
+void writeStats(const std::string& line) {
+    HKEY k;
+    if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, kStatusKey, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &k, nullptr) != 0) return;
+    setString(k, L"Stats", widen(line));
+    RegCloseKey(k);
+}
+
+std::string readStats() {
+    const std::wstring w = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"Stats");
+    const int n = WideCharToMultiByte(CP_UTF8, 0, w.data(), int(w.size()), nullptr, 0, nullptr, nullptr);
+    std::string out(size_t(n), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, w.data(), int(w.size()), out.data(), n, nullptr, nullptr);
+    return out;
 }
 
 DWORD statusSeq() {

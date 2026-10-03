@@ -28,8 +28,9 @@ tools/          Geliştirme ve ölçüm betikleri
 ## Kullanım
 
 1. `dist\EKRAN-<sürüm>-windows.zip` dosyasını açın, `ekran.exe`'yi çalıştırın (kurulum gerekmez).
-   Ayar penceresi açılır ve saatin yanında bir monitör simgesi belirir. Pencereyi kapatmak EKRAN'ı
-   kapatmaz; simgeye tıklayınca yeniden açılır (sağ tık: kısa menü, çıkış).
+   Ayar penceresi açılır ve saatin yanında bir monitör simgesi belirir. Pencerenin solundaki menüyle
+   sayfalar arasında geçilir: *Durum, Bağlantı, Görüntü, Dokunma ve performans, Genel*. Pencereyi
+   kapatmak EKRAN'ı kapatmaz; simgeye tıklayınca yeniden açılır (sağ tık: kısa menü, çıkış).
 2. Tablet uygulaması ayrı indirilir: `EKRAN-<sürüm>-android.apk` dosyasını tablete kurun (tabletin
    tarayıcısıyla indirip açın ya da USB ile kopyalayıp dosya yöneticisinden açın). PC tablete uygulama
    kurmaz. İki uygulamanın sürümü uyuşmazsa ikisi de hangisinin güncelleneceğini söyler.
@@ -60,9 +61,9 @@ dikey yapar (tablette *Otomatik döndür* açık olmalı). *Yatay / Dikey / ters
 göstersin o yön kullanılır. Seçim ve Windows ekran ayarlarından yapılan değişiklik hatırlanır; tablet her
 bağlanışta aynı yönde açılır.
 
-**Çözünürlük** (*Görüntü > Çözünürlük*): tabletin kendi çözünürlüğünün %50–150'si. Yüksek çözünürlük daha
-çok çalışma alanı verir (yazılar küçülür), düşükte yazılar büyür. Windows ekran ayarlarından yapılan
-değişiklik de hatırlanır.
+**Ekran çözünürlüğü** (*Görüntü*): Windows Ayarlar > Ekran'daki listenin aynısı, aynı biçimde
+("1600 × 940"); cihazın kendi çözünürlüğü *(Önerilen)* diye işaretlidir. Seçim cihaz başına hatırlanır
+(tablet ve telefon ayrı). Windows'tan yapılan değişiklik EKRAN'da da görünür ve kaydedilir.
 
 Ayarlar bağlantıyı koparmadan uygulanır: dokunma, performans, otomatik bağlan, yön, çözünürlük ve ikinci
 ekran ↔ tek ekran anında; yansıtma ↔ ikinci ekran ve yansıtılan ekran görüntü yeniden kurularak (tablet

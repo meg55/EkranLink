@@ -15,7 +15,7 @@
 
 namespace ekran::config {
 
-constexpr const wchar_t* kVersion = L"0.4.1";
+constexpr const wchar_t* kVersion = L"0.4.2";
 
 constexpr const wchar_t* kUserKey = L"Software\\EKRAN";
 constexpr const wchar_t* kMachineKey = L"SOFTWARE\\EKRAN";
@@ -35,8 +35,10 @@ Options loadOptions();
 void saveRotation(int degrees);  // -1: otomatik
 int lastRotation();              // yoksa 0
 void saveLastRotation(int degrees);
-// "Resolution": ikinci ekranın çözünürlüğü, tabletinkinin yüzdesi (kResolutions)
-void saveResolution(int percent);
+// İkinci ekranın çözünürlüğü, cihaz başına ("Cozunurluk-<cihaz>" = "1600x940", yatay yöndeki boyut).
+// Yoksa cihazın kendi çözünürlüğü (sürücünün önerdiği mod) kullanılır.
+bool resolutionFor(const std::string& deviceId, int& width, int& height);
+void saveResolution(const std::string& deviceId, int width, int height);
 
 // Eşleşme deposu: kök anahtar ve yol (pairing.cpp)
 HKEY secretRoot();
@@ -52,6 +54,9 @@ void rememberAddress(const std::string& ip);
 void writeStatus(const SessionState& s);
 bool readStatus(SessionState& s);
 DWORD statusSeq();  // her writeStatus'ta artar (bağlantı ya da görüntü modu değişti)
+// Saniyelik ölçüm satırı: ajan yalnızca ayar penceresi açıkken yazar ("Izle" = 1), tepsi okur
+void writeStats(const std::string& line);
+std::string readStats();
 // Kullanıcıya gösterilecek uyarı (ajan yazar, tepsi kendi dilinde bildirim olarak gösterir).
 // code: Notice (streamer.h). Her yazışta numara artar.
 void writeNotice(int code, const std::string& arg);
