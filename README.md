@@ -60,6 +60,15 @@ dikey yapar (tablette *Otomatik döndür* açık olmalı). *Yatay / Dikey / ters
 göstersin o yön kullanılır. Seçim ve Windows ekran ayarlarından yapılan değişiklik hatırlanır; tablet her
 bağlanışta aynı yönde açılır.
 
+**Çözünürlük** (*Görüntü > Çözünürlük*): tabletin kendi çözünürlüğünün %50–150'si. Yüksek çözünürlük daha
+çok çalışma alanı verir (yazılar küçülür), düşükte yazılar büyür. Windows ekran ayarlarından yapılan
+değişiklik de hatırlanır.
+
+Ayarlar bağlantıyı koparmadan uygulanır: dokunma, performans, otomatik bağlan, yön, çözünürlük ve ikinci
+ekran ↔ tek ekran anında; yansıtma ↔ ikinci ekran ve yansıtılan ekran görüntü yeniden kurularak (tablet
+bağlı kalır). Bağlantı yalnızca bağlantı türü şimdiki bağlantıyı dışarıda bırakırsa (ör. USB'deyken
+"Sadece Wi-Fi") yeniden kurulur.
+
 **Dil:** Bilgisayarda pencerede *Genel > Dil* (Sistem / Türkçe / English); tablet ve telefonda cihazın
 dili kullanılır. Uygulama telefonlarda da çalışır (küçük ekranda düzen sıkışır, gerekirse kayar).
 

@@ -63,8 +63,13 @@ Options loadOptions() {
     o.autoConnect = get(L"AutoConnect", 1) != 0;
     const DWORD r = get(L"Orientation", 0);
     o.rotation = r >= 1 && r <= 4 ? int(r - 1) * 90 : -1;
+    const int res = int(get(L"Resolution", 100));
+    for (int p : kResolutions)
+        if (p == res) o.resolution = res;
     return o;
 }
+
+void saveResolution(int percent) { set(L"Resolution", DWORD(percent)); }
 
 void saveRotation(int degrees) { set(L"Orientation", degrees < 0 ? 0 : DWORD(degrees / 90 % 4 + 1)); }
 
@@ -107,29 +112,56 @@ void rememberAddress(const std::string& ip) {
     RegCloseKey(k);
 }
 
-void writeStatus(bool connected, const std::string& device, const std::string& link, int mode) {
+void writeStatus(const SessionState& s) {
     HKEY k;
     if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, kStatusKey, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &k, nullptr) != 0) return;
-    const DWORD c = connected ? 1 : 0, m = DWORD(mode);
-    // Önce ad, bağlantı ve mod, en son "Connected": okuyan taraf tek bildirimde tutarlı değerleri görsün
-    setString(k, L"Device", widen(device));
-    setString(k, L"Link", widen(link));
-    RegSetValueExW(k, L"Display", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&m), sizeof m);
-    RegSetValueExW(k, L"Connected", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&c), sizeof c);
+    auto dword = [&](const wchar_t* name, DWORD v) {
+        RegSetValueExW(k, name, 0, REG_DWORD, reinterpret_cast<const BYTE*>(&v), sizeof v);
+    };
+    // Önce ayrıntılar, en son "Seq": okuyan taraf tek bildirimde tutarlı değerleri görsün
+    setString(k, L"Device", widen(s.device));
+    setString(k, L"Link", widen(s.link));
+    dword(L"Display", DWORD(s.mode));
+    dword(L"Width", DWORD(s.width));
+    dword(L"Height", DWORD(s.height));
+    dword(L"Connected", s.connected ? 1 : 0);
+    DWORD seq = 0, size = sizeof seq;
+    RegGetValueW(HKEY_LOCAL_MACHINE, kStatusKey, L"Seq", RRF_RT_REG_DWORD, nullptr, &seq, &size);
+    dword(L"Seq", seq + 1);
     RegCloseKey(k);
 }
 
-bool readStatus(bool& connected, std::wstring& device, std::wstring& link, int& mode) {
-    DWORD c = 0, m = 0, size = sizeof c;
-    if (RegGetValueW(HKEY_LOCAL_MACHINE, kStatusKey, L"Connected", RRF_RT_REG_DWORD, nullptr, &c, &size) != 0)
-        return false;
-    size = sizeof m;
-    RegGetValueW(HKEY_LOCAL_MACHINE, kStatusKey, L"Display", RRF_RT_REG_DWORD, nullptr, &m, &size);
-    connected = c != 0;
-    mode = int(m);
-    device = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"Device");
-    link = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"Link");
+bool readStatus(SessionState& s) {
+    auto dword = [](const wchar_t* name, DWORD& v) {
+        DWORD size = sizeof v;
+        return RegGetValueW(HKEY_LOCAL_MACHINE, kStatusKey, name, RRF_RT_REG_DWORD, nullptr, &v, &size) == 0;
+    };
+    DWORD c = 0, m = 0, w = 0, h = 0;
+    if (!dword(L"Connected", c)) return false;
+    dword(L"Display", m);
+    dword(L"Width", w);
+    dword(L"Height", h);
+    s.connected = c != 0;
+    s.mode = DisplayMode(m);
+    s.width = int(w);
+    s.height = int(h);
+    const std::wstring dev = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"Device");
+    const std::wstring link = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"Link");
+    auto narrow = [](const std::wstring& x) {
+        const int n = WideCharToMultiByte(CP_UTF8, 0, x.data(), int(x.size()), nullptr, 0, nullptr, nullptr);
+        std::string out(size_t(n), '\0');
+        WideCharToMultiByte(CP_UTF8, 0, x.data(), int(x.size()), out.data(), n, nullptr, nullptr);
+        return out;
+    };
+    s.device = narrow(dev);
+    s.link = narrow(link);
     return true;
+}
+
+DWORD statusSeq() {
+    DWORD seq = 0, size = sizeof seq;
+    RegGetValueW(HKEY_LOCAL_MACHINE, kStatusKey, L"Seq", RRF_RT_REG_DWORD, nullptr, &seq, &size);
+    return seq;
 }
 
 void writeNotice(int code, const std::string& arg) {

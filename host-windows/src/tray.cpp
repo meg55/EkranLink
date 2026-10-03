@@ -31,11 +31,11 @@ using i18n::W;
 namespace {
 
 constexpr UINT WM_TRAY = WM_APP + 1;
-constexpr UINT WM_STATE = WM_APP + 2;     // lParam: StateMsg*
+constexpr UINT WM_STATE = WM_APP + 2;     // lParam: SessionState*
 constexpr UINT WM_STATS = WM_APP + 3;     // lParam: std::string*
 constexpr UINT WM_NOTICE = WM_APP + 4;    // wParam: Notice, lParam: std::string* (ek bilgi)
 constexpr UINT WM_OPEN_UI = WM_APP + 5;   // ikinci kez çalıştırıldı: pencereyi aç
-constexpr UINT WM_ROTATION = WM_APP + 6;  // wParam: yeni sabit yön (Windows ayarlarından değişti)
+constexpr UINT WM_SETTINGS = WM_APP + 6;  // yön / çözünürlük Windows ayarlarından değişip kaydedildi
 constexpr UINT kTrayId = 1;
 
 enum MenuId : UINT {
@@ -48,12 +48,6 @@ enum MenuId : UINT {
 const wchar_t* kRunKey = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 const wchar_t* kBackgroundArg = L"--arka-plan";  // Windows ile başlarken: pencere açılmaz
 
-struct StateMsg {
-    bool connected;
-    std::string device, link;
-    DisplayMode mode;
-};
-
 HWND g_wnd = nullptr;
 NOTIFYICONDATAW g_nid{};
 HICON g_iconIdle = nullptr, g_iconOn = nullptr;
@@ -63,6 +57,7 @@ std::thread g_worker;
 bool g_connected = false;
 std::wstring g_device, g_link, g_stats;
 DisplayMode g_mode = DisplayMode::Extend;
+int g_width = 0, g_height = 0;  // bağlı tabletin ekranı
 std::wstring g_logPath;
 // Hizmet kuruluysa yayını hizmet (ajan) yapar; tepsi yalnızca arayüzdür: ayarları HKLM'e yazar,
 // durumu oradan okur. Değilse yayını tepsi kendisi yapar (ayarlar HKCU).
@@ -207,7 +202,7 @@ void startStatusWatcher() {
         HKEY k = nullptr;
         if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, config::kStatusKey, 0, KEY_NOTIFY | KEY_QUERY_VALUE, &k) != 0) return;
         HANDLE ev = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-        bool last = false;
+        DWORD lastSeq = 0;
         bool first = true;
         DWORD lastNotice = config::noticeId();  // açılıştan önceki uyarılar gösterilmez
         for (;;) {
@@ -218,20 +213,11 @@ void startStatusWatcher() {
                 lastNotice = config::readNotice(code, *arg);
                 PostMessageW(g_wnd, WM_NOTICE, WPARAM(code), reinterpret_cast<LPARAM>(arg));
             }
-            bool c = false;
-            int mode = 0;
-            std::wstring dev, link;
-            if (config::readStatus(c, dev, link, mode) && (first || c != last)) {
-                auto narrow = [](const std::wstring& w) {
-                    int n = WideCharToMultiByte(CP_UTF8, 0, w.data(), int(w.size()), nullptr, 0, nullptr, nullptr);
-                    std::string s(size_t(n), '\0');
-                    WideCharToMultiByte(CP_UTF8, 0, w.data(), int(w.size()), s.data(), n, nullptr, nullptr);
-                    return s;
-                };
-                if (!first || c)
-                    PostMessageW(g_wnd, WM_STATE, 0,
-                                 reinterpret_cast<LPARAM>(new StateMsg{c, narrow(dev), narrow(link), DisplayMode(mode)}));
-                last = c;
+            const DWORD seq = config::statusSeq();
+            SessionState st;
+            if ((first || seq != lastSeq) && config::readStatus(st)) {
+                if (!first || st.connected) PostMessageW(g_wnd, WM_STATE, 0, reinterpret_cast<LPARAM>(new SessionState(st)));
+                lastSeq = seq;
                 first = false;
             }
             HANDLE hs[2] = {ev, g_statusQuit};
@@ -256,8 +242,8 @@ void startStreamer() {
         return;
     }
     StreamerEvents ev;
-    ev.onState = [](bool connected, const std::string& device, const std::string& link, DisplayMode mode) {
-        PostMessageW(g_wnd, WM_STATE, 0, reinterpret_cast<LPARAM>(new StateMsg{connected, device, link, mode}));
+    ev.onState = [](const SessionState& s) {
+        PostMessageW(g_wnd, WM_STATE, 0, reinterpret_cast<LPARAM>(new SessionState(s)));
     };
     ev.onPairRequest = [](const std::string& device, const std::string& code, HANDLE cancel) {
         return askPairing(widen(device), widen(code), cancel);
@@ -268,7 +254,7 @@ void startStreamer() {
     ev.onNotice = [](Notice n, const std::string& arg) {
         PostMessageW(g_wnd, WM_NOTICE, WPARAM(n), reinterpret_cast<LPARAM>(new std::string(arg)));
     };
-    ev.onRotationChanged = [](int rotation) { PostMessageW(g_wnd, WM_ROTATION, WPARAM(rotation), 0); };
+    ev.onSettingsChanged = [] { PostMessageW(g_wnd, WM_SETTINGS, 0, 0); };
     g_streamer = std::make_unique<Streamer>(g_opt, ev);
     g_worker = std::thread([] {
         CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -285,11 +271,9 @@ void stopStreamer() {
     g_connected = false;
 }
 
-void restartStreamer() {
-    if (g_serviceMode) return;  // ajan kayıt defterindeki değişikliği görüp kendisi yeniden başlar
-    stopStreamer();
-    startStreamer();
-    updateTray();
+// Ayar değişti: bağlantı kopmadan uygulanır (hizmet modunda ajan kayıt defterindeki değişikliği görür)
+void applyOptions() {
+    if (g_streamer) g_streamer->update(g_opt);
 }
 
 std::vector<std::wstring> listOutputs() {
@@ -358,6 +342,8 @@ public:
         m.link = g_link;
         m.stats = g_stats;
         m.activeMode = g_mode;
+        m.tabletWidth = g_width;
+        m.tabletHeight = g_height;
         m.driver = g_driver;
         m.serviceMode = g_serviceMode;
         m.serviceStale = g_serviceStale;
@@ -375,12 +361,12 @@ public:
             case ui::Act::Link:
                 g_opt.mode = LinkMode(v);
                 regSet(L"Mode", DWORD(v));
-                if (g_streamer) g_streamer->setMode(g_opt.mode);
+                applyOptions();
                 break;
             case ui::Act::AutoConnect:
                 g_opt.autoConnect = v != 0;
                 regSet(L"AutoConnect", DWORD(v));
-                restartStreamer();
+                applyOptions();
                 break;
             case ui::Act::ConnectNow:
                 if (g_serviceMode) config::set(L"ConnectNow", config::get(L"ConnectNow", 0) + 1);  // ajan izliyor
@@ -391,27 +377,32 @@ public:
                 g_opt.onlyTablet = v == int(DisplayMode::Only);
                 regSet(L"Mirror", g_opt.extend ? 0 : 1);
                 regSet(L"OnlyTablet", g_opt.onlyTablet ? 1 : 0);
-                restartStreamer();
+                applyOptions();
                 break;
             case ui::Act::Output:
                 g_opt.output = v;
                 regSet(L"Output", DWORD(v));
-                restartStreamer();
+                applyOptions();
                 break;
             case ui::Act::Rotation:
                 g_opt.rotation = v;
-                config::saveRotation(v);  // hizmet modunda ajan değişikliği görüp uygular
-                if (g_streamer) g_streamer->setRotation(v);
+                config::saveRotation(v);
+                applyOptions();
+                break;
+            case ui::Act::Resolution:
+                g_opt.resolution = v;
+                config::saveResolution(v);
+                applyOptions();
                 break;
             case ui::Act::Touch:
                 g_opt.touchAsMouse = v != 0;
                 regSet(L"TouchAsMouse", DWORD(v));
-                restartStreamer();
+                applyOptions();
                 break;
             case ui::Act::LowLatency:
                 g_opt.lowLatency = v != 0;
                 regSet(L"LowLatency", DWORD(v));
-                restartStreamer();
+                applyOptions();
                 break;
             case ui::Act::Autostart:
                 setAutostart(v != 0);
@@ -522,14 +513,19 @@ LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             onCommand(LOWORD(w));
             return 0;
         case WM_STATE: {
-            std::unique_ptr<StateMsg> s(reinterpret_cast<StateMsg*>(l));
+            std::unique_ptr<SessionState> s(reinterpret_cast<SessionState*>(l));
+            const bool changed = s->connected != g_connected;
             g_connected = s->connected;
             g_device = widen(s->device);
             g_link = widen(s->link);
             g_mode = s->mode;
-            g_stats.clear();
+            g_width = s->width;
+            g_height = s->height;
+            if (changed) {
+                g_stats.clear();
+                notify(W(g_connected ? i18n::NotifyConnected : i18n::NotifyDisconnected), g_device + L" (" + g_link + L")");
+            }
             updateTray();
-            notify(W(g_connected ? i18n::NotifyConnected : i18n::NotifyDisconnected), g_device + L" (" + g_link + L")");
             return 0;
         }
         case WM_NOTICE: {
@@ -537,8 +533,8 @@ LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             showNotice(Notice(w), *arg);
             return 0;
         }
-        case WM_ROTATION:
-            g_opt.rotation = int(w);
+        case WM_SETTINGS:
+            g_opt = config::loadOptions();
             ui::refresh();
             return 0;
         case WM_STATS: {

@@ -223,6 +223,31 @@ bool VirtualDisplay::isolate() {
 void VirtualDisplay::restoreLayout() {
     if (!isolated_) return;
     isolated_ = false;
+    // Tek ekrandayken tabletin çözünürlüğü / yönü değişmiş olabilir: kayıtlı düzende onunkini güncelle,
+    // yoksa eski düzen yüklenince tablet de eski moduna döner.
+    std::vector<DISPLAYCONFIG_PATH_INFO> paths;
+    std::vector<DISPLAYCONFIG_MODE_INFO> modes;
+    auto self = [&](const DISPLAYCONFIG_PATH_INFO& p) {
+        return p.targetInfo.id == targetId_ && p.targetInfo.adapterId.LowPart == adapter_.LowPart &&
+               p.targetInfo.adapterId.HighPart == adapter_.HighPart;
+    };
+    if (queryActive(paths, modes)) {
+        for (const auto& now : paths) {
+            if (!self(now)) continue;
+            for (auto& saved : savedPaths_) {
+                if (!self(saved)) continue;
+                saved.targetInfo.rotation = now.targetInfo.rotation;
+                const UINT32 ns = now.sourceInfo.modeInfoIdx, ss = saved.sourceInfo.modeInfoIdx;
+                if (ns < modes.size() && ss < savedModes_.size()) {
+                    const POINTL pos = savedModes_[ss].sourceMode.position;
+                    savedModes_[ss].sourceMode = modes[ns].sourceMode;
+                    savedModes_[ss].sourceMode.position = pos;
+                }
+                const UINT32 nt = now.targetInfo.modeInfoIdx, st = saved.targetInfo.modeInfoIdx;
+                if (nt < modes.size() && st < savedModes_.size()) savedModes_[st].targetMode = modes[nt].targetMode;
+            }
+        }
+    }
     LONG r = SetDisplayConfig(UINT32(savedPaths_.size()), savedPaths_.data(), UINT32(savedModes_.size()),
                               savedModes_.data(), SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_ALLOW_CHANGES);
     if (r != ERROR_SUCCESS) {
@@ -255,6 +280,37 @@ bool VirtualDisplay::setRotation(int degrees) {
         return false;
     }
     logf("Sanal ekran: %s", want & 1 ? "dikey" : "yatay");
+    return true;
+}
+
+bool VirtualDisplay::resolution(int& width, int& height) const {
+    if (!added_ || gdiName_.empty()) return false;
+    DEVMODEW dm{};
+    dm.dmSize = sizeof dm;
+    if (!EnumDisplaySettingsExW(gdiName_.c_str(), ENUM_CURRENT_SETTINGS, &dm, 0)) return false;
+    const bool portrait = dm.dmDisplayOrientation & 1;
+    width = int(portrait ? dm.dmPelsHeight : dm.dmPelsWidth);
+    height = int(portrait ? dm.dmPelsWidth : dm.dmPelsHeight);
+    return true;
+}
+
+bool VirtualDisplay::setResolution(int width, int height) {
+    if (!added_ || gdiName_.empty()) return false;
+    DEVMODEW dm{};
+    dm.dmSize = sizeof dm;
+    if (!EnumDisplaySettingsExW(gdiName_.c_str(), ENUM_CURRENT_SETTINGS, &dm, 0)) return false;
+    const bool portrait = dm.dmDisplayOrientation & 1;
+    const DWORD w = DWORD(portrait ? height : width), h = DWORD(portrait ? width : height);
+    if (dm.dmPelsWidth == w && dm.dmPelsHeight == h) return true;
+    dm.dmPelsWidth = w;
+    dm.dmPelsHeight = h;
+    dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT;
+    const LONG r = ChangeDisplaySettingsExW(gdiName_.c_str(), &dm, nullptr, 0, nullptr);
+    if (r != DISP_CHANGE_SUCCESSFUL) {
+        logf("Sanal ekran: çözünürlük %dx%d yapılamadı (%ld)", width, height, r);
+        return false;
+    }
+    logf("Sanal ekran: çözünürlük %dx%d", width, height);
     return true;
 }
 

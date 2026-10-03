@@ -15,7 +15,7 @@
 
 namespace ekran::config {
 
-constexpr const wchar_t* kVersion = L"0.4.0";
+constexpr const wchar_t* kVersion = L"0.4.1";
 
 constexpr const wchar_t* kUserKey = L"Software\\EKRAN";
 constexpr const wchar_t* kMachineKey = L"SOFTWARE\\EKRAN";
@@ -35,6 +35,8 @@ Options loadOptions();
 void saveRotation(int degrees);  // -1: otomatik
 int lastRotation();              // yoksa 0
 void saveLastRotation(int degrees);
+// "Resolution": ikinci ekranın çözünürlüğü, tabletinkinin yüzdesi (kResolutions)
+void saveResolution(int percent);
 
 // Eşleşme deposu: kök anahtar ve yol (pairing.cpp)
 HKEY secretRoot();
@@ -47,8 +49,9 @@ std::vector<std::string> knownAddresses();
 void rememberAddress(const std::string& ip);
 
 // Durum (ajan yazar, tepsi okur)
-void writeStatus(bool connected, const std::string& device, const std::string& link, int mode = 0);
-bool readStatus(bool& connected, std::wstring& device, std::wstring& link, int& mode);
+void writeStatus(const SessionState& s);
+bool readStatus(SessionState& s);
+DWORD statusSeq();  // her writeStatus'ta artar (bağlantı ya da görüntü modu değişti)
 // Kullanıcıya gösterilecek uyarı (ajan yazar, tepsi kendi dilinde bildirim olarak gösterir).
 // code: Notice (streamer.h). Her yazışta numara artar.
 void writeNotice(int code, const std::string& arg);

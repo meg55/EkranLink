@@ -30,7 +30,32 @@ constexpr UINT32 kCancel = POINTER_FLAG_UP | POINTER_FLAG_CANCELED;
 
 TouchInjector::TouchInjector(Mode mode) : mode_(mode) {
     if (mode_ == Mode::Touch && !touchInjectionReady()) mode_ = Mode::Mouse;
-    if (mode_ == Mode::Touch) keeper_ = std::thread([this] { keepAlive(); });
+    if (mode_ == Mode::Touch) {
+        keeper_ = std::thread([this] { keepAlive(); });
+        keeperStarted_ = true;
+    }
+}
+
+void TouchInjector::setMode(Mode mode) {
+    std::lock_guard<std::mutex> lock(m_);
+    if (mode == Mode::Touch && !touchInjectionReady()) mode = Mode::Mouse;
+    if (mode == mode_) return;
+    // Yarım kalan dokunma ya da basılı sol tuş Windows'ta takılı kalmasın
+    for (int i = 0; i < kMaxContacts; i++)
+        if (contacts_[i].active) injectLocked(i, kCancel);
+    if (mouseDown_) {
+        INPUT in{};
+        in.type = INPUT_MOUSE;
+        in.mi.dwFlags = MOUSEEVENTF_LEFTUP;
+        SendInput(1, &in, sizeof in);
+    }
+    dropContactsLocked();
+    mode_ = mode;
+    if (mode_ == Mode::Touch && !keeperStarted_) {
+        keeper_ = std::thread([this] { keepAlive(); });  // kilidi bıraktıktan sonra çalışmaya başlar
+        keeperStarted_ = true;
+    }
+    logf("Dokunma: %s", mode_ == Mode::Touch ? "dokunmatik ekran" : "fare");
 }
 
 TouchInjector::~TouchInjector() {

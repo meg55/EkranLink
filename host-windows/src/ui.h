@@ -16,6 +16,7 @@ struct Model {
     bool connected = false;
     std::wstring device, link, stats;
     DisplayMode activeMode = DisplayMode::Extend;
+    int tabletWidth = 0, tabletHeight = 0;  // bağlı tabletin ekranı (çözünürlük seçenekleri için)
     bool driver = false;        // sanal ekran sürücüsü kurulu (ikinci ekran / tek ekran)
     bool serviceMode = false;   // hizmet kurulu
     bool serviceStale = false;  // kurulu hizmet bu sürümden farklı
@@ -32,6 +33,7 @@ enum class Act {
     Display,      // DisplayMode
     Output,       // yansıtılan ekran sırası
     Rotation,     // -1 otomatik, 0/90/180/270
+    Resolution,   // yüzde (kResolutions)
     Touch,        // 0 dokunmatik, 1 fare
     LowLatency,   // 0/1
     Autostart,    // 0/1

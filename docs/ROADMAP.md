@@ -89,6 +89,12 @@ Derleme için Visual Studio gerekmez: MinGW-w64 (GCC) yeterli.
 - [x] Kalıcı monitör yönü: Otomatik (tabletle) ya da sabit; Windows ekran ayarlarından yapılan değişiklik de
       kaydedilir (`Orientation`, `LastRotation`)
 - [x] Telefon düzeni: kısa kenar < 520dp'de sıkı yerleşim, gerekirse kayan karşılama ekranı, çentik payı
+- [x] Canlı ayarlar (0.4.1): ayar değişince yayın yeniden başlamaz (`Streamer::update`). Dokunma, performans,
+      otomatik bağlan, yön, çözünürlük, ikinci ekran ↔ tek ekran anında; yansıtma ↔ ikinci ekran ve yansıtılan
+      ekran yalnızca görüntü boru hattı yeniden kurularak (bağlantı ve tablet çözücüsü sürer). Tek ekrandan
+      çıkarken tabletin o anki çözünürlüğü/yönü korunur
+- [x] Çözünürlük seçimi: tabletinkinin %50/75/100/125/150'si (sürücünün sunduğu modlar), Windows'tan yapılan
+      değişiklik de kaydedilir (`Resolution`)
 - [x] Güvenilir Wi-Fi keşfi: arayüz başına soket, 3 kez yineleme, bilinen tablet adreslerine doğrudan soru
       (yayın güvenlik duvarıyla engellenip denendi: 1,2 sn'de bağlandı). Tablet UDP/TCP portu boşalana kadar dener
 - [ ] Kalıcı APK sürüm anahtarı (GitHub sürümleri için; şu an hata ayıklama anahtarı)

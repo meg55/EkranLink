@@ -58,6 +58,17 @@ namespace ekran::i18n {
     X(OrientMirrorHint, L"Yansıtmada yön, bilgisayar ekranının kendi yönüdür.",                                     \
       L"When mirroring, the orientation is that of the computer screen.")                                          \
     X(MirroredScreen, L"Yansıtılan ekran", L"Mirrored screen")                                                      \
+    X(Resolution, L"Çözünürlük", L"Resolution")                                                                     \
+    X(ResPercent, L"%%%d", L"%d%%")                                                                                 \
+    X(ResPercentSize, L"%%%d  ·  %d×%d", L"%d%%  ·  %d×%d")                                                         \
+    X(ResNative, L"  (tabletin kendi çözünürlüğü)", L"  (tablet's native resolution)")                             \
+    X(ResHint,                                                                                                      \
+      L"Yüksek çözünürlük daha çok çalışma alanı verir, yazılar küçülür; düşükte yazılar büyür. Windows ekran "     \
+      L"ayarlarından yaptığınız değişiklik de hatırlanır.",                                                         \
+      L"A higher resolution gives more workspace with smaller text; a lower one makes text larger. Changes made "  \
+      L"in Windows display settings are remembered too.")                                                           \
+    X(ResMirrorHint, L"Yansıtmada çözünürlük, bilgisayar ekranının kendi çözünürlüğüdür.",                          \
+      L"When mirroring, the resolution is that of the computer screen.")                                           \
     X(ScreenN, L"Ekran %d  (%d×%d)", L"Screen %d  (%d×%d)")                                                         \
     X(SecInput, L"Dokunma ve performans", L"Touch and performance")                                                 \
     X(Touch, L"Dokunma", L"Touch")                                                                                  \

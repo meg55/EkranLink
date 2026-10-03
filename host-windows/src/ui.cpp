@@ -524,6 +524,23 @@ void Window::paint() {
                   W(i18n::OrientLandscapeFlipped), W(i18n::OrientPortraitFlipped)},
                  rot, mode != 2, [this](int i) { host_->act(Act::Rotation, i == 0 ? -1 : (i - 1) * 90); });
         hint(mode != 2 ? W(i18n::OrientHint) : W(i18n::OrientMirrorHint), t.sub);
+        divider();
+        label(W(i18n::Resolution), nullptr);
+        {
+            std::vector<std::wstring> items;
+            int sel = 0;
+            for (size_t i = 0; i < std::size(kResolutions); i++) {
+                const int p = kResolutions[i];
+                std::wstring s = m.tabletWidth > 0
+                                     ? i18n::F(i18n::ResPercentSize, p, m.tabletWidth * p / 100, m.tabletHeight * p / 100)
+                                     : i18n::F(i18n::ResPercent, p);
+                if (p == 100) s += W(i18n::ResNative);
+                items.push_back(s);
+                if (p == m.opt.resolution) sel = int(i);
+            }
+            dropdown(items, sel, mode != 2, [this](int i) { host_->act(Act::Resolution, kResolutions[i]); });
+        }
+        hint(mode != 2 ? W(i18n::ResHint) : W(i18n::ResMirrorHint), t.sub);
         if (mode == 2) {
             divider();
             label(W(i18n::MirroredScreen), nullptr);

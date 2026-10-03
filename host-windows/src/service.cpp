@@ -332,7 +332,7 @@ int runAgent() {
     HKEY settings = nullptr;
     RegOpenKeyExW(HKEY_LOCAL_MACHINE, config::kSettingsKey, 0, KEY_NOTIFY | KEY_QUERY_VALUE, &settings);
     HANDLE regEv = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    config::writeStatus(false, "", "");
+    config::writeStatus(SessionState{});
 
     auto handleForget = [] {
         if (config::get(L"ForgetPairs", 0) == 0) return false;
@@ -350,18 +350,11 @@ int runAgent() {
     };
     applyLanguage();
 
-    auto same = [](const Options& a, const Options& b) {
-        return a.mode == b.mode && a.output == b.output && a.extend == b.extend && a.onlyTablet == b.onlyTablet &&
-               a.touchAsMouse == b.touchAsMouse && a.lowLatency == b.lowLatency && a.autoConnect == b.autoConnect;
-    };
-
     bool quit = false;
     while (!quit) {
         const Options opt = config::loadOptions();
         StreamerEvents ev;
-        ev.onState = [](bool connected, const std::string& device, const std::string& link, DisplayMode mode) {
-            config::writeStatus(connected, device, link, int(mode));
-        };
+        ev.onState = [](const SessionState& s) { config::writeStatus(s); };
         ev.onNotice = [](Notice n, const std::string& arg) { config::writeNotice(int(n), arg); };
         ev.onPairRequest = [](const std::string& device, const std::string& code, HANDLE cancel) {
             // Oturum açılmadan (kilit ekranı) yeni tablet eşleştirilmez: kilit ekranı yabancıya gitmesin
@@ -400,19 +393,15 @@ int runAgent() {
                 streamer.connectNow();
                 continue;
             }
-            const Options now = config::loadOptions();
-            if (!same(opt, now)) {
-                logf("Ayarlar değişti; yayın yeniden başlıyor");
-                break;
-            }
-            streamer.setRotation(now.rotation);  // yön bağlantıyı koparmadan değişir
+            // Ayarlar bağlantıyı koparmadan uygulanır (Streamer::update)
+            streamer.update(config::loadOptions());
             applyLanguage();
         }
         streamer.stop();
         worker.join();
     }
 
-    config::writeStatus(false, "", "");
+    config::writeStatus(SessionState{});
     logf("EKRAN ajanı kapandı");
     if (settings) RegCloseKey(settings);
     CloseHandle(regEv);

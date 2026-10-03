@@ -26,6 +26,8 @@ public:
     // imageW×imageH: yakalanan görüntü (panel yönü), orient: masaüstüne göre dönüşü
     void setMapping(RECT desktop, RECT content, int imageW, int imageH, Orientation orient);
     void onTouch(uint8_t action, uint8_t pointerId, int x, int y, int pressure);
+    // Bağlantı sürerken mod değiştir (basılı parmak / fare tuşu önce bırakılır)
+    void setMode(Mode mode);
 
 private:
     static constexpr int kMaxContacts = 10;
@@ -43,6 +45,7 @@ private:
     void mouse(uint8_t action, uint8_t pointerId, POINT pt);
 
     Mode mode_;
+    bool keeperStarted_ = false;
     RECT desktop_{};
     RECT content_{};
     int imageW_ = 1, imageH_ = 1;

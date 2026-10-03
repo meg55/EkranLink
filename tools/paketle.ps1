@@ -94,6 +94,9 @@ GÖRÜNTÜ MODLARI (pencerede Görüntü)
   Monitör yönü: Otomatik'te tableti dik çevirmek monitörü de dikey yapar (tablette "Otomatik döndür"
   açık olmalı). Yatay / Dikey / ters seçilebilir. Seçim ve Windows ekran ayarlarından yapılan
   değişiklik hatırlanır.
+  Çözünürlük: tabletinkinin %50-150'si (yüksek = daha çok alan, küçük yazı). Windows ekran
+  ayarlarından yapılan değişiklik de hatırlanır.
+  Ayarlar bağlantıyı koparmadan uygulanır; tablet bağlı kalır.
 
 EKRANSIZ MINI PC (oturum açma ekranı)
   Pencerede Genel > "Oturum açılmadan önce başlat" (bir kez yönetici izni ister). EKRAN Windows hizmeti olarak
