@@ -25,6 +25,7 @@ add_library(ekran_core STATIC
   src/usb_watch.cpp
   src/desktop.cpp
   src/config.cpp
+  src/i18n.cpp
   src/pair_prompt.cpp
   src/streamer.cpp
 )
@@ -41,8 +42,8 @@ add_executable(ekran-host src/main.cpp)
 target_link_libraries(ekran-host PRIVATE ekran_core)
 
 # ekran.exe: bildirim alanı uygulaması (günlük kullanım)
-add_executable(ekran WIN32 src/tray.cpp src/service.cpp)
-target_link_libraries(ekran PRIVATE ekran_core shell32 advapi32 gdi32)
+add_executable(ekran WIN32 src/tray.cpp src/ui.cpp src/service.cpp)
+target_link_libraries(ekran PRIVATE ekran_core shell32 advapi32 gdi32 d2d1 dwrite dwmapi)
 
 # ekran-surucu.exe: sanal ekran sürücüsü aygıtını kur/kaldır (yönetici)
 add_executable(ekran-surucu src/driver_tool.cpp)

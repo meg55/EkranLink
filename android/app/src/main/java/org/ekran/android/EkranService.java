@@ -43,7 +43,7 @@ public final class EkranService extends Service implements Session.Host {
     /** Tanı modu (`--ez yuzeysiz true`): çözücü yüzeye çizmeden çalışır. Hizmet başlamadan ayarlanır. */
     static volatile boolean headless;
 
-    final Stats stats = new Stats();
+    Stats stats; // onCreate'te kurulur (durum metinleri hizmetin kaynaklarıyla çevrilir)
     private StreamServer server;
     private DiscoveryResponder discovery;
     private PairStore pairStore;
@@ -69,6 +69,7 @@ public final class EkranService extends Service implements Session.Host {
     @Override
     public void onCreate() {
         super.onCreate();
+        stats = new Stats(getResources());
         instance = this;
         String androidId = android.provider.Settings.Secure.getString(getContentResolver(),
                 android.provider.Settings.Secure.ANDROID_ID);
@@ -292,9 +293,10 @@ public final class EkranService extends Service implements Session.Host {
     public void onSessionActive(final boolean isActive, boolean encrypted) {
         active = isActive;
         if (isActive) {
-            stats.setStatus(Stats.CONNECTED, encrypted ? "Bağlı · Wi-Fi, şifreli" : "Bağlı · USB");
+            stats.setStatus(Stats.CONNECTED,
+                    encrypted ? R.string.status_connected_wifi : R.string.status_connected_usb);
         } else {
-            stats.setStatus(Stats.WAITING, "Bilgisayar bekleniyor");
+            stats.setStatus(Stats.WAITING, R.string.status_waiting);
             config = null;
             pcDisplayOn = true;
             synchronized (this) {
@@ -329,10 +331,9 @@ public final class EkranService extends Service implements Session.Host {
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         Notification.Builder b;
         if (Build.VERSION.SDK_INT >= 26) {
-            if (nm.getNotificationChannel(CHANNEL) == null) {
-                nm.createNotificationChannel(new android.app.NotificationChannel(CHANNEL, "Bilgisayar bağlantısı",
-                        NotificationManager.IMPORTANCE_LOW));
-            }
+            // Kanal varsa yalnızca adı güncellenir (cihaz dili değiştiyse ayarlarda da yeni dilde görünsün)
+            nm.createNotificationChannel(new android.app.NotificationChannel(CHANNEL,
+                    getString(R.string.notif_channel), NotificationManager.IMPORTANCE_LOW));
             b = new Notification.Builder(this, CHANNEL);
         } else {
             b = new Notification.Builder(this).setPriority(Notification.PRIORITY_LOW);
@@ -344,11 +345,11 @@ public final class EkranService extends Service implements Session.Host {
         PendingIntent cut = PendingIntent.getService(this, 1,
                 new Intent(this, EkranService.class).setAction(ACTION_DISCONNECT), immutable);
         return b.setSmallIcon(android.R.drawable.presence_online)
-                .setContentTitle("EKRAN · bilgisayara bağlı (" + link + ")")
-                .setContentText("Ekrana dönmek için dokunun")
+                .setContentTitle(getString(R.string.notif_title, link))
+                .setContentText(getString(R.string.notif_text))
                 .setContentIntent(open)
                 .setOngoing(true)
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Bağlantıyı kes", cut)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, getString(R.string.disconnect), cut)
                 .build();
     }
 }

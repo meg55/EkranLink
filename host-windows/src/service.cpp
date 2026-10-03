@@ -16,6 +16,7 @@
 
 #include "adb.h"
 #include "config.h"
+#include "i18n.h"
 #include "desktop.h"
 #include "log.h"
 #include "pair_prompt.h"
@@ -342,6 +343,13 @@ int runAgent() {
     };
     handleForget();
 
+    // Dil: ayar, yoksa tepsinin yazdığı kullanıcı dili (SYSTEM'in kendi dili kullanıcınınki değildir)
+    auto applyLanguage = [] {
+        const DWORD l = config::get(L"Language", 0);
+        i18n::setLanguage(int(l ? l : config::get(L"UiLanguage", 0)));
+    };
+    applyLanguage();
+
     auto same = [](const Options& a, const Options& b) {
         return a.mode == b.mode && a.output == b.output && a.extend == b.extend && a.onlyTablet == b.onlyTablet &&
                a.touchAsMouse == b.touchAsMouse && a.lowLatency == b.lowLatency && a.autoConnect == b.autoConnect;
@@ -351,10 +359,10 @@ int runAgent() {
     while (!quit) {
         const Options opt = config::loadOptions();
         StreamerEvents ev;
-        ev.onState = [](bool connected, const std::string& device, const std::string& link) {
-            config::writeStatus(connected, device, link);
+        ev.onState = [](bool connected, const std::string& device, const std::string& link, DisplayMode mode) {
+            config::writeStatus(connected, device, link, int(mode));
         };
-        ev.onNotice = [](const std::string& title, const std::string& text) { config::writeNotice(title, text); };
+        ev.onNotice = [](Notice n, const std::string& arg) { config::writeNotice(int(n), arg); };
         ev.onPairRequest = [](const std::string& device, const std::string& code, HANDLE cancel) {
             // Oturum açılmadan (kilit ekranı) yeni tablet eşleştirilmez: kilit ekranı yabancıya gitmesin
             const std::wstring desk = inputDesktopName();
@@ -392,10 +400,13 @@ int runAgent() {
                 streamer.connectNow();
                 continue;
             }
-            if (!same(opt, config::loadOptions())) {
+            const Options now = config::loadOptions();
+            if (!same(opt, now)) {
                 logf("Ayarlar değişti; yayın yeniden başlıyor");
                 break;
             }
+            streamer.setRotation(now.rotation);  // yön bağlantıyı koparmadan değişir
+            applyLanguage();
         }
         streamer.stop();
         worker.join();

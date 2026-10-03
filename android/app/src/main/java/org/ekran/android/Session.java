@@ -136,8 +136,12 @@ final class Session implements H264Decoder.FrameListener {
 
     /** Sürüm uyuşmazlığı: kullanıcıya hangi uygulamanın güncelleneceği söylenir. */
     static final class IncompatibleException extends IOException {
-        IncompatibleException(String message) {
+        /** Ekranda gösterilecek metnin dize kaynağı (cihaz diline göre çevrilir). */
+        final int messageRes;
+
+        IncompatibleException(int messageRes, String message) {
             super(message);
+            this.messageRes = messageRes;
         }
     }
 
@@ -156,9 +160,9 @@ final class Session implements H264Decoder.FrameListener {
         while (drained < 64 * 1024 && (n = in.read(buf, 0, buf.length)) > 0) {
             drained += n;
         }
-        throw new IncompatibleException(peerVersion > VERSION
-                ? "Bilgisayardaki EKRAN daha yeni: tablete EKRAN'ın yeni sürümünü kurun"
-                : "Bilgisayardaki EKRAN eski: bilgisayara EKRAN'ın yeni sürümünü kurun");
+        boolean pcNewer = peerVersion > VERSION;
+        throw new IncompatibleException(pcNewer ? R.string.status_pc_newer : R.string.status_pc_older,
+                "PC protokol sürümü " + peerVersion + (pcNewer ? " (daha yeni)" : " (daha eski)"));
     }
 
     // --- Anahtar değişimi ve eşleştirme ---

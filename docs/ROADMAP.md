@@ -82,6 +82,13 @@ Derleme için Visual Studio gerekmez: MinGW-w64 (GCC) yeterli.
       `dist\EKRAN-<sürüm>-windows.zip` (exe'ler + adb) ve `dist\EKRAN-<sürüm>-android.apk`.
       USB'de uygulama yoksa PC bildirimle söyler; protokol sürümü uyuşmazsa tablet `Incompatible`
       gönderir, iki taraf da hangi uygulamanın güncelleneceğini gösterir
+- [x] Ayar penceresi (0.4.0): Direct2D, Windows'un açık/koyu temasına ve DPI'ına uyar, yalnızca açıkken
+      kaynak kullanır. Tepsi sol tık pencere, sağ tık kısa menü; ikinci kez çalıştırma pencereyi öne getirir
+- [x] Türkçe / İngilizce: PC'de `i18n.h` (Sistem / Türkçe / English), Android'de `values` / `values-tr`.
+      Hizmetin bildirimleri kodla taşınır, tepsi kendi dilinde gösterir
+- [x] Kalıcı monitör yönü: Otomatik (tabletle) ya da sabit; Windows ekran ayarlarından yapılan değişiklik de
+      kaydedilir (`Orientation`, `LastRotation`)
+- [x] Telefon düzeni: kısa kenar < 520dp'de sıkı yerleşim, gerekirse kayan karşılama ekranı, çentik payı
 - [x] Güvenilir Wi-Fi keşfi: arayüz başına soket, 3 kez yineleme, bilinen tablet adreslerine doğrudan soru
       (yayın güvenlik duvarıyla engellenip denendi: 1,2 sn'de bağlandı). Tablet UDP/TCP portu boşalana kadar dener
 - [ ] Kalıcı APK sürüm anahtarı (GitHub sürümleri için; şu an hata ayıklama anahtarı)

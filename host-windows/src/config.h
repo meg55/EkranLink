@@ -15,7 +15,7 @@
 
 namespace ekran::config {
 
-constexpr const wchar_t* kVersion = L"0.3.1";
+constexpr const wchar_t* kVersion = L"0.4.0";
 
 constexpr const wchar_t* kUserKey = L"Software\\EKRAN";
 constexpr const wchar_t* kMachineKey = L"SOFTWARE\\EKRAN";
@@ -30,6 +30,11 @@ bool machineStore();
 DWORD get(const wchar_t* name, DWORD def);
 void set(const wchar_t* name, DWORD v);
 Options loadOptions();
+// Monitör yönü. "Orientation": 0 tabletle döner, 1–4 sabit 0/90/180/270°.
+// "LastRotation": otomatikte en son kullanılan yön (tablet yön bildirmezse bununla açılır).
+void saveRotation(int degrees);  // -1: otomatik
+int lastRotation();              // yoksa 0
+void saveLastRotation(int degrees);
 
 // Eşleşme deposu: kök anahtar ve yol (pairing.cpp)
 HKEY secretRoot();
@@ -42,12 +47,13 @@ std::vector<std::string> knownAddresses();
 void rememberAddress(const std::string& ip);
 
 // Durum (ajan yazar, tepsi okur)
-void writeStatus(bool connected, const std::string& device, const std::string& link);
-bool readStatus(bool& connected, std::wstring& device, std::wstring& link);
-// Kullanıcıya gösterilecek uyarı (ajan yazar, tepsi bildirim olarak gösterir). Her yazışta numara artar.
-void writeNotice(const std::string& title, const std::string& text);
+void writeStatus(bool connected, const std::string& device, const std::string& link, int mode = 0);
+bool readStatus(bool& connected, std::wstring& device, std::wstring& link, int& mode);
+// Kullanıcıya gösterilecek uyarı (ajan yazar, tepsi kendi dilinde bildirim olarak gösterir).
+// code: Notice (streamer.h). Her yazışta numara artar.
+void writeNotice(int code, const std::string& arg);
 DWORD noticeId();
-DWORD readNotice(std::wstring& title, std::wstring& text);  // numarayı döndürür
+DWORD readNotice(int& code, std::string& arg);  // numarayı döndürür
 
 // %ProgramData%\EKRAN
 std::wstring programDataDir();

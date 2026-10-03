@@ -61,7 +61,20 @@ Options loadOptions() {
     o.touchAsMouse = get(L"TouchAsMouse", 0) != 0;
     o.lowLatency = get(L"LowLatency", 0) != 0;
     o.autoConnect = get(L"AutoConnect", 1) != 0;
+    const DWORD r = get(L"Orientation", 0);
+    o.rotation = r >= 1 && r <= 4 ? int(r - 1) * 90 : -1;
     return o;
+}
+
+void saveRotation(int degrees) { set(L"Orientation", degrees < 0 ? 0 : DWORD(degrees / 90 % 4 + 1)); }
+
+int lastRotation() {
+    const DWORD r = get(L"LastRotation", 0);
+    return r >= 1 && r <= 4 ? int(r - 1) * 90 : 0;
+}
+
+void saveLastRotation(int degrees) {
+    if (lastRotation() != degrees) set(L"LastRotation", DWORD(degrees / 90 % 4 + 1));
 }
 
 HKEY secretRoot() { return g_machine ? HKEY_LOCAL_MACHINE : HKEY_CURRENT_USER; }
@@ -94,33 +107,38 @@ void rememberAddress(const std::string& ip) {
     RegCloseKey(k);
 }
 
-void writeStatus(bool connected, const std::string& device, const std::string& link) {
+void writeStatus(bool connected, const std::string& device, const std::string& link, int mode) {
     HKEY k;
     if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, kStatusKey, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &k, nullptr) != 0) return;
-    const DWORD c = connected ? 1 : 0;
-    // Önce ad ve bağlantı, en son "Connected": okuyan taraf tek bildirimde tutarlı değerleri görsün
+    const DWORD c = connected ? 1 : 0, m = DWORD(mode);
+    // Önce ad, bağlantı ve mod, en son "Connected": okuyan taraf tek bildirimde tutarlı değerleri görsün
     setString(k, L"Device", widen(device));
     setString(k, L"Link", widen(link));
+    RegSetValueExW(k, L"Display", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&m), sizeof m);
     RegSetValueExW(k, L"Connected", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&c), sizeof c);
     RegCloseKey(k);
 }
 
-bool readStatus(bool& connected, std::wstring& device, std::wstring& link) {
-    DWORD c = 0, size = sizeof c;
+bool readStatus(bool& connected, std::wstring& device, std::wstring& link, int& mode) {
+    DWORD c = 0, m = 0, size = sizeof c;
     if (RegGetValueW(HKEY_LOCAL_MACHINE, kStatusKey, L"Connected", RRF_RT_REG_DWORD, nullptr, &c, &size) != 0)
         return false;
+    size = sizeof m;
+    RegGetValueW(HKEY_LOCAL_MACHINE, kStatusKey, L"Display", RRF_RT_REG_DWORD, nullptr, &m, &size);
     connected = c != 0;
+    mode = int(m);
     device = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"Device");
     link = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"Link");
     return true;
 }
 
-void writeNotice(const std::string& title, const std::string& text) {
+void writeNotice(int code, const std::string& arg) {
     HKEY k;
     if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, kStatusKey, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &k, nullptr) != 0) return;
-    setString(k, L"NoticeTitle", widen(title));
-    setString(k, L"NoticeText", widen(text));
-    const DWORD id = noticeId() + 1;  // en son: okuyan taraf metni hazır bulsun
+    const DWORD c = DWORD(code);
+    RegSetValueExW(k, L"NoticeCode", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&c), sizeof c);
+    setString(k, L"NoticeArg", widen(arg));
+    const DWORD id = noticeId() + 1;  // en son: okuyan taraf değerleri hazır bulsun
     RegSetValueExW(k, L"NoticeId", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&id), sizeof id);
     RegCloseKey(k);
 }
@@ -131,10 +149,13 @@ DWORD noticeId() {
     return id;
 }
 
-DWORD readNotice(std::wstring& title, std::wstring& text) {
+DWORD readNotice(int& code, std::string& arg) {
     const DWORD id = noticeId();
-    title = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"NoticeTitle");
-    text = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"NoticeText");
+    DWORD c = 0, size = sizeof c;
+    RegGetValueW(HKEY_LOCAL_MACHINE, kStatusKey, L"NoticeCode", RRF_RT_REG_DWORD, nullptr, &c, &size);
+    code = int(c);
+    const std::wstring w = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"NoticeArg");
+    arg.assign(w.begin(), w.end());  // sürüm metni (ASCII)
     return id;
 }
 

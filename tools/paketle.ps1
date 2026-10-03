@@ -69,7 +69,9 @@ Copy-Item (Join-Path $kok 'LICENSE') $hedef
 EKRAN $versionName — eski tabletleri bilgisayar ekranı yapın
 ===========================================================
 
-Kurulum gerekmez. ekran.exe'yi çalıştırın; saatin yanında bir monitör simgesi belirir.
+Kurulum gerekmez. ekran.exe'yi çalıştırın: ayar penceresi açılır, saatin yanında bir monitör simgesi
+belirir. Pencereyi kapatmak EKRAN'ı kapatmaz; simgeye tıklayınca yeniden açılır (sağ tık: menü, çıkış).
+Dil: pencerede Genel > Dil (Sistem / Türkçe / English). Tablet ve telefon cihazın dilini kullanır.
 
 TABLET UYGULAMASI (ayrı indirilir)
   Tablete EKRAN-$versionName-android.apk dosyasını kurun: tabletin tarayıcısıyla indirip açın ya da
@@ -82,22 +84,24 @@ KULLANIM
   Wi-Fi ile ilk bağlantıda iki cihazda aynı 6 haneli kod görünür; ikisinde de onaylayın.
   Tablet Windows'a çoklu dokunmatik ekran olarak bağlanır. Üç parmakla dokunmak ölçümleri gösterir.
 
-GÖRÜNTÜ MODLARI (simge > Görüntü)
-  İkinci ekran  Tablet ayrı bir monitör olur. Tableti dik çevirmek monitörü de dikey yapar
-                (tablette "Otomatik döndür" açık olmalı).
+GÖRÜNTÜ MODLARI (pencerede Görüntü)
+  İkinci ekran  Tablet ayrı bir monitör olur.
   Tek ekran     Tablet bağlıyken diğer monitörler kapanır; tablet ayrılınca geri gelir.
   Yansıtma      Seçili PC ekranının kopyası.
   İkinci ekran ve tek ekran için EKRAN sanal ekran sürücüsü gerekir. Şimdilik yalnızca kaynak koddan
   derlenip kurulabiliyor (driver\README.md); sürücü yoksa EKRAN yansıtır.
   Windows ekranı kapatınca tablet de kapanır, açınca birlikte uyanır.
+  Monitör yönü: Otomatik'te tableti dik çevirmek monitörü de dikey yapar (tablette "Otomatik döndür"
+  açık olmalı). Yatay / Dikey / ters seçilebilir. Seçim ve Windows ekran ayarlarından yapılan
+  değişiklik hatırlanır.
 
 EKRANSIZ MINI PC (oturum açma ekranı)
-  Simge > "Oturum açılmadan önce başlat" (bir kez yönetici izni ister). EKRAN Windows hizmeti olarak
+  Pencerede Genel > "Oturum açılmadan önce başlat" (bir kez yönetici izni ister). EKRAN Windows hizmeti olarak
   C:\Program Files\EKRAN'a kurulur ve açılışta başlar; kilit ve şifre ekranı tablette görünür.
   Kilit perdesini tablette yukarı kaydırın. Windows kilit ekranını yalnızca ana monitörde gösterir.
 
 SORUN OLURSA
-  Simge > "Günlüğü aç" (%LOCALAPPDATA%\EKRAN\ekran.log)
+  Pencerede Genel > "Günlüğü aç" (%LOCALAPPDATA%\EKRAN\ekran.log)
   Ayrıntılı ölçümler için konsol sürümü: ekran-host.exe
 
 Kaynak kodu ve lisans: GPL-3.0 (LICENSE). adb, Android SDK platform-tools'tandır (adb\NOTICE.txt).

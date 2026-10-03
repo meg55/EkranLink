@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Karşılama ekranı -->
+    <string name="welcome_tagline">Bu cihaz bilgisayarınızın ekranı olmaya hazır.</string>
+    <string name="welcome_usb_step">Kabloyu takın. Bilgisayarda EKRAN açık, bu cihazda USB hata ayıklama açık olmalı.</string>
+    <string name="welcome_wifi_found">Aynı ağdaki bilgisayar bu cihazı kendiliğinden bulur.\nBu cihazın adresi: %1$s</string>
+    <string name="welcome_wifi_none">Cihaz bir Wi-Fi ağına bağlı değil. USB ile bağlanabilirsiniz.</string>
+    <string name="auto_open_title">Bilgisayara takılınca otomatik aç</string>
+    <string name="auto_open_hint">Bilgisayardaki EKRAN\'da da \"otomatik bağlan\" açık olmalı</string>
+    <string name="toggle_on">Açık</string>
+    <string name="toggle_off">Kapalı</string>
+    <string name="footer_version">%1$s · sürüm %2$s</string>
+    <string name="forget_pairs">Eşleşmeleri unut</string>
+    <string name="forget_confirm">Tüm eşleşmeler silinsin mi? Tekrar dokunun</string>
+    <string name="forget_done">Eşleşmeler silindi</string>
+
+    <!-- Durum (bilgi katmanındaki başlık) -->
+    <string name="status_waiting">Bilgisayar bekleniyor</string>
+    <string name="status_connecting">Bağlanıyor…</string>
+    <string name="status_connected_wifi">Bağlı · Wi-Fi, şifreli</string>
+    <string name="status_connected_usb">Bağlı · USB</string>
+    <string name="status_connection_lost">Bağlantı koptu</string>
+    <string name="status_port_busy">Port %1$d başka bir uygulamada; o kapanınca bağlanılır</string>
+    <string name="status_pc_newer">Bilgisayardaki EKRAN daha yeni: bu cihaza EKRAN\'ın yeni sürümünü kurun</string>
+    <string name="status_pc_older">Bilgisayardaki EKRAN eski: bilgisayara EKRAN\'ın yeni sürümünü kurun</string>
+
+    <!-- Ölçüm kartı -->
+    <string name="stat_video">Görüntü</string>
+    <string name="stat_fps">Kare hızı</string>
+    <string name="stat_data">Veri</string>
+    <string name="stat_decode">Çözme</string>
+    <string name="stat_decoder">Çözücü</string>
+    <string name="stat_dropped">Düşen kare</string>
+    <string name="stat_fps_value">%1$.0f fps  (gelen %2$.0f)</string>
+    <string name="stat_data_value">%1$.2f Mbit/sn</string>
+    <string name="stat_decode_value">%1$.1f ms  (en az %2$.1f · en çok %3$.1f)</string>
+    <string name="stat_decoder_default">(varsayılan)</string>
+    <string name="stats_hide_hint">Gizlemek için üç parmakla dokunun</string>
+    <string name="disconnect">Bağlantıyı kes</string>
+
+    <!-- Uyku örtüsü -->
+    <string name="sleep_cover">Bilgisayarın ekranı kapalı</string>
+
+    <!-- Eşleştirme -->
+    <string name="pair_title">Eşleştirme isteği</string>
+    <string name="pair_message">%1$s bu cihaza görüntü göndermek istiyor.</string>
+    <string name="pair_hint">Bilgisayarda görünen kodla aynıysa onaylayın.</string>
+    <string name="pair_reject">Reddet</string>
+    <string name="pair_accept">Onayla</string>
+
+    <!-- Bildirim -->
+    <string name="notif_channel">Bilgisayar bağlantısı</string>
+    <string name="notif_title">EKRAN · bilgisayara bağlı (%1$s)</string>
+    <string name="notif_text">Ekrana dönmek için dokunun</string>
+</resources>

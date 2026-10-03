@@ -239,8 +239,8 @@ final class H264Decoder {
         }
 
         String profile = info.profileIdc == 66 ? "Baseline" : info.profileIdc == 77 ? "Main"
-                : info.profileIdc == 100 ? "High" : ("profil " + info.profileIdc);
-        stats.setDecoder(name != null ? name : "(varsayılan)",
+                : info.profileIdc == 100 ? "High" : ("profile_idc " + info.profileIdc);
+        stats.setDecoder(name, // null: varsayılan çözücü (metni Stats cihaz diline çevirir)
                 info.width + "×" + info.height + " H.264 " + profile + " L" + (info.levelIdc / 10f));
         Log.i(TAG, "Çözücü başladı: " + name + " " + info.width + "x" + info.height);
 

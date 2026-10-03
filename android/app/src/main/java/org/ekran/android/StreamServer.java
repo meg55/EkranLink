@@ -76,7 +76,7 @@ final class StreamServer extends Thread {
                 serverSocket = ss;
                 break;
             } catch (IOException e) {
-                stats.setStatus(Stats.ERROR, "Port " + PORT + " başka bir uygulamada; o kapanınca bağlanılır");
+                stats.setStatus(Stats.ERROR, R.string.status_port_busy, PORT);
                 Log.w(TAG, "bind", e);
                 try {
                     Thread.sleep(3000);
@@ -91,7 +91,7 @@ final class StreamServer extends Thread {
 
         while (!stopped) {
             if (!incompatible) {
-                stats.setStatus(Stats.WAITING, "Bilgisayar bekleniyor");
+                stats.setStatus(Stats.WAITING, R.string.status_waiting);
             }
             Socket s;
             try {
@@ -117,7 +117,7 @@ final class StreamServer extends Thread {
         String peer = String.valueOf(s.getRemoteSocketAddress());
         stats.resetSession();
         if (!incompatible) {
-            stats.setStatus(Stats.CONNECTING, "Bağlanıyor…");
+            stats.setStatus(Stats.CONNECTING, R.string.status_connecting);
         }
         Log.i(TAG, "Bağlandı: " + peer);
         try {
@@ -147,12 +147,12 @@ final class StreamServer extends Thread {
         } catch (Session.IncompatibleException e) {
             // PC birkaç saniyede bir yeniden dener: uyarı ekranda kalsın
             incompatible = true;
-            stats.setStatus(Stats.ERROR, e.getMessage());
+            stats.setStatus(Stats.ERROR, e.messageRes);
         } catch (Exception e) {
             incompatible = false;
             if (!stopped) {
                 Log.w(TAG, "Akış hatası", e);
-                stats.setStatus(Stats.ERROR, "Bağlantı koptu");
+                stats.setStatus(Stats.ERROR, R.string.status_connection_lost);
             }
         } finally {
             session = null;

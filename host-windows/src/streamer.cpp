@@ -84,7 +84,9 @@ bool makeNv12Pool(ID3D11Device* dev, int w, int h, ComPtr<ID3D11Texture2D> (&poo
 }  // namespace
 
 Streamer::Streamer(Options opt, StreamerEvents ev)
-    : opt_(std::move(opt)), ev_(std::move(ev)), mode_(opt_.mode), wake_(CreateEventW(nullptr, FALSE, FALSE, nullptr)) {}
+    : opt_(std::move(opt)), ev_(std::move(ev)), mode_(opt_.mode), wake_(CreateEventW(nullptr, FALSE, FALSE, nullptr)) {
+    fixedRotation_ = opt_.rotation;
+}
 
 Streamer::~Streamer() { CloseHandle(wake_); }
 
@@ -102,14 +104,14 @@ void Streamer::setMode(LinkMode m) {
     if (conn_) conn_->close();
 }
 
-void Streamer::notice(const std::string& title, const std::string& text) {
+void Streamer::notice(Notice n, const std::string& arg, const char* logText) {
     // Bağlantı birkaç saniyede bir yeniden denenir: aynı uyarı 10 dakikada bir
     const int64_t now = nowUs();
-    if (text == lastNotice_ && now < lastNoticeUs_ + 600'000'000) return;
-    lastNotice_ = text;
+    if (int(n) == lastNotice_ && now < lastNoticeUs_ + 600'000'000) return;
+    lastNotice_ = int(n);
     lastNoticeUs_ = now;
-    logf("%s: %s", title.c_str(), text.c_str());
-    if (ev_.onNotice) ev_.onNotice(title, text);
+    logf("%s", logText);
+    if (ev_.onNotice) ev_.onNotice(n, arg);
 }
 
 void Streamer::sleepInterruptible(int ms) { WaitForSingleObject(wake_, DWORD(ms)); }
@@ -158,8 +160,7 @@ void Streamer::run() {
                     prepared.clear();
                     declinedLogged = false;
                 } else if (dev != prepared && adb::appState(adbPath) == adb::App::Missing) {
-                    notice("Tablette EKRAN uygulaması yok",
-                           "EKRAN'ın Android uygulamasını (APK) tablete indirip kurun. Kurulunca bağlantı kendiliğinden kurulur.");
+                    notice(Notice::AppMissing, {}, "USB: tablette EKRAN uygulaması yok; APK tablete ayrıca kurulmalı");
                     nextUsbPollUs = nowUs() + 10'000'000;  // kurulmasını bekle
                 } else if (!adb::prepareUsb(adbPath, proto::kPort)) {
                     nextUsbPollUs = nowUs() + 3'000'000;  // ör. tablette "USB hata ayıklamaya izin ver" bekleniyor
@@ -231,9 +232,8 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
             incompatibleHost_ = host;
             incompatibleUntilUs_ = nowUs() + 30'000'000;
             const bool tabletOld = conn.peerVersion() < proto::kVersion;
-            notice(tabletOld ? "Tabletteki EKRAN eski" : "Bu bilgisayardaki EKRAN eski",
-                   tabletOld ? "Tablete EKRAN'ın Android uygulamasının yeni sürümünü (APK) kurun."
-                             : "Bilgisayara EKRAN'ın yeni sürümünü kurun (tablette " + conn.peerAppVersion() + " var).");
+            notice(tabletOld ? Notice::TabletOutdated : Notice::PcOutdated, conn.peerAppVersion(),
+                   tabletOld ? "Tabletteki EKRAN eski" : "Bu bilgisayardaki EKRAN eski");
             logf("Sürüm uyuşmuyor: tablet protokol %u (uygulama %s), PC %u", conn.peerVersion(),
                  conn.peerAppVersion().c_str(), proto::kVersion);
         }
@@ -281,7 +281,6 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
         }
     }
     const bool only = !target.empty() && opt_.onlyTablet && vdisp.isolate();
-    const std::string modeName = target.empty() ? "yansıtma" : only ? "tek ekran" : "ikinci ekran";
     logMemory("el sıkışma sonrası");
 
     followInputDesktop();  // ajan: kilit ekranındaysak oraya bağlan
@@ -372,7 +371,8 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
     logMemory("kodlayıcı");
     logf("Kodlayıcı: %s | akış %dx%d, içerik %ldx%ld, %d kbps", enc.name().c_str(), W, H,
          content.right - content.left, content.bottom - content.top, opt_.kbps);
-    if (ev_.onState) ev_.onState(true, hello.model, link + " · " + modeName);
+    const DisplayMode dmode = target.empty() ? DisplayMode::Mirror : only ? DisplayMode::Only : DisplayMode::Extend;
+    if (ev_.onState) ev_.onState(true, hello.model, link, dmode);
 
     // Tabletten gelenler: kare onayı, pong, dokunma
     std::thread reader([&] {
@@ -416,7 +416,10 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
 
     CursorState cursor;
     Waiter waiter;
-    int appliedRotation = 0;  // yeni eklenen sanal monitör yatay başlar
+    // Monitör yönü. Yeni sanal monitörü Windows kendi kaydından döndürmüş olabilir: gerçek yönden başla.
+    int appliedRotation = target.empty() ? 0 : cap.orientation().rotation;
+    int tabletApplied = -1;  // en son uygulanan tablet bildirimi
+    int lastFixed = -2;      // ayar değişimini fark etmek için (-2: oturum başı)
     bool tabletAwake = true;  // tablet ekranı açık başlar
     bool dirty = true, forceKey = true;
     int pushersLeft = 0, slot = 0, lastSlot = 0;
@@ -429,12 +432,22 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
     const int64_t firstPusherUs = opt_.lowLatency ? opt_.pusherMs * 1000 : minFrameUs + 2000;
 
     while (!stop_ && conn.alive()) {
-        // Tablet dikey/yatay çevrildi: sanal monitörü döndür (yakalama kendiliğinden yeniden kurulur).
-        // Yansıtmada PC'nin gerçek ekranına dokunulmaz.
-        const int want = wantRotation;
-        if (want >= 0 && want != appliedRotation) {
-            appliedRotation = want;
-            if (!target.empty()) vdisp.setRotation(want);
+        // Monitör yönü (yakalama kendiliğinden yeniden kurulur). Yansıtmada PC'nin gerçek ekranına dokunulmaz.
+        //  - sabit yön seçiliyse o
+        //  - otomatikte tablet çevrilince tabletin yönü; tablet bildirmiyorsa en son kullanılan yön
+        // Tablet bildirimi yalnızca değişince uygulanır: Windows ayarlarından yapılan değişikliği ezmesin.
+        if (!target.empty()) {
+            const int fixed = fixedRotation_;
+            const int tablet = wantRotation;
+            int want = -1;
+            if (fixed >= 0) want = fixed;
+            else if (tablet >= 0 && tablet != tabletApplied) want = tabletApplied = tablet;
+            else if (fixed != lastFixed) want = tablet >= 0 ? tablet : config::lastRotation();  // otomatiğe geçildi
+            lastFixed = fixed;
+            if (want >= 0 && want != appliedRotation) {
+                appliedRotation = want;
+                if (vdisp.setRotation(want) && fixed < 0) config::saveLastRotation(want);
+            }
         }
 
         // Uyku eşitleme: Windows ekranları kapatınca tablet de ekranını kapatır; açınca uyanır
@@ -485,6 +498,20 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
             content = scaler.content();
             if (srcW != w0 || srcH != h0) sendConfig();
             touch.setMapping(gpu.desktopRect, content, srcW, srcH, sent);
+            // Yönü biz değiştirmediysek kullanıcı Windows ekran ayarlarından değiştirdi: hatırla
+            const int now = cap.orientation().rotation;
+            if (!target.empty() && now != appliedRotation) {
+                appliedRotation = now;
+                if (fixedRotation_ >= 0) {
+                    fixedRotation_ = now;
+                    lastFixed = now;
+                    config::saveRotation(now);
+                    if (ev_.onRotationChanged) ev_.onRotationChanged(now);
+                } else {
+                    config::saveLastRotation(now);
+                }
+                logf("Yön Windows ayarlarından değişti: %d° (kaydedildi)", now);
+            }
             if (sent.rotation != r0 || srcW != w0) {
                 logf("Yön: %d°%s", cap.orientation().rotation, scaler.rotated() ? " (görüntü düzeltildi)" : "");
                 // İmleç yeni yöne çevrilerek yeniden gönderilir (henüz resim gelmediyse yalnızca konum)
@@ -605,7 +632,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
     CloseHandle(ackEvent);
     detach();
     logf("Bağlantı kapandı (%s)", link.c_str());
-    if (ev_.onState) ev_.onState(false, hello.model, link + " · " + modeName);
+    if (ev_.onState) ev_.onState(false, hello.model, link, dmode);
     return true;
 }
 

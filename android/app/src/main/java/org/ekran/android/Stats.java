@@ -1,6 +1,13 @@
 package org.ekran.android;
 
-/** Ekrandaki bilgi katmanı için durum ve sayaçlar. Tüm metotlar iş parçacığı güvenli. */
+import android.content.res.Resources;
+
+/**
+ * Ekrandaki bilgi katmanı için durum ve sayaçlar. Tüm metotlar iş parçacığı güvenli.
+ *
+ * Durum metni dize kaynağı olarak saklanır (ağ iş parçacığının Activity'si yok); özet alınırken hizmetin
+ * kaynaklarıyla cihaz diline çevrilir.
+ */
 final class Stats {
     static final int WAITING = 0, CONNECTING = 1, CONNECTED = 2, ERROR = 3;
 
@@ -28,9 +35,11 @@ final class Stats {
     private float fps, inFps, mbps, latAvgMs, latMinMs, latMaxMs;
     private long totalFrames, droppedFrames;
 
+    private final Resources res;
     private int state = WAITING;
-    private String status = "Bilgisayar bekleniyor";
-    private String decoderName = "-";
+    private int statusRes = R.string.status_waiting;
+    private Object[] statusArgs = {};
+    private String decoderName = "-"; // null: sistemin varsayılan çözücüsü
     private String streamInfo = "-";
     private String surfaceInfo = "-";
 
@@ -63,9 +72,15 @@ final class Stats {
         droppedFrames++;
     }
 
-    synchronized void setStatus(int state, String s) {
+    Stats(Resources res) {
+        this.res = res;
+    }
+
+    /** resId: durum metninin dize kaynağı; args: içindeki biçim değerleri. */
+    synchronized void setStatus(int state, int resId, Object... args) {
         this.state = state;
-        status = s;
+        statusRes = resId;
+        statusArgs = args;
     }
 
     synchronized void setDecoder(String name, String stream) {
@@ -109,10 +124,10 @@ final class Stats {
 
         Snapshot s = new Snapshot();
         s.state = state;
-        s.status = status;
+        s.status = res.getString(statusRes, statusArgs);
         s.surface = surfaceInfo;
         s.stream = streamInfo;
-        s.decoder = decoderName;
+        s.decoder = decoderName != null ? decoderName : res.getString(R.string.stat_decoder_default);
         s.inFps = inFps;
         s.fps = fps;
         s.mbps = mbps;

@@ -1,5 +1,6 @@
 #include "pair_prompt.h"
 
+#include "i18n.h"
 #include "log.h"
 
 namespace ekran {
@@ -21,7 +22,7 @@ struct PairAsk {
 
 DWORD WINAPI pairAskThread(void* p) {
     auto* a = static_cast<PairAsk*>(p);
-    a->result = MessageBoxW(nullptr, a->text.c_str(), L"EKRAN — eşleştirme",
+    a->result = MessageBoxW(nullptr, a->text.c_str(), i18n::W(i18n::PairTitle),
                             MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND);
     return 0;
 }
@@ -36,10 +37,7 @@ BOOL CALLBACK closeDialog(HWND w, LPARAM) {
 
 bool askPairing(const std::wstring& device, const std::wstring& code, HANDLE cancel) {
     PairAsk a;
-    a.text = L"\"" + device + L"\" bu bilgisayarla eşleşmek istiyor.\n\n"
-             L"Tablette görünen kod:\n\n        " + code +
-             L"\n\nKodlar aynıysa Evet'e basın ve tablette de onaylayın.\n"
-             L"Farklıysa Hayır'a basın: ağda başka biri araya girmeye çalışıyor olabilir.";
+    a.text = i18n::F(i18n::PairText, device.c_str(), code.c_str());
     DWORD tid = 0;
     HANDLE th = CreateThread(nullptr, 0, pairAskThread, &a, 0, &tid);
     HANDLE hs[2] = {th, cancel};

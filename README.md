@@ -28,7 +28,8 @@ tools/          Geliştirme ve ölçüm betikleri
 ## Kullanım
 
 1. `dist\EKRAN-<sürüm>-windows.zip` dosyasını açın, `ekran.exe`'yi çalıştırın (kurulum gerekmez).
-   Saatin yanında bir monitör simgesi belirir.
+   Ayar penceresi açılır ve saatin yanında bir monitör simgesi belirir. Pencereyi kapatmak EKRAN'ı
+   kapatmaz; simgeye tıklayınca yeniden açılır (sağ tık: kısa menü, çıkış).
 2. Tablet uygulaması ayrı indirilir: `EKRAN-<sürüm>-android.apk` dosyasını tablete kurun (tabletin
    tarayıcısıyla indirip açın ya da USB ile kopyalayıp dosya yöneticisinden açın). PC tablete uygulama
    kurmaz. İki uygulamanın sürümü uyuşmazsa ikisi de hangisinin güncelleneceğini söyler.
@@ -39,11 +40,11 @@ tools/          Geliştirme ve ölçüm betikleri
 Tablet Windows'a çoklu dokunmatik ekran olarak bağlanır: kaydırma, iki parmakla yakınlaştırma, basılı tutunca sağ tık.
 Üç parmakla dokunmak ölçümleri gösterir/gizler.
 
-**Ekransız mini PC:** simge > *Oturum açılmadan önce başlat* (bir kez yönetici izni ister). EKRAN Windows
+**Ekransız mini PC:** pencerede *Genel > Oturum açılmadan önce başlat* (bir kez yönetici izni ister). EKRAN Windows
 hizmeti olarak açılışta başlar; kilit ekranı ve şifre ekranı tablette görünür, tabletten açılır (kilit
 perdesini yukarı kaydırın). Windows kilit ekranını yalnızca ana monitörde gösterir.
 
-**Otomatik bağlanma:** PC'de simge > *Bağlantı* > *Otomatik bağlan*, tablette karşılama ekranındaki
+**Otomatik bağlanma:** PC'de *Bağlantı > Tablet bulununca otomatik bağlan*, tablette karşılama ekranındaki
 *Bilgisayara takılınca otomatik aç*. İkisi de açıksa tableti takmanız yeterli; biri kapalıysa PC'de
 *Şimdi bağlan*'a tıklayın ya da tablette EKRAN'ı açın.
 
@@ -51,11 +52,16 @@ perdesini yukarı kaydırın). Windows kilit ekranını yalnızca ana monitörde
 kopmaz, dönünce görüntü kaldığı yerden sürer. Bağlantıyı kesmek için bildirimdeki ya da ölçüm kartındaki
 (üç parmak) *Bağlantıyı kes*.
 
-Görüntü modları (simge > *Görüntü*): **İkinci ekran**, **Tek ekran** (tablet bağlıyken diğer monitörler
+Görüntü modları (pencerede *Görüntü*): **İkinci ekran**, **Tek ekran** (tablet bağlıyken diğer monitörler
 kapanır, tablet ayrılınca geri gelir) ve **Yansıtma**. Windows ekranı kapatınca tablet de kararır.
 
-İkinci ekran modunda tableti dik çevirmek Windows'taki monitörü de dikey yapar (tablette *Otomatik döndür*
-açık olmalı; kapalıysa monitör yatay kalır).
+**Monitör yönü** (*Görüntü > Monitör yönü*): *Otomatik*te tableti dik çevirmek Windows'taki monitörü de
+dikey yapar (tablette *Otomatik döndür* açık olmalı). *Yatay / Dikey / ters* seçilirse tablet ne gösterirse
+göstersin o yön kullanılır. Seçim ve Windows ekran ayarlarından yapılan değişiklik hatırlanır; tablet her
+bağlanışta aynı yönde açılır.
+
+**Dil:** Bilgisayarda pencerede *Genel > Dil* (Sistem / Türkçe / English); tablet ve telefonda cihazın
+dili kullanılır. Uygulama telefonlarda da çalışır (küçük ekranda düzen sıkışır, gerekirse kayar).
 
 ## Derlemek
 
