@@ -2,6 +2,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace ekran::adb {
 
@@ -11,22 +12,23 @@ std::wstring find();
 // Komutu pencere açmadan çalıştırır; çıktıyı döndürür. Başarısızsa false.
 bool run(const std::wstring& adbPath, const std::wstring& args, std::string* output = nullptr, int timeoutMs = 10000);
 
-// USB'de hata ayıklaması açık cihazın seri numarası; yoksa boş (sessiz; tek adb çağrısı)
-std::string serial(const std::wstring& adbPath);
+// USB'de hata ayıklaması açık (yetkili) cihazların seri numaraları (sessiz; tek adb çağrısı).
+// Sonraki komutlar seri numarasıyla o cihaza gider.
+std::vector<std::string> devices(const std::wstring& adbPath);
 
-// Tablette EKRAN uygulaması kurulu mu. PC uygulama kurmaz: APK ayrıca indirilip tablete kurulur.
+// Cihazda EKRAN uygulaması kurulu mu. PC uygulama kurmaz: APK ayrıca indirilip cihaza kurulur.
 enum class App { Installed, Missing, Unknown };
-App appState(const std::wstring& adbPath);
+App appState(const std::wstring& adbPath, const std::string& serial);
 
 // Port yönlendir (adb forward)
-bool prepareUsb(const std::wstring& adbPath, unsigned port);
+bool prepareUsb(const std::wstring& adbPath, const std::string& serial, unsigned port);
 
-// Tableti ekran olmaya davet et: kararı tablet verir ("bilgisayara takılınca otomatik aç" ayarı).
+// Cihazı ekran olmaya davet et: kararı cihaz verir ("bilgisayara takılınca otomatik aç" ayarı).
 enum class Launch { Started, AlreadyOpen, Declined, Failed };
-Launch requestLaunch(const std::wstring& adbPath);
+Launch requestLaunch(const std::wstring& adbPath, const std::string& serial);
 
-// Tablet ekranını hemen kapat (Windows ekranları kapatınca). Tablet "USB takılıyken uyanık kal"
-// ayarındaysa kendi zaman aşımı hiç işlemez; bu yüzden USB'de PC kapatır. Uyandırmayı tablet yapar.
-void screenOff(const std::wstring& adbPath, int sdk);
+// Cihaz ekranını hemen kapat (Windows ekranları kapatınca). Cihaz "USB takılıyken uyanık kal"
+// ayarındaysa kendi zaman aşımı hiç işlemez; bu yüzden USB'de PC kapatır. Uyandırmayı cihaz yapar.
+void screenOff(const std::wstring& adbPath, const std::string& serial, int sdk);
 
 }  // namespace ekran::adb

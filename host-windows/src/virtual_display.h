@@ -56,6 +56,7 @@ private:
     std::vector<DISPLAYCONFIG_PATH_INFO> savedPaths_;
     std::vector<DISPLAYCONFIG_MODE_INFO> savedModes_;
 
+    DWORD persistFlags() const;
     bool added_ = false;
     std::atomic<bool> pinging_{false};
     std::thread pinger_;

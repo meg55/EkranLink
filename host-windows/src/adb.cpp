@@ -28,12 +28,15 @@ std::wstring exeDir() {
     return s.substr(0, s.find_last_of(L'\\'));
 }
 
+// "-s SERİ " (komut o cihaza gitsin; birden çok cihaz takılıyken adb aksi halde hata verir)
+std::wstring to(const std::string& serial) { return L"-s " + std::wstring(serial.begin(), serial.end()) + L" "; }
+
 }  // namespace
 
-App appState(const std::wstring& adbPath) {
+App appState(const std::wstring& adbPath, const std::string& serial) {
     // adb başarısızsa (ör. tablette "USB hata ayıklamaya izin ver" bekleniyor) bilinmiyor
     std::string out;
-    if (!run(adbPath, L"shell pm list packages org.ekran.android", &out)) return App::Unknown;
+    if (!run(adbPath, to(serial) + L"shell pm list packages org.ekran.android", &out)) return App::Unknown;
     return out.find("package:org.ekran.android") != std::string::npos ? App::Installed : App::Missing;
 }
 
@@ -90,51 +93,64 @@ bool run(const std::wstring& adbPath, const std::wstring& args, std::string* out
     return code == 0;
 }
 
-std::string serial(const std::wstring& adbPath) {
+std::vector<std::string> devices(const std::wstring& adbPath) {
+    // "adb devices": "SERİ<TAB>device" satırları (yetkisiz / çevrimdışı cihazlar atlanır)
     std::string out;
-    if (!run(adbPath, L"get-serialno", &out, 3000)) return {};
-    while (!out.empty() && (out.back() == '\n' || out.back() == '\r' || out.back() == ' ')) out.pop_back();
-    return out == "unknown" ? std::string() : out;
+    std::vector<std::string> list;
+    if (!run(adbPath, L"devices", &out, 3000)) return list;
+    size_t p = 0;
+    while (p < out.size()) {
+        size_t e = out.find('\n', p);
+        if (e == std::string::npos) e = out.size();
+        std::string line = out.substr(p, e - p);
+        p = e + 1;
+        while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
+        const size_t tab = line.find('\t');
+        if (tab == std::string::npos || line.compare(tab + 1, std::string::npos, "device") != 0) continue;
+        list.push_back(line.substr(0, tab));
+    }
+    return list;
 }
 
-void screenOff(const std::wstring& adbPath, int sdk) {
+void screenOff(const std::wstring& adbPath, const std::string& serial, int sdk) {
     if (sdk >= 20) {
-        run(adbPath, L"shell input keyevent 223");  // KEYCODE_SLEEP: yalnızca kapatır
+        run(adbPath, to(serial) + L"shell input keyevent 223");  // KEYCODE_SLEEP: yalnızca kapatır
         return;
     }
     // 4.x: yalnızca güç tuşu var ve ekranı aç/kapa yapar; önce açık olduğundan emin ol
     std::string out;
-    if (run(adbPath, L"shell dumpsys power", &out) &&
+    if (run(adbPath, to(serial) + L"shell dumpsys power", &out) &&
         (out.find("mScreenOn=true") != std::string::npos || out.find("Display Power: state=ON") != std::string::npos))
-        run(adbPath, L"shell input keyevent 26");
+        run(adbPath, to(serial) + L"shell input keyevent 26");
 }
 
-bool prepareUsb(const std::wstring& adbPath, unsigned port) {
+bool prepareUsb(const std::wstring& adbPath, const std::string& serial, unsigned port) {
     std::string out;
     wchar_t fwd[64];
     swprintf(fwd, 64, L"forward tcp:%u tcp:%u", port, port);
-    if (!run(adbPath, fwd, &out)) {
+    if (!run(adbPath, to(serial) + fwd, &out)) {
         logf("USB: adb forward başarısız: %s", out.c_str());
         return false;
     }
     return true;
 }
 
-Launch requestLaunch(const std::wstring& adbPath) {
+Launch requestLaunch(const std::wstring& adbPath, const std::string& serial) {
     // Açık bileşene yayın; -f 32 (FLAG_INCLUDE_STOPPED_PACKAGES): hiç açılmamış uygulamaya da ulaşsın.
     // Sonuç kodu tabletin kararı (AutoStartReceiver): 1 izin var, 2 otomatik açma kapalı, 3 zaten açık.
     // Uygulamayı tablet değil biz başlatırız: Android 10+ arka plandan ekran açılmasına izin vermez, adb verir.
     std::string out;
-    if (!run(adbPath, L"shell am broadcast -f 32 -n org.ekran.android/.AutoStartReceiver", &out)) return Launch::Failed;
+    if (!run(adbPath, to(serial) + L"shell am broadcast -f 32 -n org.ekran.android/.AutoStartReceiver", &out))
+        return Launch::Failed;
     const size_t p = out.find("result=");
     const int r = p == std::string::npos ? -1 : std::atoi(out.c_str() + p + 7);
     if (r == 2) return Launch::Declined;
     if (r == 3) return Launch::AlreadyOpen;
     // 1 ya da eski sürüm (alıcı yok): ekranı uyandır (KEYCODE_WAKEUP 4.4 öncesinde yok) ve başlat
-    if (run(adbPath, L"shell dumpsys power", &out) &&
+    if (run(adbPath, to(serial) + L"shell dumpsys power", &out) &&
         (out.find("mScreenOn=false") != std::string::npos || out.find("Display Power: state=OFF") != std::string::npos))
-        run(adbPath, L"shell input keyevent 26");
-    run(adbPath, L"shell am start -n org.ekran.android/.MainActivity");
+        run(adbPath, to(serial) + L"shell input keyevent 26");
+    run(adbPath, to(serial) + L"shell am start -n org.ekran.android/.MainActivity");
     return Launch::Started;
 }
 

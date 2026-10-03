@@ -6,6 +6,7 @@
 #include <winsock2.h>
 #include <psapi.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <thread>
 
@@ -169,18 +170,30 @@ void Streamer::run() {
                 // (bildirim yoksa 3 sn'de bir); takıldıktan sonraki birkaç saniye adb'nin görmesi beklenir.
                 const int64_t now = nowUs();
                 nextUsbPollUs = now + (now < usbBurstUntilUs ? 1'000'000 : usb.ok() ? 30'000'000 : 3'000'000);
-                const std::string dev = adb::serial(adbPath);
+                // Birden çok cihaz takılıysa: hazırlanmış olan, yoksa EKRAN'ı kurulu olan ilk cihaz
+                const std::vector<std::string> devs = adb::devices(adbPath);
+                std::string dev = devs.empty() ? std::string() : devs.front();
+                if (devs.size() > 1 && std::find(devs.begin(), devs.end(), prepared) != devs.end()) {
+                    dev = prepared;
+                } else if (devs.size() > 1) {
+                    for (const auto& d : devs)
+                        if (adb::appState(adbPath, d) == adb::App::Installed) {
+                            dev = d;
+                            break;
+                        }
+                    logf("USB: %d cihaz takılı; %s kullanılıyor", int(devs.size()), dev.c_str());
+                }
                 if (dev.empty()) {
                     prepared.clear();
                     declinedLogged = false;
-                } else if (dev != prepared && adb::appState(adbPath) == adb::App::Missing) {
+                } else if (dev != prepared && adb::appState(adbPath, dev) == adb::App::Missing) {
                     notice(Notice::AppMissing, {}, "USB: tablette EKRAN uygulaması yok; APK tablete ayrıca kurulmalı");
                     nextUsbPollUs = nowUs() + 10'000'000;  // kurulmasını bekle
-                } else if (!adb::prepareUsb(adbPath, proto::kPort)) {
+                } else if (!adb::prepareUsb(adbPath, dev, proto::kPort)) {
                     nextUsbPollUs = nowUs() + 3'000'000;  // ör. tablette "USB hata ayıklamaya izin ver" bekleniyor
                 } else {
                     prepared = dev;
-                    const adb::Launch l = adb::requestLaunch(adbPath);
+                    const adb::Launch l = adb::requestLaunch(adbPath, dev);
                     if (l == adb::Launch::Declined) {
                         if (!declinedLogged) logf("USB: tablet bağlanmak istemiyor (\"otomatik aç\" kapalı ya da bağlantı tabletten kesildi); bağlanmak için tablette EKRAN'ı açın");
                         declinedLogged = true;
@@ -189,7 +202,7 @@ void Streamer::run() {
                         declinedLogged = false;
                         if (l == adb::Launch::Started) sleepInterruptible(1500);  // tablet sunucusunu açsın
                         tried = true;
-                        connected = runSession("127.0.0.1", "USB", adbPath);
+                        connected = runSession("127.0.0.1", "USB", adbPath, dev);
                         // bağlantı bitince hemen yeniden bak; sürüm uyuşmuyorsa bir süre bekle
                         nextUsbPollUs = incompatibleHost_ == "127.0.0.1" ? incompatibleUntilUs_ : 0;
                     }
@@ -231,7 +244,8 @@ void Streamer::run() {
     }
 }
 
-bool Streamer::runSession(const std::string& host, const std::string& link, const std::wstring& adbPath) {
+bool Streamer::runSession(const std::string& host, const std::string& link, const std::wstring& adbPath,
+                          const std::string& adbSerial) {
     Connection conn;
     proto::Hello hello;
     PairingHooks hooks;
@@ -550,9 +564,9 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
                 // Tablette başka bir uygulama kullanılıyorsa ekranı kapatılmaz
                 if (!tabletAwake && !adbPath.empty() && tabletVisible) {
                     // USB: tablet mesajı işleyip (uyku kilidi) hazırlansın, sonra ekranını kapat
-                    std::thread([adbPath, sdk = int(hello.sdk)] {
+                    std::thread([adbPath, adbSerial, sdk = int(hello.sdk)] {
                         Sleep(300);
-                        adb::screenOff(adbPath, sdk);
+                        adb::screenOff(adbPath, adbSerial, sdk);
                     }).detach();
                 }
             }

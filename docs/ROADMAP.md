@@ -99,6 +99,10 @@ Derleme için Visual Studio gerekmez: MinGW-w64 (GCC) yeterli.
 - [x] Ayar penceresi sayfalı (0.4.2): sol menü (Durum, Bağlantı, Görüntü, Dokunma ve performans, Genel), kaydırma
       yok; 1–5 / ↑↓ / Ctrl+Tab ile geçiş. Durum sayfası: bağlantı, mod, ekran, gecikme / veri / kare hızı
       (hizmet modunda yalnızca pencere açıkken aktarılır), çözülene kadar kalan uyarılar, Windows ekran ayarları kısayolu
+- [x] Yön / çözünürlük Windows'un kaydına da yazılır (0.4.3, tek ekranda değil): monitör bir sonraki bağlanışta
+      doğrudan doğru modla açılır, fazladan mod değişimi olmaz
+- [x] Birden çok adb cihazı takılıyken: hazırlanmış olan, yoksa EKRAN'ı kurulu olan cihaz seçilir; tüm adb komutları `-s`ile
+      o cihaza gider (tam çoklu cihaz yol haritasında)
 - [x] Güvenilir Wi-Fi keşfi: arayüz başına soket, 3 kez yineleme, bilinen tablet adreslerine doğrudan soru
       (yayın güvenlik duvarıyla engellenip denendi: 1,2 sn'de bağlandı). Tablet UDP/TCP portu boşalana kadar dener
 - [ ] Kalıcı APK sürüm anahtarı (GitHub sürümleri için; şu an hata ayıklama anahtarı)

@@ -83,7 +83,8 @@ public:
 
 private:
     // Tablete bağlanıp oturum bitene kadar yayın yapar. El sıkışma başarılıysa true.
-    bool runSession(const std::string& host, const std::string& link, const std::wstring& adbPath = {});
+    bool runSession(const std::string& host, const std::string& link, const std::wstring& adbPath = {},
+                    const std::string& adbSerial = {});
     void setMode(LinkMode m);
     void sleepInterruptible(int ms);
     void notice(Notice n, const std::string& arg, const char* logText);

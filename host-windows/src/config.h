@@ -15,7 +15,7 @@
 
 namespace ekran::config {
 
-constexpr const wchar_t* kVersion = L"0.4.2";
+constexpr const wchar_t* kVersion = L"0.4.3";
 
 constexpr const wchar_t* kUserKey = L"Software\\EKRAN";
 constexpr const wchar_t* kMachineKey = L"SOFTWARE\\EKRAN";

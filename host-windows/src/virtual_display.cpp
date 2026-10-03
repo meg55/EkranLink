@@ -260,6 +260,11 @@ void VirtualDisplay::restoreLayout() {
     savedModes_.clear();
 }
 
+// Yön / çözünürlük Windows'un kaydına da yazılır: monitör bir sonraki bağlanışta doğrudan bu modla açılır
+// (yoksa Windows eski kaydıyla açar, EKRAN hemen düzeltir ve ekran fazladan bir kez gidip gelir).
+// Tek ekrandayken yazılmaz: o düzen geçicidir, Windows'un kaydına girmemeli.
+DWORD VirtualDisplay::persistFlags() const { return isolated_ ? 0 : CDS_UPDATEREGISTRY; }
+
 bool VirtualDisplay::setRotation(int degrees) {
     if (!added_ || gdiName_.empty()) return false;
     const DWORD want = DWORD((degrees / 90) & 3);  // DMDO_DEFAULT, DMDO_90, DMDO_180, DMDO_270
@@ -274,7 +279,7 @@ bool VirtualDisplay::setRotation(int degrees) {
     }
     dm.dmDisplayOrientation = want;
     dm.dmFields = DM_DISPLAYORIENTATION | DM_PELSWIDTH | DM_PELSHEIGHT;
-    const LONG r = ChangeDisplaySettingsExW(gdiName_.c_str(), &dm, nullptr, 0, nullptr);
+    const LONG r = ChangeDisplaySettingsExW(gdiName_.c_str(), &dm, nullptr, persistFlags(), nullptr);
     if (r != DISP_CHANGE_SUCCESSFUL) {
         logf("Sanal ekran: döndürülemedi (%ld)", r);
         return false;
@@ -305,7 +310,7 @@ bool VirtualDisplay::setResolution(int width, int height) {
     dm.dmPelsWidth = w;
     dm.dmPelsHeight = h;
     dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT;
-    const LONG r = ChangeDisplaySettingsExW(gdiName_.c_str(), &dm, nullptr, 0, nullptr);
+    const LONG r = ChangeDisplaySettingsExW(gdiName_.c_str(), &dm, nullptr, persistFlags(), nullptr);
     if (r != DISP_CHANGE_SUCCESSFUL) {
         logf("Sanal ekran: çözünürlük %dx%d yapılamadı (%ld)", width, height, r);
         return false;
