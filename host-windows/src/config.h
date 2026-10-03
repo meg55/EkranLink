@@ -9,6 +9,7 @@
 #include <windows.h>
 
 #include <string>
+#include <vector>
 
 #include "streamer.h"
 
@@ -34,6 +35,11 @@ Options loadOptions();
 HKEY secretRoot();
 std::wstring secretPath();   // PcId burada
 std::wstring pairsPath();    // cihaz kimliği → anahtar
+
+// Wi-Fi ile bağlanılan son tablet adresleri (en yenisi önce, en çok 4). Keşifte bunlara doğrudan da sorulur:
+// Wi-Fi yayını güvenilir değil (onaysız, güç tasarrufundaki tablet kaçırabilir), doğrudan paket ulaşır.
+std::vector<std::string> knownAddresses();
+void rememberAddress(const std::string& ip);
 
 // Durum (ajan yazar, tepsi okur)
 void writeStatus(bool connected, const std::string& device, const std::string& link);

@@ -68,6 +68,32 @@ HKEY secretRoot() { return g_machine ? HKEY_LOCAL_MACHINE : HKEY_CURRENT_USER; }
 std::wstring secretPath() { return g_machine ? kSecretKey : kUserKey; }
 std::wstring pairsPath() { return secretPath() + L"\\Pairs"; }
 
+std::vector<std::string> knownAddresses() {
+    std::vector<std::string> out;
+    const std::wstring w = getString(secretRoot(), secretPath().c_str(), L"Tabletler");
+    size_t b = 0;
+    while (b < w.size()) {
+        size_t e = w.find(L' ', b);
+        if (e == std::wstring::npos) e = w.size();
+        if (e > b) out.emplace_back(w.begin() + b, w.begin() + e);  // yalnızca ASCII (IPv4)
+        b = e + 1;
+    }
+    return out;
+}
+
+void rememberAddress(const std::string& ip) {
+    const std::vector<std::string> list = knownAddresses();
+    if (!list.empty() && list.front() == ip) return;
+    std::wstring w = widen(ip);
+    int n = 1;
+    for (const auto& a : list)
+        if (a != ip && n++ < 4) w += L" " + widen(a);
+    HKEY k;
+    if (RegCreateKeyExW(secretRoot(), secretPath().c_str(), 0, nullptr, 0, KEY_SET_VALUE, nullptr, &k, nullptr) != 0) return;
+    setString(k, L"Tabletler", w);
+    RegCloseKey(k);
+}
+
 void writeStatus(bool connected, const std::string& device, const std::string& link) {
     HKEY k;
     if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, kStatusKey, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &k, nullptr) != 0) return;

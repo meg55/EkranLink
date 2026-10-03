@@ -14,6 +14,12 @@ PC, her ağ arayüzünün yayın adresine (ör. 192.168.1.255, USB internet payl
 
 Tablet boştayken hiçbir paket göndermez; yalnızca soru gelince cevap verir.
 
+Soru her arayüzden, o arayüzün adresine bağlı ayrı bir soketle gönderilir: aynı ağa iki kartla
+(Ethernet + Wi-Fi) bağlı PC'de bağlanmamış soketin yayını yalnızca yönlendirmenin seçtiği karttan çıkar.
+Wi-Fi yayını onaysız gider ve güç tasarrufundaki tablet kaçırabilir; bu yüzden soru 1 sn içinde 3 kez
+yinelenir ve daha önce Wi-Fi ile bağlanılan tabletlerin adreslerine (en çok 4, eşleşme deposunda
+`Tabletler`) doğrudan da sorulur. Doğrudan paketi erişim noktası onaylı ve yeniden göndererek iletir.
+
 ## Çerçeve
 
 ```

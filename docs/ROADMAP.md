@@ -82,6 +82,8 @@ Derleme için Visual Studio gerekmez: MinGW-w64 (GCC) yeterli.
       `dist\EKRAN-<sürüm>-windows.zip` (exe'ler + adb) ve `dist\EKRAN-<sürüm>-android.apk`.
       USB'de uygulama yoksa PC bildirimle söyler; protokol sürümü uyuşmazsa tablet `Incompatible`
       gönderir, iki taraf da hangi uygulamanın güncelleneceğini gösterir
+- [x] Güvenilir Wi-Fi keşfi: arayüz başına soket, 3 kez yineleme, bilinen tablet adreslerine doğrudan soru
+      (yayın güvenlik duvarıyla engellenip denendi: 1,2 sn'de bağlandı). Tablet UDP/TCP portu boşalana kadar dener
 - [ ] Kalıcı APK sürüm anahtarı (GitHub sürümleri için; şu an hata ayıklama anahtarı)
 - [ ] USB yoklamasını `adb get-state` yerine Windows cihaz bildirimleriyle yapma
 - [ ] Yazılım kodlayıcı yedeği (donanım kodlayıcısı olmayan PC'ler)

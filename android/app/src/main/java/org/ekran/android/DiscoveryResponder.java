@@ -12,7 +12,8 @@ import java.net.SocketException;
 
 /**
  * Ağda bulunma: PC UDP yayınıyla "EKRN?" sorar, tablet kendini tanıtan bir cevap döner.
- * Sadece soru gelince çalışır; boşta hiçbir paket göndermez (pil ve ağ dostu).
+ * Sadece soru gelince çalışır; boşta hiçbir paket göndermez (pil ve ağ dostu). PC hem ağ yayınıyla hem
+ * (daha önce bağlandıysa) doğrudan bu tabletin adresine sorar.
  *
  * Soru:  "EKRN?" + u16 sürüm
  * Cevap: "EKRN!" + u16 sürüm + u16 tcpPort + str ad + str kimlik
@@ -23,7 +24,7 @@ final class DiscoveryResponder extends Thread {
     private final String name;
     private final String id;
     private volatile boolean stopped;
-    private DatagramSocket socket;
+    private volatile DatagramSocket socket;
 
     DiscoveryResponder(String name, String id) {
         super("ekran-discovery");
@@ -34,13 +35,32 @@ final class DiscoveryResponder extends Thread {
 
     @Override
     public void run() {
-        try {
-            socket = new DatagramSocket(null);
-            socket.setReuseAddress(true);
-            socket.setBroadcast(true);
-            socket.bind(new InetSocketAddress(StreamServer.PORT));
-        } catch (SocketException e) {
-            Log.w(TAG, "UDP portu açılamadı", e);
+        // Port başka bir uygulamadaysa boşalana kadar dene (bulunamamak sessiz bir arızadır)
+        while (!stopped) {
+            DatagramSocket s = null;
+            try {
+                s = new DatagramSocket(null);
+                s.setReuseAddress(true);
+                s.setBroadcast(true);
+                s.bind(new InetSocketAddress(StreamServer.PORT));
+                socket = s;
+                break;
+            } catch (SocketException e) {
+                if (s != null) {
+                    s.close();
+                }
+                Log.w(TAG, "UDP portu açılamadı", e);
+                try {
+                    Thread.sleep(3000);
+                } catch (InterruptedException ie) {
+                    return;
+                }
+            }
+        }
+        if (stopped) {
+            if (socket != null) {
+                socket.close();
+            }
             return;
         }
         byte[] reply = buildReply();
@@ -79,8 +99,10 @@ final class DiscoveryResponder extends Thread {
 
     void shutdown() {
         stopped = true;
-        if (socket != null) {
-            socket.close();
+        interrupt(); // port beklerken uyuyorsa
+        DatagramSocket s = socket;
+        if (s != null) {
+            s.close();
         }
     }
 }

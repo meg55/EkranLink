@@ -12,6 +12,7 @@
 #include "adb.h"
 #include "capture.h"
 #include "com.h"
+#include "config.h"
 #include "desktop.h"
 #include "discovery.h"
 #include "encoder.h"
@@ -186,7 +187,7 @@ void Streamer::run() {
             std::string ip = opt_.ip;
             if (ip.empty()) {
                 const int64_t now = nowUs();
-                for (const auto& dev : discoverDevices(700)) {
+                for (const auto& dev : discoverDevices(1000, config::knownAddresses())) {
                     auto it = rejectedUntil_.find(dev.id);
                     if (it != rejectedUntil_.end() && it->second > now) continue;  // az önce reddedildi
                     ip = dev.ip;
@@ -238,6 +239,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
         }
         return false;
     }
+    if (!usb) config::rememberAddress(host);  // bir dahaki keşifte doğrudan sorulsun
     {
         std::lock_guard<std::mutex> lock(connMutex_);
         conn_ = &conn;
