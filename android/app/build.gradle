@@ -2,6 +2,16 @@ plugins {
     id 'com.android.application'
 }
 
+// Sürüm imzası: anahtar ve şifreleri depoda DEĞİL. Yol şuradan okunur:
+//  - CI: RELEASE_KEYSTORE_PROPERTIES ortam değişkeni
+//  - geliştirici: ~/.gradle/gradle.properties içinde releaseKeystoreProperties=<yol>/keystore.properties
+// Dosya: storeFile, storePassword, keyAlias, keyPassword. Yoksa release derlemesi imzasız kalır.
+def releaseSigning = new Properties()
+def releaseSigningPath = System.getenv('RELEASE_KEYSTORE_PROPERTIES') ?: project.findProperty('releaseKeystoreProperties')
+if (releaseSigningPath && file(releaseSigningPath).exists()) {
+    file(releaseSigningPath).withInputStream { releaseSigning.load(it) }
+}
+
 android {
     namespace 'org.ekran.android'
     compileSdk 35
@@ -16,8 +26,24 @@ android {
         versionName '0.4.3'
     }
 
+    signingConfigs {
+        release {
+            if (releaseSigning.storeFile) {
+                storeFile file(releaseSigning.storeFile)
+                storePassword releaseSigning.storePassword
+                keyAlias releaseSigning.keyAlias
+                keyPassword releaseSigning.keyPassword
+                // v1: Android 7.0 öncesi yalnızca bunu tanır (4.x tabletler); v2/v3: yeni sürümler
+                enableV1Signing true
+                enableV2Signing true
+                enableV3Signing true
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig releaseSigning.storeFile ? signingConfigs.release : null
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
         }

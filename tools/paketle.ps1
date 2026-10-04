@@ -7,8 +7,8 @@
     BENIOKU.txt. Kurulum gerektirmez; zip'i açıp ekran.exe'yi çalıştırın.
     Tablet uygulaması pakette yok: PC tablete uygulama kurmaz, APK ayrıca indirilip tablete kurulur.
 
-    Not: APK şimdilik hata ayıklama anahtarıyla imzalı. GitHub sürümleri için kalıcı bir sürüm anahtarı
-    gerekecek (yoksa farklı makinede derlenen sürüm eskisinin üstüne kurulamaz).
+    APK sürüm anahtarıyla imzalanır (v1+v2+v3; Android 4.x için v1 şart). Anahtar depoda değildir; yolu
+    ~/.gradle/gradle.properties içindeki releaseKeystoreProperties ya da RELEASE_KEYSTORE_PROPERTIES verir.
 #>
 param([switch] $Temiz)
 
@@ -31,10 +31,16 @@ if (-not $env:JAVA_HOME) {
 Push-Location (Join-Path $kok 'android')
 try {
     # --no-daemon: arkada kalan Gradle sunucusu yüzlerce MB bellek tutar ve çıktı borusunu açık bırakır
-    & .\gradlew.bat assembleDebug --no-daemon --console=plain -q
+    # Sürüm anahtarı tanımlıysa (android/app/build.gradle: releaseKeystoreProperties / RELEASE_KEYSTORE_PROPERTIES)
+    # imzalı sürüm, değilse geliştirme anahtarıyla imzalı hata ayıklama derlemesi
+    & .\gradlew.bat assembleRelease assembleDebug --no-daemon --console=plain -q
     if ($LASTEXITCODE -ne 0) { throw 'Android derlemesi başarısız' }
 } finally { Pop-Location }
-$apk = Join-Path $kok 'android\app\build\outputs\apk\debug\app-debug.apk'
+$apk = Join-Path $kok 'android\app\build\outputs\apk\release\app-release.apk'
+if (-not (Test-Path $apk)) {
+    Write-Warning 'Sürüm anahtarı yok: APK geliştirme anahtarıyla imzalı (yayınlanmamalı)'
+    $apk = Join-Path $kok 'android\app\build\outputs\apk\debug\app-debug.apk'
+}
 
 # --- Windows ---
 $buildArgs = @{}
