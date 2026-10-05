@@ -20,6 +20,7 @@ enum class LinkMode { Auto, Usb, Wifi };
 struct Options {
     LinkMode mode = LinkMode::Auto;
     std::string ip;       // Wi-Fi'de sabit adres (boşsa ağda aranır)
+    std::string serial;   // USB'de yalnızca bu adb cihazı (boşsa kendisi seçer)
     int output = 0;       // yansıtılacak PC ekranı (yansıtma modunda)
     bool extend = true;   // ikinci ekran: sürücü kuruluysa tablet için sanal monitör aç, yoksa yansıt
     bool onlyTablet = false;  // tek ekran: tablet bağlıyken diğer monitörler kapanır (yalnızca ikinci ekranda)

@@ -18,10 +18,12 @@
 
         <activity
             android:name=".MainActivity"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|navigation"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard|navigation"
             android:exported="true"
             android:launchMode="singleTask"
             android:screenOrientation="sensorLandscape">
+            <!-- Android 16+ büyük ekranlarda (600dp+) bu kilit yok sayılır: dikey pencerede görüntü çevrilir
+                 (MainActivity.onWindowShape) -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

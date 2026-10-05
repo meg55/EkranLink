@@ -161,6 +161,10 @@ public final class EkranService extends Service implements Session.Host {
         server.setSurface(s);
     }
 
+    void setVideoRotation(int degrees) {
+        server.setVideoRotation(degrees);
+    }
+
     void setSurfaceSize(int w, int h) {
         surfaceW = w;
         surfaceH = h;

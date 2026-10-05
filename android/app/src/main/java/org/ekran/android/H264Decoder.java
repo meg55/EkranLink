@@ -4,6 +4,7 @@ import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaFormat;
+import android.os.Build;
 import android.util.Log;
 import android.view.Surface;
 
@@ -36,6 +37,7 @@ final class H264Decoder {
 
     private Surface surface;
     private boolean suspended; // ekran kapalı: kare gelirse düşür
+    private int rotation;      // yüzeye çizerken saat yönünde çevirme (pencere dikeyken 90/270)
     private final Stats stats;
     private final FrameListener listener;
 
@@ -205,6 +207,22 @@ final class H264Decoder {
         suspended = false;
     }
 
+    /**
+     * Pencere dikeyken yatay görüntü yüzeye çevrilerek çizilir (ekran kartı yapar, ek yük yok). Değişince çözücü
+     * yeniden kurulur; true: yeni çözücü için anahtar kare gerekiyor.
+     */
+    synchronized boolean setRotation(int degrees) {
+        if (degrees == rotation) {
+            return false;
+        }
+        rotation = degrees;
+        if (codec == null) {
+            return false;
+        }
+        release(); // bir sonraki anahtar karede yeni açıyla kurulur
+        return true;
+    }
+
     private void ensureCodec() throws IOException {
         if (suspended || sps == null || pps == null) {
             return;
@@ -220,6 +238,9 @@ final class H264Decoder {
         format.setByteBuffer("csd-0", withStartCode(SpsRewriter.lowLatency(sps)));
         format.setByteBuffer("csd-1", withStartCode(pps));
         format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, Math.max(info.width * info.height, 512 * 1024));
+        if (rotation != 0 && Build.VERSION.SDK_INT >= 23) {
+            format.setInteger(MediaFormat.KEY_ROTATION, rotation); // dikey pencere yalnızca Android 16+'da olur
+        }
         // Düşük gecikme istekleri: tanımayan çözücü bu anahtarları yok sayar.
         format.setInteger("low-latency", 1);                                // Android 11+
         format.setInteger("vdec-lowlatency", 1);                            // MediaTek

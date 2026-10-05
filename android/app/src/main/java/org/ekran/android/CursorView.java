@@ -11,6 +11,9 @@ import android.view.View;
 /**
  * Fare imlecini tablette yerel olarak çizer. İmleç hareketi video kodlaması gerektirmez;
  * hem PC'yi daha az yorar hem de imleç gecikmesiz hissedilir.
+ *
+ * Koordinatlar yatay görüntüye göredir; pencere dikeyse (Android 16+ büyük ekran) tuval {@link #setTurn} kadar
+ * çevrilerek çizilir, görüntünün çözücüde çevrildiği gibi.
  */
 final class CursorView extends View {
     private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
@@ -21,10 +24,26 @@ final class CursorView extends View {
     private int cursorX, cursorY; // kaynak ekran pikseli (imleç resminin sol üstü)
     private boolean visible;
     private Session.Config config;
+    private int turn;
 
     CursorView(Context context) {
         super(context);
         setWillNotDraw(false);
+    }
+
+    /** Pencere dikeyken görüntünün saat yönünde çevrilme açısı (0, 90, 270). */
+    void setTurn(int degrees) {
+        turn = degrees;
+        invalidate();
+    }
+
+    /** Yatay görüntünün bu görünümdeki genişliği (dikey pencerede en/boy yer değiştirir). */
+    int landscapeWidth() {
+        return turn == 0 ? getWidth() : getHeight();
+    }
+
+    int landscapeHeight() {
+        return turn == 0 ? getHeight() : getWidth();
     }
 
     void setConfig(Session.Config c) {
@@ -65,7 +84,7 @@ final class CursorView extends View {
             return false;
         }
         float toStreamX = c.contentW / (float) c.srcW, toStreamY = c.contentH / (float) c.srcH;
-        float toViewX = getWidth() / (float) c.streamW, toViewY = getHeight() / (float) c.streamH;
+        float toViewX = landscapeWidth() / (float) c.streamW, toViewY = landscapeHeight() / (float) c.streamH;
         float left = (c.contentX + cursorX * toStreamX) * toViewX;
         float top = (c.contentY + cursorY * toStreamY) * toViewY;
         dst.set(left, top, left + bitmap.getWidth() * toStreamX * toViewX,
@@ -74,7 +93,9 @@ final class CursorView extends View {
     }
 
     private void invalidateCursor() {
-        if (visible && computeDst()) {
+        if (turn != 0) {
+            invalidate(); // donanım çiziminde dikdörtgen zaten yok sayılıyor
+        } else if (visible && computeDst()) {
             dst.roundOut(dirty);
             dirty.inset(-2, -2);
             invalidate(dirty);
@@ -84,6 +105,12 @@ final class CursorView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         if (visible && computeDst()) {
+            if (turn == 90) {
+                canvas.translate(getWidth(), 0);
+            } else if (turn == 270) {
+                canvas.translate(0, getHeight());
+            }
+            canvas.rotate(turn);
             canvas.drawBitmap(bitmap, null, dst, paint);
         }
     }

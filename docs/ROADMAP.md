@@ -155,6 +155,10 @@ MSVC + WDK ile derlenip yerel sertifikayla imzalanıyor.
       döner; Android iletişim kutuları çevrilemediği için eşleştirme ve "eşleşmeleri unut" onayı da bu katmanda
 - [x] Yansıtmada dikey çevrilmiş PC monitörü video işlemcide düz çevrilir (desteklemeyen kartta yan kalır;
       dokunma ve imleç her iki durumda doğru)
+- [x] Android 16+ büyük ekranlar (600dp+): targetSdk 36 ile yatay kilit yok sayılır, pencere dikey açılabilir.
+      Görüntü çözücüde çevrilir (MediaFormat KEY_ROTATION; ekran kartı yapar, ek yük yok), imleç tuvalde, dokunma
+      elle aynı açıyla; PC'ye ekran hep yatay bildirilir ve monitör yatay kilitli uygulamadaki gibi dikey olur.
+      Ölçüldü (Android 16 öykünücüsü, sw720dp): dört yönde (ters dikey dahil) dokunma ±1 px, imleç parmağın altında
 - [ ] Görüntüyü DXGI yakalama yerine doğrudan sürücüden almak (bir kopya daha az, oturum açma ekranı)
 - [ ] Dağıtım imzası (SignPath Foundation veya EV + Microsoft) — şu an sürücü yalnızca derlendiği bilgisayarda kurulabiliyor
 

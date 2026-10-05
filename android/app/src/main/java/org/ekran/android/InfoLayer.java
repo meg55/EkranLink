@@ -291,7 +291,7 @@ final class InfoLayer extends ViewGroup {
 
     // --- Dışarıdan ---
 
-    /** Tabletin tutuluş yönü: yatay ekrana göre saat yönünde 0, 90 ya da 270 derece. */
+    /** İçeriğin dik okunması için pencereye göre saat yönünün tersine çevrilme açısı: 0, 90, 180 ya da 270. */
     void setOrientation(int degrees) {
         if (degrees == rotation) {
             return;
@@ -438,6 +438,11 @@ final class InfoLayer extends ViewGroup {
             l = insets.top;
             b = insets.left;
             r = insets.bottom;
+        } else if (rotation == 180) {
+            t = insets.bottom;
+            l = insets.right;
+            b = insets.top;
+            r = insets.left;
         } else {
             l = insets.left;
             t = insets.top;

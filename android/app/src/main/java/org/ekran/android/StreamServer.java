@@ -34,6 +34,7 @@ final class StreamServer extends Thread {
     private volatile ServerSocket serverSocket;
     private Socket client;
     private volatile Session session;
+    private volatile int rotation;    // pencere dikeyken görüntünün çevrilme açısı
 
     StreamServer(Surface surface, boolean headless, Stats stats, Session.Host host) {
         super("ekran-server");
@@ -45,6 +46,15 @@ final class StreamServer extends Thread {
 
     Session session() {
         return session;
+    }
+
+    /** Pencere dikeyken görüntünün çevrilme açısı; sonraki oturumlar da kullanır. */
+    void setVideoRotation(int degrees) {
+        rotation = degrees;
+        Session ses = session;
+        if (ses != null) {
+            ses.setVideoRotation(degrees);
+        }
     }
 
     /** Yüzey değişti (ekran kapandı: null, açıldı: yeni yüzey). Oturum varsa kopmadan sürer. */
@@ -135,6 +145,7 @@ final class StreamServer extends Thread {
                     ses.suspendVideo(); // ekran kapalıyken bağlanıldı
                 }
                 session = ses;
+                ses.setVideoRotation(rotation); // session atandıktan sonra: arada gelen değişiklik kaçmaz
                 Surface now = surface;
                 if (now != sf && now != null) {
                     ses.resumeVideo(now); // bu arada ekran açıldı

@@ -173,7 +173,9 @@ void Streamer::run() {
                 // Birden çok cihaz takılıysa: hazırlanmış olan, yoksa EKRAN'ı kurulu olan ilk cihaz
                 const std::vector<std::string> devs = adb::devices(adbPath);
                 std::string dev = devs.empty() ? std::string() : devs.front();
-                if (devs.size() > 1 && std::find(devs.begin(), devs.end(), prepared) != devs.end()) {
+                if (!opt_.serial.empty()) {
+                    dev = std::find(devs.begin(), devs.end(), opt_.serial) != devs.end() ? opt_.serial : std::string();
+                } else if (devs.size() > 1 && std::find(devs.begin(), devs.end(), prepared) != devs.end()) {
                     dev = prepared;
                 } else if (devs.size() > 1) {
                     for (const auto& d : devs)

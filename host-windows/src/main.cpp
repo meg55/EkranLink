@@ -29,7 +29,8 @@ void usage() {
         "  --usb             Sadece USB (adb)\n"
         "  --wifi            Sadece Wi-Fi (ağda otomatik aranır)\n"
         "  --ip ADRES        Wi-Fi ile bu IP'deki tablete bağlan\n"
-        "  --yansit          İkinci ekran yerine mevcut ekranı yansıt (sürücü kurulu değilse zaten yansıtır)\n"
+        "  --seri SERİ       USB'de birden çok cihaz takılıysa yalnızca bu cihaz (adb devices)\n"
+        "  --yansit         İkinci ekran yerine mevcut ekranı yansıt (sürücü kurulu değilse zaten yansıtır)\n"
         "  --tek-ekran       Tablet bağlıyken diğer monitörleri kapat (tablet Windows'un tek ekranı olur)\n"
         "  --ekran N         Yansıtılacak PC ekranı (0, 1, ...)\n"
         "  --fare            Dokunmayı fare tıklaması olarak ilet (varsayılan: çoklu dokunmatik ekran)\n"
@@ -51,6 +52,7 @@ bool parse(int argc, char** argv, Options& o) {
         if (a == "--usb") o.mode = LinkMode::Usb;
         else if (a == "--wifi") o.mode = LinkMode::Wifi;
         else if (a == "--ip" && i + 1 < argc) { o.ip = argv[++i]; o.mode = LinkMode::Wifi; }
+        else if (a == "--seri" && i + 1 < argc) { o.serial = argv[++i]; o.mode = LinkMode::Usb; }
         else if (a == "--ekran") { if (!next(o.output)) return false; }
         else if (a == "--fps") { if (!next(o.fps)) return false; }
         else if (a == "--bitrate") { if (!next(o.kbps)) return false; }

@@ -30,6 +30,8 @@ final class OrientationWatcher extends OrientationEventListener {
     private final ContentObserver lockObserver;
     private boolean active;
     private int candidate = -1, reported = -1;
+    private int turn;            // pencere dikeyken görüntünün çevrilme açısı, bkz. setTurn
+    private int lastDeg = ORIENTATION_UNKNOWN; // son algılayıcı ölçümü (algılayıcı yalnızca değişince haber verebilir)
 
     private final Runnable settle = new Runnable() {
         @Override
@@ -55,6 +57,19 @@ final class OrientationWatcher extends OrientationEventListener {
         };
     }
 
+    /**
+     * Android 16+ büyük ekranlarda yatay kilit yok sayılır; pencere dikey olunca görüntü saat yönünde bu kadar
+     * (90/270) çevrilerek çizilir. Yön, pencereye değil görüntüye göre bildirilir.
+     */
+    void setTurn(int degrees) {
+        if (degrees != turn) {
+            turn = degrees;
+            if (active && lastDeg != ORIENTATION_UNKNOWN) {
+                onOrientationChanged(lastDeg); // cihaz kıpırdamasa da yeni açıyla yeniden hesapla
+            }
+        }
+    }
+
     /** Son bildirilen yön (henüz yoksa -1). */
     int current() {
         return reported;
@@ -69,6 +84,7 @@ final class OrientationWatcher extends OrientationEventListener {
         ContentResolver cr = activity.getContentResolver();
         if (on) {
             candidate = reported = -1;
+            lastDeg = ORIENTATION_UNKNOWN;
             cr.registerContentObserver(Settings.System.getUriFor(Settings.System.ACCELEROMETER_ROTATION), false,
                     lockObserver);
         } else {
@@ -92,12 +108,13 @@ final class OrientationWatcher extends OrientationEventListener {
 
     @Override
     public void onOrientationChanged(int deg) {
+        lastDeg = deg;
         if (deg == ORIENTATION_UNKNOWN) {
             return; // masada düz duruyor
         }
-        // deg: cihazın doğal yönüne göre saat yönünde dönüş; ekranın o anki dönüşünü ekleyince
-        // yatay görüntüye göre dönüş çıkar (telefonlarda doğal yön dikeydir).
-        int rel = (deg + activity.getWindowManager().getDefaultDisplay().getRotation() * 90) % 360;
+        // deg: cihazın doğal yönüne göre saat yönünde dönüş; ekranın o anki dönüşünü (ve dikey pencerede
+        // görüntünün çevrilmesini) ekleyince yatay görüntüye göre dönüş çıkar (telefonlarda doğal yön dikeydir).
+        int rel = (deg + activity.getWindowManager().getDefaultDisplay().getRotation() * 90 + turn) % 360;
         int q = (rel + 45) / 90 % 4 * 90;
         int dist = Math.abs(rel - q);
         if (Math.min(dist, 360 - dist) > MARGIN) {

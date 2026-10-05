@@ -424,6 +424,13 @@ final class Session implements H264Decoder.FrameListener {
         sendVisible();
     }
 
+    /** Pencere dikey: görüntüyü saat yönünde bu kadar çevirerek çiz (0, 90, 270). */
+    void setVideoRotation(int degrees) {
+        if (decoder.setRotation(degrees) && !closed && helloSent) {
+            sendQueue.offer(body(MSG_KEY_REQUEST, 0));
+        }
+    }
+
     /** Yüzey geri geldi: yeni yüzeyle devam et, PC'den anahtar kare iste. */
     void resumeVideo(Surface surface) {
         decoder.resume(surface);

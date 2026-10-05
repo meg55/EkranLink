@@ -37,6 +37,13 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
     private boolean statsPinned;      // kullanıcı üç parmakla ölçüm kartını açtı
     private boolean suppressTouch;    // üç parmak hareketi sürerken PC'ye dokunma gönderme
     private OrientationWatcher orientationWatcher;
+    // Görüntü hep yataydır. Android 16+ büyük ekranlarda yatay kilit yok sayılır; pencere dikey olunca görüntü,
+    // imleç ve dokunma saat yönünde turn kadar çevrilir (bkz. onWindowShape).
+    private int turn;
+    private int lastLandscape = -1;   // pencerenin son yatay ekran dönüşü
+    private int windowW, windowH;
+    private Object displayListener;   // API 17+: 180° dönüşte boyut değişmez, yalnızca bu haber verir
+    private int sentOrientation = -1; // oturuma son bildirilen tutuluş yönü
     // Uyku eşitleme: Windows ekranları kapattı. Tablet ekranı kendi zaman aşımıyla kapanır, bağlantı sürer.
     private boolean sleeping;
     private boolean started, resumed;
@@ -72,6 +79,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
             }
             service = s;
             s.setUiVisible(started);
+            s.setVideoRotation(turn);
             if (surfaceW > 0) {
                 s.setSurfaceSize(surfaceW, surfaceH);
             }
@@ -100,16 +108,16 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
 
         SurfaceView surfaceView = new SurfaceView(this);
         surfaceView.getHolder().addCallback(this);
-        surfaceView.setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent e) {
-                onTouchEvent(v, e);
-                return true;
-            }
-        });
         root.addView(surfaceView, full);
 
         cursorView = new CursorView(this);
+        cursorView.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent e) {
+                onScreenTouch(e);
+                return true;
+            }
+        });
         root.addView(cursorView, full);
 
         String version = "?";
@@ -156,8 +164,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
         orientationWatcher = new OrientationWatcher(this, handler, new OrientationWatcher.Listener() {
             @Override
             public void onOrientation(int degrees) {
-                info.setOrientation(degrees);
-                sendOrientation(degrees);
+                applyOrientation();
             }
         });
 
@@ -190,7 +197,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
         return s != null ? s.session() : null;
     }
 
-    private void onTouchEvent(View v, MotionEvent e) {
+    private void onScreenTouch(MotionEvent e) {
         int action = e.getActionMasked();
         Session ses = session();
         Session.Config c = config;
@@ -215,10 +222,11 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
             }
             return;
         }
-        if (ses == null || c == null || v.getWidth() == 0 || v.getHeight() == 0) {
+        int lw = cursorView.landscapeWidth(), lh = cursorView.landscapeHeight();
+        if (ses == null || c == null || lw == 0 || lh == 0) {
             return;
         }
-        float sx = c.streamW / (float) v.getWidth(), sy = c.streamH / (float) v.getHeight();
+        float sx = c.streamW / (float) lw, sy = c.streamH / (float) lh;
         switch (action) {
             case MotionEvent.ACTION_DOWN:
             case MotionEvent.ACTION_POINTER_DOWN:
@@ -227,33 +235,94 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
                 int i = e.getActionIndex();
                 int type = (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN)
                         ? Session.TOUCH_DOWN : Session.TOUCH_UP;
-                send(ses, type, e, i, sx, sy);
+                send(ses, type, e, i, sx, sy, turn, lw, lh);
                 break;
             }
             case MotionEvent.ACTION_MOVE:
                 for (int i = 0; i < e.getPointerCount(); i++) {
-                    send(ses, Session.TOUCH_MOVE, e, i, sx, sy);
+                    send(ses, Session.TOUCH_MOVE, e, i, sx, sy, turn, lw, lh);
                 }
                 break;
             case MotionEvent.ACTION_CANCEL:
-                send(ses, Session.TOUCH_CANCEL, e, 0, sx, sy);
+                send(ses, Session.TOUCH_CANCEL, e, 0, sx, sy, turn, lw, lh);
                 break;
             default:
                 break;
         }
     }
 
-    private static void send(Session ses, int type, MotionEvent e, int i, float sx, float sy) {
-        int x = Math.max(0, Math.round(e.getX(i) * sx));
-        int y = Math.max(0, Math.round(e.getY(i) * sy));
+    /** Dokunma (pencere pikseli) → yatay görüntüde nokta (dikey pencerede çevrilmenin tersi) → akış pikseli. */
+    private static void send(Session ses, int type, MotionEvent e, int i, float sx, float sy, int turn, int lw, int lh) {
+        float vx = e.getX(i), vy = e.getY(i), lx = vx, ly = vy;
+        if (turn == 90) {
+            lx = vy;
+            ly = lh - vx;
+        } else if (turn == 270) {
+            lx = lw - vy;
+            ly = vx;
+        }
+        int x = Math.max(0, Math.round(lx * sx));
+        int y = Math.max(0, Math.round(ly * sy));
         int pressure = Math.min(1024, Math.max(0, Math.round(e.getPressure(i) * 1024)));
         ses.sendTouch(type, e.getPointerId(i), x, y, pressure);
     }
 
-    private void sendOrientation(int degrees) {
+    /**
+     * Pencere boyutu ya da ekran dönüşü değişti. Pencere yataysa görüntü olduğu gibi çizilir. Dikeyse (Android 16+
+     * büyük ekranlar yatay kilidi yok sayar) görüntü, pencerenin son yatay dönüşündeymiş gibi çevrilir: kullanıcı
+     * yatay kilitli uygulamadakiyle aynı şeyi görür, PC de monitörü aynı şekilde döndürür.
+     */
+    private void onWindowShape(boolean portrait) {
+        if (Build.VERSION.SDK_INT < 23) {
+            // Çözücü burada görüntüyü çeviremez; yatay kilit de zaten uygulanır (dikey yalnızca açılışta bir an)
+            portrait = false;
+        }
+        @SuppressWarnings("deprecation")
+        int rot = getWindowManager().getDefaultDisplay().getRotation();
+        int base;
+        if (!portrait) {
+            base = lastLandscape = rot;
+        } else {
+            // yatay dönüşler dikeyin iki yanındadır; sonuncusu yoksa birini seç
+            base = lastLandscape >= 0 && ((lastLandscape - rot) & 1) != 0 ? lastLandscape : (rot + 1) & 3;
+        }
+        int t = ((base - rot) & 3) * 90;
+        orientationWatcher.setTurn(t);
+        cursorView.setTurn(t);
+        if (t != turn) {
+            turn = t;
+            Log.i("EkranYon", "Pencere " + (t == 0 ? "yatay" : "dikey; görüntü " + t + "° çevriliyor"));
+            EkranService s = service;
+            if (s != null) {
+                s.setVideoRotation(t);
+            }
+        }
+        applyOrientation();
+    }
+
+    /**
+     * Tutuluş yönünü bilgi katmanına ve PC'ye uygula. Algılayıcı kapalıysa (otomatik döndürme kapalı, ya da
+     * cihaz masada düz) dikey pencerenin kendisi dik tutuluş sayılır.
+     */
+    private void applyOrientation() {
+        int deg = orientationWatcher.current();
+        if (deg < 0 && turn != 0) {
+            deg = turn;
+        }
+        info.setOrientation(((Math.max(deg, 0) - turn) % 360 + 360) % 360);
         Session ses = session();
-        if (ses != null) {
-            ses.sendOrientation(degrees);
+        if (deg >= 0 && deg != sentOrientation && ses != null) {
+            sentOrientation = deg;
+            ses.sendOrientation(deg);
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // Yeni boyutla yerleşimden önce: katmanlar doğrudan yeni yönde ölçülür (yüzey boyutu sonra gelir)
+        if (newConfig.orientation != android.content.res.Configuration.ORIENTATION_UNDEFINED) {
+            onWindowShape(newConfig.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT);
         }
     }
 
@@ -275,7 +344,11 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
         if (intent.hasExtra("yon")) {
             int deg = intent.getIntExtra("yon", 0);
             info.setOrientation(deg);
-            sendOrientation(deg);
+            Session ses = session();
+            if (ses != null) {
+                sentOrientation = deg;
+                ses.sendOrientation(deg);
+            }
         }
         // Tanı: `--ez uyku true|false` Windows'un ekranı kapatıp açmasını taklit eder
         if (intent.hasExtra("uyku")) {
@@ -362,6 +435,39 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
         }
         orientationWatcher.setActive(true);
         handler.post(tick);
+        if (Build.VERSION.SDK_INT >= 17) {
+            watchDisplay(true);
+        }
+    }
+
+    @android.annotation.TargetApi(17)
+    private void watchDisplay(boolean on) {
+        android.hardware.display.DisplayManager dm =
+                (android.hardware.display.DisplayManager) getSystemService(DISPLAY_SERVICE);
+        if (on && displayListener == null) {
+            android.hardware.display.DisplayManager.DisplayListener l =
+                    new android.hardware.display.DisplayManager.DisplayListener() {
+                        @Override
+                        public void onDisplayChanged(int displayId) {
+                            if (windowW > 0) {
+                                onWindowShape(windowH > windowW); // dikey pencere ters çevrildi
+                            }
+                        }
+
+                        @Override
+                        public void onDisplayAdded(int displayId) {
+                        }
+
+                        @Override
+                        public void onDisplayRemoved(int displayId) {
+                        }
+                    };
+            dm.registerDisplayListener(l, handler);
+            displayListener = l;
+        } else if (!on && displayListener != null) {
+            dm.unregisterDisplayListener((android.hardware.display.DisplayManager.DisplayListener) displayListener);
+            displayListener = null;
+        }
     }
 
     @Override
@@ -369,6 +475,9 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
         resumed = false;
         orientationWatcher.setActive(false);
         handler.removeCallbacks(tick);
+        if (Build.VERSION.SDK_INT >= 17) {
+            watchDisplay(false);
+        }
         super.onPause();
     }
 
@@ -397,11 +506,15 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        surfaceW = width;
-        surfaceH = height;
+        windowW = width;
+        windowH = height;
+        onWindowShape(height > width);
+        // PC'ye hep yatay boyut: dikey pencerede görüntü çevrilerek çizilir
+        surfaceW = Math.max(width, height);
+        surfaceH = Math.min(width, height);
         EkranService s = service;
         if (s != null) {
-            s.setSurfaceSize(width, height);
+            s.setSurfaceSize(surfaceW, surfaceH);
         }
     }
 
@@ -529,8 +642,9 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
                     config = null;
                     cursorView.clear();
                 }
-                if (active && orientationWatcher.current() >= 0) {
-                    sendOrientation(orientationWatcher.current()); // yeni sanal monitör yatay başlar
+                if (active) {
+                    sentOrientation = -1;
+                    applyOrientation(); // yeni sanal monitör yatay başlar
                 }
                 // Bağlıyken yalnızca görüntü; ölçüm kartı üç parmakla açılır
                 info.setConnected(active);
