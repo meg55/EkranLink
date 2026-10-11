@@ -16,19 +16,26 @@ struct Resolution {
     int width = 0, height = 0;  // yatay yöndeki boyut
 };
 
+// Listede bir cihaz: bağlı ya da bağlanılabilir
+struct DeviceView {
+    std::wstring name, link;
+    DeviceState state = DeviceState::Found;
+    DisplayMode mode = DisplayMode::Extend;
+    // Bağlıyken: ölçümler (saniyede bir; boşsa henüz yok), monitörün şimdiki çözünürlüğü ve yönü
+    std::wstring latency, data, fps;
+    Resolution current;
+    int rotation = 0;
+    int width = 0, height = 0;  // cihazın ekranı = önerilen çözünürlük
+};
+
 struct Model {
     Options opt;
-    bool connected = false;
-    std::wstring device, link;
-    DisplayMode activeMode = DisplayMode::Extend;
-    int deviceWidth = 0, deviceHeight = 0;  // bağlı cihazın ekranı = önerilen çözünürlük
-    // Ölçümler (bağlıyken, saniyede bir): boşsa henüz yok
-    std::wstring latency, data, fps;
-    // Sanal monitörün Windows'taki modları (Windows ekran ayarlarındaki listenin aynısı) ve şimdiki
-    // çözünürlük / yön. Bağlı değilken ya da yansıtmada boş.
+    std::vector<DeviceView> devices;  // bağlılar önce
+    int connected = 0;                // bağlı cihaz sayısı
+    // Görüntü sayfasında ayarları gösterilen bağlı cihaz (devices sırası; yoksa -1) ve onun monitörünün
+    // Windows'taki modları (Windows ekran ayarlarındaki listenin aynısı). Yansıtmada boş.
+    int displayDevice = -1;
     std::vector<Resolution> modes;
-    Resolution current;
-    int currentRotation = 0;
     // Çözülene kadar Durum sayfasında kalan uyarı (0: yok)
     Notice notice = Notice(0);
     std::wstring noticeArg;
@@ -41,20 +48,22 @@ struct Model {
 };
 
 enum class Act {
-    Reload,       // pencere öne geldi: ayarları depodan yeniden oku
-    Closed,       // pencere kapandı (ölçüm aktarımı durur)
-    Link,         // LinkMode
-    AutoConnect,  // 0/1
-    ConnectNow,
-    Display,      // DisplayMode
-    Output,       // yansıtılan ekran sırası
-    Rotation,     // -1 otomatik, 0/90/180/270
-    Resolution,   // Model::modes sırası
-    Touch,        // 0 dokunmatik, 1 fare
-    LowLatency,   // 0/1
-    Autostart,    // 0/1
-    Service,      // kur / kaldır / güncelle
-    Language,     // 0/1/2
+    Reload,         // pencere öne geldi: ayarları depodan yeniden oku
+    Closed,         // pencere kapandı (ölçüm aktarımı ve cihaz arama durur)
+    Link,           // LinkMode
+    AutoConnect,    // 0/1
+    Connect,        // Model::devices sırası
+    Disconnect,     // Model::devices sırası (-1: hepsi)
+    DisplayDevice,  // Görüntü sayfasındaki cihaz (Model::devices sırası)
+    Display,        // DisplayMode
+    Output,         // yansıtılan ekran sırası
+    Rotation,       // -1 otomatik, 0/90/180/270
+    Resolution,     // Model::modes sırası
+    Touch,          // 0 dokunmatik, 1 fare
+    LowLatency,     // 0/1
+    Autostart,      // 0/1
+    Service,        // kur / kaldır / güncelle
+    Language,       // 0/1/2
     Forget,
     OpenLog,
     OpenDisplaySettings,

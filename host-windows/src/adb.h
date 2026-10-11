@@ -20,8 +20,13 @@ std::vector<std::string> devices(const std::wstring& adbPath);
 enum class App { Installed, Missing, Unknown };
 App appState(const std::wstring& adbPath, const std::string& serial);
 
-// Port yönlendir (adb forward)
-bool prepareUsb(const std::wstring& adbPath, const std::string& serial, unsigned port);
+// Cihazdaki uygulamanın kimliği ve adı (uygulamayı açmadan; eski sürümler kimlik vermez, ad adb'den okunur).
+// Birden çok cihazda aynı tableti USB ve Wi-Fi'de iki kez saymamak için.
+App probe(const std::wstring& adbPath, const std::string& serial, std::string& id, std::string& name);
+
+// Port yönlendir (adb forward): PC'deki localPort → cihazdaki remotePort. localPort 0 ise adb boş bir port
+// seçer ve localPort'a yazılır (birden çok USB cihazı aynı anda bağlanabilsin).
+bool prepareUsb(const std::wstring& adbPath, const std::string& serial, unsigned& localPort, unsigned remotePort);
 
 // Cihazı ekran olmaya davet et: kararı cihaz verir ("bilgisayara takılınca otomatik aç" ayarı).
 enum class Launch { Started, AlreadyOpen, Declined, Failed };

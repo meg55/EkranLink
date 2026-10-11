@@ -69,12 +69,14 @@ Options loadOptions() {
 }
 
 namespace {
-std::wstring resolutionValue(const std::string& deviceId) {
-    std::wstring name = L"Cozunurluk-";
+// Cihaza özel ayarın adı: "<önek><cihaz kimliğinin harf ve rakamları>"
+std::wstring deviceValue(const wchar_t* prefix, const std::string& deviceId) {
+    std::wstring name = prefix;
     for (char c : deviceId.substr(0, 32))
         if (std::isalnum(static_cast<unsigned char>(c))) name += wchar_t(c);
     return name;
 }
+std::wstring resolutionValue(const std::string& deviceId) { return deviceValue(L"Cozunurluk-", deviceId); }
 }  // namespace
 
 bool resolutionFor(const std::string& deviceId, int& width, int& height) {
@@ -95,13 +97,15 @@ void saveResolution(const std::string& deviceId, int width, int height) {
 
 void saveRotation(int degrees) { set(L"Orientation", degrees < 0 ? 0 : DWORD(degrees / 90 % 4 + 1)); }
 
-int lastRotation() {
-    const DWORD r = get(L"LastRotation", 0);
+int lastRotation(const std::string& deviceId) {
+    // Birden çok cihaz olabilir: her birinin kendi yönü (eski sürümün tek "LastRotation"ı yedek)
+    const DWORD r = get(deviceValue(L"SonYon-", deviceId).c_str(), get(L"LastRotation", 0));
     return r >= 1 && r <= 4 ? int(r - 1) * 90 : 0;
 }
 
-void saveLastRotation(int degrees) {
-    if (lastRotation() != degrees) set(L"LastRotation", DWORD(degrees / 90 % 4 + 1));
+void saveLastRotation(const std::string& deviceId, int degrees) {
+    const std::wstring name = deviceValue(L"SonYon-", deviceId);
+    if (get(name.c_str(), 0) != DWORD(degrees / 90 % 4 + 1)) set(name.c_str(), DWORD(degrees / 90 % 4 + 1));
 }
 
 HKEY secretRoot() { return g_machine ? HKEY_LOCAL_MACHINE : HKEY_CURRENT_USER; }
@@ -134,70 +138,146 @@ void rememberAddress(const std::string& ip) {
     RegCloseKey(k);
 }
 
-void writeStatus(const SessionState& s) {
+namespace {
+
+std::string narrow(const std::wstring& x) {
+    const int n = WideCharToMultiByte(CP_UTF8, 0, x.data(), int(x.size()), nullptr, 0, nullptr, nullptr);
+    std::string out(size_t(n), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, x.data(), int(x.size()), out.data(), n, nullptr, nullptr);
+    return out;
+}
+
+void setMulti(HKEY k, const wchar_t* name, const std::vector<std::wstring>& lines) {
+    std::wstring buf;
+    for (const auto& l : lines) buf += l + L'\0';
+    buf += L'\0';
+    RegSetValueExW(k, name, 0, REG_MULTI_SZ, reinterpret_cast<const BYTE*>(buf.data()),
+                   DWORD(buf.size() * sizeof(wchar_t)));
+}
+
+std::vector<std::wstring> getMulti(HKEY root, const wchar_t* path, const wchar_t* name) {
+    std::vector<std::wstring> out;
+    DWORD size = 0;
+    if (RegGetValueW(root, path, name, RRF_RT_REG_MULTI_SZ, nullptr, nullptr, &size) != ERROR_SUCCESS || size == 0)
+        return out;
+    std::wstring buf(size / sizeof(wchar_t) + 1, L'\0');
+    if (RegGetValueW(root, path, name, RRF_RT_REG_MULTI_SZ, nullptr, buf.data(), &size) != ERROR_SUCCESS) return out;
+    for (size_t b = 0; b < buf.size() && buf[b];) {
+        const size_t e = buf.find(L'\0', b);
+        out.push_back(buf.substr(b, e - b));
+        b = e + 1;
+    }
+    return out;
+}
+
+std::vector<std::wstring> split(const std::wstring& s, wchar_t sep) {
+    std::vector<std::wstring> out;
+    size_t b = 0;
+    for (;;) {
+        const size_t e = s.find(sep, b);
+        out.push_back(s.substr(b, e == std::wstring::npos ? std::wstring::npos : e - b));
+        if (e == std::wstring::npos) break;
+        b = e + 1;
+    }
+    return out;
+}
+
+}  // namespace
+
+void writeDevices(const std::vector<DeviceInfo>& list) {
     HKEY k;
     if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, kStatusKey, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &k, nullptr) != 0) return;
     auto dword = [&](const wchar_t* name, DWORD v) {
         RegSetValueExW(k, name, 0, REG_DWORD, reinterpret_cast<const BYTE*>(&v), sizeof v);
     };
-    // Önce ayrıntılar, en son "Seq": okuyan taraf tek bildirimde tutarlı değerleri görsün
-    setString(k, L"Device", widen(s.device));
-    setString(k, L"Link", widen(s.link));
-    setString(k, L"DeviceId", widen(s.deviceId));
-    setString(k, L"Gdi", s.gdiName);
-    dword(L"Display", DWORD(s.mode));
-    dword(L"Width", DWORD(s.width));
-    dword(L"Height", DWORD(s.height));
-    dword(L"Connected", s.connected ? 1 : 0);
+    // Satır: anahtar, durum, ad, bağlantı, kimlik, görüntü modu, genişlik, yükseklik, GDI adı (sekmeyle ayrılır)
+    std::vector<std::wstring> lines;
+    DWORD connected = 0;
+    const DeviceInfo* first = nullptr;
+    for (const auto& d : list) {
+        wchar_t nums[64];
+        swprintf(nums, 64, L"%d\t%d\t%d", int(d.mode), d.width, d.height);
+        lines.push_back(widen(d.key) + L"\t" + std::to_wstring(int(d.state)) + L"\t" + widen(d.name) + L"\t" +
+                        widen(d.link) + L"\t" + widen(d.deviceId) + L"\t" + nums + L"\t" + d.gdiName);
+        if (d.state == DeviceState::Connected) {
+            connected++;
+            if (!first) first = &d;
+        }
+    }
+    setMulti(k, L"Cihazlar", lines);
+    if (first) {
+        setString(k, L"Device", widen(first->name));
+        setString(k, L"Link", widen(first->link));
+        setString(k, L"DeviceId", widen(first->deviceId));
+        setString(k, L"Gdi", first->gdiName);
+        dword(L"Display", DWORD(first->mode));
+        dword(L"Width", DWORD(first->width));
+        dword(L"Height", DWORD(first->height));
+    }
+    dword(L"Connected", connected);
+    // En son "Seq": okuyan taraf tek bildirimde tutarlı değerleri görsün
     DWORD seq = 0, size = sizeof seq;
     RegGetValueW(HKEY_LOCAL_MACHINE, kStatusKey, L"Seq", RRF_RT_REG_DWORD, nullptr, &seq, &size);
     dword(L"Seq", seq + 1);
     RegCloseKey(k);
 }
 
-bool readStatus(SessionState& s) {
-    auto dword = [](const wchar_t* name, DWORD& v) {
-        DWORD size = sizeof v;
-        return RegGetValueW(HKEY_LOCAL_MACHINE, kStatusKey, name, RRF_RT_REG_DWORD, nullptr, &v, &size) == 0;
-    };
-    DWORD c = 0, m = 0, w = 0, h = 0;
-    if (!dword(L"Connected", c)) return false;
-    dword(L"Display", m);
-    dword(L"Width", w);
-    dword(L"Height", h);
-    s.connected = c != 0;
-    s.mode = DisplayMode(m);
-    s.width = int(w);
-    s.height = int(h);
-    const std::wstring dev = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"Device");
-    const std::wstring link = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"Link");
-    auto narrow = [](const std::wstring& x) {
-        const int n = WideCharToMultiByte(CP_UTF8, 0, x.data(), int(x.size()), nullptr, 0, nullptr, nullptr);
-        std::string out(size_t(n), '\0');
-        WideCharToMultiByte(CP_UTF8, 0, x.data(), int(x.size()), out.data(), n, nullptr, nullptr);
-        return out;
-    };
-    s.device = narrow(dev);
-    s.link = narrow(link);
-    s.deviceId = narrow(getString(HKEY_LOCAL_MACHINE, kStatusKey, L"DeviceId"));
-    s.gdiName = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"Gdi");
+bool readDevices(std::vector<DeviceInfo>& list) {
+    list.clear();
+    DWORD c = 0, size = sizeof c;
+    if (RegGetValueW(HKEY_LOCAL_MACHINE, kStatusKey, L"Connected", RRF_RT_REG_DWORD, nullptr, &c, &size) != 0) return false;
+    for (const auto& line : getMulti(HKEY_LOCAL_MACHINE, kStatusKey, L"Cihazlar")) {
+        const auto f = split(line, L'\t');
+        if (f.size() < 9) continue;
+        DeviceInfo d;
+        d.key = narrow(f[0]);
+        d.state = DeviceState(_wtoi(f[1].c_str()));
+        d.name = narrow(f[2]);
+        d.link = narrow(f[3]);
+        d.deviceId = narrow(f[4]);
+        d.mode = DisplayMode(_wtoi(f[5].c_str()));
+        d.width = _wtoi(f[6].c_str());
+        d.height = _wtoi(f[7].c_str());
+        d.gdiName = f[8];
+        list.push_back(std::move(d));
+    }
     return true;
 }
 
-void writeStats(const std::string& line) {
+void writeStats(const std::map<std::string, std::string>& byKey) {
     HKEY k;
     if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, kStatusKey, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &k, nullptr) != 0) return;
-    setString(k, L"Stats", widen(line));
+    std::vector<std::wstring> lines;
+    for (const auto& [key, line] : byKey) lines.push_back(widen(key) + L"\t" + widen(line));
+    setMulti(k, L"Stats", lines);
     RegCloseKey(k);
 }
 
-std::string readStats() {
-    const std::wstring w = getString(HKEY_LOCAL_MACHINE, kStatusKey, L"Stats");
-    const int n = WideCharToMultiByte(CP_UTF8, 0, w.data(), int(w.size()), nullptr, 0, nullptr, nullptr);
-    std::string out(size_t(n), '\0');
-    WideCharToMultiByte(CP_UTF8, 0, w.data(), int(w.size()), out.data(), n, nullptr, nullptr);
+std::map<std::string, std::string> readStats() {
+    std::map<std::string, std::string> out;
+    for (const auto& line : getMulti(HKEY_LOCAL_MACHINE, kStatusKey, L"Stats")) {
+        const size_t t = line.find(L'\t');
+        if (t != std::wstring::npos) out[narrow(line.substr(0, t))] = narrow(line.substr(t + 1));
+    }
     return out;
 }
+
+void sendCommand(const std::string& cmd) {
+    HKEY k;
+    if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, kSettingsKey, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &k, nullptr) != 0) return;
+    setString(k, L"Komut", widen(cmd));
+    const DWORD id = commandId() + 1;  // en son: ajan komutu hazır bulsun
+    RegSetValueExW(k, L"KomutNo", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&id), sizeof id);
+    RegCloseKey(k);
+}
+
+DWORD commandId() {
+    DWORD id = 0, size = sizeof id;
+    RegGetValueW(HKEY_LOCAL_MACHINE, kSettingsKey, L"KomutNo", RRF_RT_REG_DWORD, nullptr, &id, &size);
+    return id;
+}
+
+std::string readCommand() { return narrow(getString(HKEY_LOCAL_MACHINE, kSettingsKey, L"Komut")); }
 
 DWORD statusSeq() {
     DWORD seq = 0, size = sizeof seq;

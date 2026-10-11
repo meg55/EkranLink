@@ -124,15 +124,52 @@ void screenOff(const std::wstring& adbPath, const std::string& serial, int sdk) 
         run(adbPath, to(serial) + L"shell input keyevent 26");
 }
 
-bool prepareUsb(const std::wstring& adbPath, const std::string& serial, unsigned port) {
+bool prepareUsb(const std::wstring& adbPath, const std::string& serial, unsigned& localPort, unsigned remotePort) {
     std::string out;
     wchar_t fwd[64];
-    swprintf(fwd, 64, L"forward tcp:%u tcp:%u", port, port);
+    swprintf(fwd, 64, L"forward tcp:%u tcp:%u", localPort, remotePort);
     if (!run(adbPath, to(serial) + fwd, &out)) {
-        logf("USB: adb forward başarısız: %s", out.c_str());
+        logf("USB: adb forward başarısız (%s): %s", serial.c_str(), out.c_str());
         return false;
     }
+    if (localPort == 0) {
+        localPort = unsigned(std::atoi(out.c_str()));  // "tcp:0" ile adb seçtiği portu yazar
+        if (localPort == 0) {
+            logf("USB: adb port bildirmedi (%s)", out.c_str());
+            return false;
+        }
+    }
     return true;
+}
+
+App probe(const std::wstring& adbPath, const std::string& serial, std::string& id, std::string& name) {
+    // Uygulama sonuç verisi olarak "kimlik|ad" döndürür; kurulu değilse yayın alıcısız kalır (result=0)
+    std::string out;
+    if (!run(adbPath, to(serial) + L"shell am broadcast -f 32 -n org.ekranlink.android/.AutoStartReceiver --ez kimlik true",
+             &out))
+        return App::Unknown;
+    const size_t r = out.find("result=");
+    if (r == std::string::npos || std::atoi(out.c_str() + r + 7) == 0) return appState(adbPath, serial);
+    const size_t d = out.find("data=\"");
+    if (d != std::string::npos) {
+        const size_t b = d + 6, e = out.find('"', b), bar = out.find('|', b);
+        if (e != std::string::npos && bar != std::string::npos && bar < e) {
+            id = out.substr(b, bar - b);
+            name = out.substr(bar + 1, e - bar - 1);
+        }
+    }
+    if (name.empty()) {
+        std::string maker, model;
+        run(adbPath, to(serial) + L"shell getprop ro.product.manufacturer", &maker, 3000);
+        run(adbPath, to(serial) + L"shell getprop ro.product.model", &model, 3000);
+        auto trim = [](std::string s) {
+            while (!s.empty() && (s.back() == '\r' || s.back() == '\n' || s.back() == ' ')) s.pop_back();
+            return s;
+        };
+        name = trim(maker) + (maker.empty() ? "" : " ") + trim(model);
+        if (name == " " || name.empty()) name = serial;
+    }
+    return App::Installed;
 }
 
 Launch requestLaunch(const std::wstring& adbPath, const std::string& serial) {

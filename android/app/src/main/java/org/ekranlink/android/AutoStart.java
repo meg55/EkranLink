@@ -42,6 +42,12 @@ final class AutoStart {
         prefs(c).edit().remove(KEY_HOLD).apply();
     }
 
+    /** Bekletme sürüyor mu (değiştirmeden; PC yalnızca cihazı tanımak için sordu). */
+    static boolean isHeld(Context c) {
+        SharedPreferences p = prefs(c);
+        return p.getBoolean(KEY_HOLD, false) && System.currentTimeMillis() - p.getLong(KEY_LAST_ASK, 0) <= HOLD_GAP_MS;
+    }
+
     /** PC sordu: bekletme sürüyor mu? Sorular 30 sn kesildiyse kablo çıkarılmıştır, bekletme biter. */
     static boolean held(Context c) {
         SharedPreferences p = prefs(c);

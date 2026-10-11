@@ -2,7 +2,9 @@
 
 #include <setupapi.h>
 
+#include <algorithm>
 #include <cstring>
+#include <mutex>
 #include <vector>
 
 #include "../../driver/src/ekranvd-ioctl.h"
@@ -174,10 +176,19 @@ bool queryActive(std::vector<DISPLAYCONFIG_PATH_INFO>& paths, std::vector<DISPLA
     return true;
 }
 
+// Tek ekran düzeni süreç genelinde ortak (birden çok cihaz): ilk geçen kaydeder, son çıkan geri yükler
+std::mutex g_isoMutex;
+int g_isoCount = 0;
+std::vector<DISPLAYCONFIG_PATH_INFO> g_savedPaths;
+std::vector<DISPLAYCONFIG_MODE_INFO> g_savedModes;
+
+bool sameAdapter(const LUID& a, const LUID& b) { return a.LowPart == b.LowPart && a.HighPart == b.HighPart; }
+
 }  // namespace
 
 bool VirtualDisplay::isolate() {
-    if (!added_) return false;
+    if (!added_ || isolated_) return isolated_;
+    std::lock_guard<std::mutex> lock(g_isoMutex);
     std::vector<DISPLAYCONFIG_PATH_INFO> paths;
     std::vector<DISPLAYCONFIG_MODE_INFO> modes;
     if (!queryActive(paths, modes)) return false;
@@ -185,79 +196,121 @@ bool VirtualDisplay::isolate() {
     int self = -1;
     for (size_t i = 0; i < paths.size(); i++) {
         const auto& t = paths[i].targetInfo;
-        if (t.id == targetId_ && t.adapterId.LowPart == adapter_.LowPart && t.adapterId.HighPart == adapter_.HighPart)
-            self = int(i);
+        if (t.id == targetId_ && sameAdapter(t.adapterId, adapter_)) self = int(i);
     }
     if (self < 0) return false;
     if (paths.size() == 1) return true;  // zaten tek ekran (ör. ekransız mini PC)
 
-    // Geri yükleme için şimdiki düzen
-    savedPaths_ = paths;
-    savedModes_ = modes;
+    // Geri yükleme için şimdiki düzen (ilk tek ekrana geçen cihaz kaydeder)
+    if (g_isoCount == 0) {
+        g_savedPaths = paths;
+        g_savedModes = modes;
+    }
 
-    // Yalnızca tabletin yolu etkin kalsın; (0, 0)'a taşınınca ana ekran olur
+    // Yalnızca EkranLink monitörleri (aynı sürücü bağdaştırıcısı) etkin kalsın: bu cihaz (0, 0)'da ana ekran,
+    // diğerleri sağına dizilir
+    LONG x = 0;
+    auto place = [&](size_t i) {
+        const UINT32 src = paths[i].sourceInfo.modeInfoIdx;
+        if (src == DISPLAYCONFIG_PATH_MODE_IDX_INVALID || src >= modes.size() ||
+            modes[src].infoType != DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE)
+            return;
+        modes[src].sourceMode.position = {x, 0};
+        x += LONG(modes[src].sourceMode.width);
+    };
+    place(size_t(self));
+    int others = 0;
     for (size_t i = 0; i < paths.size(); i++) {
         if (int(i) == self) continue;
+        if (sameAdapter(paths[i].targetInfo.adapterId, adapter_)) {
+            place(i);
+            continue;
+        }
         paths[i].flags &= ~DISPLAYCONFIG_PATH_ACTIVE;
         paths[i].sourceInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
         paths[i].targetInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
+        others++;
     }
-    const UINT32 src = paths[self].sourceInfo.modeInfoIdx;
-    if (src != DISPLAYCONFIG_PATH_MODE_IDX_INVALID && src < modes.size() &&
-        modes[src].infoType == DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE)
-        modes[src].sourceMode.position = {0, 0};
 
     const LONG r = SetDisplayConfig(UINT32(paths.size()), paths.data(), UINT32(modes.size()), modes.data(),
                                     SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_ALLOW_CHANGES);
     if (r != ERROR_SUCCESS) {
         logf("Tek ekran: diğer monitörler kapatılamadı (%ld)", r);
-        savedPaths_.clear();
-        savedModes_.clear();
+        if (g_isoCount == 0) {
+            g_savedPaths.clear();
+            g_savedModes.clear();
+        }
         return false;
     }
     isolated_ = true;
-    logf("Tek ekran: diğer %d monitör kapatıldı, tablet ana ekran", int(paths.size()) - 1);
+    g_isoCount++;
+    logf("Tek ekran: diğer %d monitör kapatıldı, cihaz ana ekran", others);
     return true;
 }
 
 void VirtualDisplay::restoreLayout() {
     if (!isolated_) return;
     isolated_ = false;
-    // Tek ekrandayken tabletin çözünürlüğü / yönü değişmiş olabilir: kayıtlı düzende onunkini güncelle,
-    // yoksa eski düzen yüklenince tablet de eski moduna döner.
+    std::lock_guard<std::mutex> lock(g_isoMutex);
+    if (--g_isoCount > 0) return;  // başka cihaz hâlâ tek ekranda: düzeni o geri yükleyecek
+
+    // Tek ekrandayken EkranLink monitörlerinin çözünürlüğü / yönü değişmiş olabilir, ya da yeni cihaz bağlanmış
+    // olabilir: kayıtlı düzende onları güncelle / ekle, yoksa eski düzen yüklenince eski modlarına döner (ya da
+    // kayıtta olmayan monitör kapanır).
     std::vector<DISPLAYCONFIG_PATH_INFO> paths;
     std::vector<DISPLAYCONFIG_MODE_INFO> modes;
-    auto self = [&](const DISPLAYCONFIG_PATH_INFO& p) {
-        return p.targetInfo.id == targetId_ && p.targetInfo.adapterId.LowPart == adapter_.LowPart &&
-               p.targetInfo.adapterId.HighPart == adapter_.HighPart;
-    };
     if (queryActive(paths, modes)) {
+        LONG right = 0;
+        for (const auto& sp : g_savedPaths) {
+            const UINT32 ss = sp.sourceInfo.modeInfoIdx;
+            if ((sp.flags & DISPLAYCONFIG_PATH_ACTIVE) && ss < g_savedModes.size())
+                right = std::max(right, g_savedModes[ss].sourceMode.position.x + LONG(g_savedModes[ss].sourceMode.width));
+        }
         for (const auto& now : paths) {
-            if (!self(now)) continue;
-            for (auto& saved : savedPaths_) {
-                if (!self(saved)) continue;
+            if (!sameAdapter(now.targetInfo.adapterId, adapter_)) continue;
+            bool found = false;
+            for (auto& saved : g_savedPaths) {
+                if (saved.targetInfo.id != now.targetInfo.id || !sameAdapter(saved.targetInfo.adapterId, adapter_))
+                    continue;
+                found = true;
                 saved.targetInfo.rotation = now.targetInfo.rotation;
                 const UINT32 ns = now.sourceInfo.modeInfoIdx, ss = saved.sourceInfo.modeInfoIdx;
-                if (ns < modes.size() && ss < savedModes_.size()) {
-                    const POINTL pos = savedModes_[ss].sourceMode.position;
-                    savedModes_[ss].sourceMode = modes[ns].sourceMode;
-                    savedModes_[ss].sourceMode.position = pos;
+                if (ns < modes.size() && ss < g_savedModes.size()) {
+                    const POINTL pos = g_savedModes[ss].sourceMode.position;
+                    g_savedModes[ss].sourceMode = modes[ns].sourceMode;
+                    g_savedModes[ss].sourceMode.position = pos;
                 }
                 const UINT32 nt = now.targetInfo.modeInfoIdx, st = saved.targetInfo.modeInfoIdx;
-                if (nt < modes.size() && st < savedModes_.size()) savedModes_[st].targetMode = modes[nt].targetMode;
+                if (nt < modes.size() && st < g_savedModes.size()) g_savedModes[st].targetMode = modes[nt].targetMode;
             }
+            if (found) continue;
+            // Tek ekrandayken bağlanan cihaz: kayıtlı düzenin sağına eklenir
+            DISPLAYCONFIG_PATH_INFO add = now;
+            const UINT32 ns = now.sourceInfo.modeInfoIdx, nt = now.targetInfo.modeInfoIdx;
+            if (ns < modes.size()) {
+                DISPLAYCONFIG_MODE_INFO m = modes[ns];
+                m.sourceMode.position = {right, 0};
+                right += LONG(m.sourceMode.width);
+                add.sourceInfo.modeInfoIdx = UINT32(g_savedModes.size());
+                g_savedModes.push_back(m);
+            }
+            if (nt < modes.size()) {
+                add.targetInfo.modeInfoIdx = UINT32(g_savedModes.size());
+                g_savedModes.push_back(modes[nt]);
+            }
+            g_savedPaths.push_back(add);
         }
     }
-    LONG r = SetDisplayConfig(UINT32(savedPaths_.size()), savedPaths_.data(), UINT32(savedModes_.size()),
-                              savedModes_.data(), SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_ALLOW_CHANGES);
+    LONG r = SetDisplayConfig(UINT32(g_savedPaths.size()), g_savedPaths.data(), UINT32(g_savedModes.size()),
+                              g_savedModes.data(), SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_ALLOW_CHANGES);
     if (r != ERROR_SUCCESS) {
         // Kayıtlı düzen uymadı (ör. monitör söküldü): Windows'un bu monitör kümesi için bildiği düzen
         logf("Tek ekran: eski düzen yüklenemedi (%ld), genişletilmiş düzene dönülüyor", r);
         r = SetDisplayConfig(0, nullptr, 0, nullptr, SDC_APPLY | SDC_TOPOLOGY_EXTEND);
     }
     if (r == ERROR_SUCCESS) logf("Tek ekran: monitörler geri açıldı");
-    savedPaths_.clear();
-    savedModes_.clear();
+    g_savedPaths.clear();
+    g_savedModes.clear();
 }
 
 // Yön / çözünürlük Windows'un kaydına da yazılır: monitör bir sonraki bağlanışta doğrudan bu modla açılır

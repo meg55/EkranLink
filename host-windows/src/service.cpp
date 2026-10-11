@@ -10,7 +10,10 @@
 
 #include <objbase.h>
 
+#include <algorithm>
 #include <atomic>
+#include <map>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -333,7 +336,7 @@ int runAgent() {
     HKEY settings = nullptr;
     RegOpenKeyExW(HKEY_LOCAL_MACHINE, config::kSettingsKey, 0, KEY_NOTIFY | KEY_QUERY_VALUE, &settings);
     HANDLE regEv = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    config::writeStatus(SessionState{});
+    config::writeDevices({});
 
     auto handleForget = [] {
         if (config::get(L"ForgetPairs", 0) == 0) return false;
@@ -352,11 +355,23 @@ int runAgent() {
     applyLanguage();
 
     std::atomic<bool> statsToUi{config::get(L"Izle", 0) != 0}, statsToLog{config::get(L"Tani", 0) != 0};
+    // Bağlı cihazların son ölçüm satırları (pencere açıkken tepsiye)
+    std::mutex statsMutex;
+    std::map<std::string, std::string> stats;
     bool quit = false;
     while (!quit) {
         const Options opt = config::loadOptions();
         StreamerEvents ev;
-        ev.onState = [](const SessionState& s) { config::writeStatus(s); };
+        ev.onDevices = [&](const std::vector<DeviceInfo>& list) {
+            config::writeDevices(list);
+            std::lock_guard<std::mutex> lock(statsMutex);
+            for (auto it = stats.begin(); it != stats.end();) {
+                const bool on = std::any_of(list.begin(), list.end(), [&](const DeviceInfo& d) {
+                    return d.key == it->first && d.state == DeviceState::Connected;
+                });
+                it = on ? std::next(it) : stats.erase(it);
+            }
+        };
         ev.onNotice = [](Notice n, const std::string& arg) { config::writeNotice(int(n), arg); };
         ev.onPairRequest = [](const std::string& device, const std::string& code, HANDLE cancel) {
             // Oturum açılmadan (kilit ekranı) yeni tablet eşleştirilmez: kilit ekranı yabancıya gitmesin
@@ -368,12 +383,17 @@ int runAgent() {
             return askPairing(widen(device), widen(code), cancel);
         };
         // Saniyelik ölçüm: ayar penceresi açıkken (Izle = 1) tepsiye, tanıda (Tani = 1) günlüğe
-        ev.onStats = [&](const std::string& line) {
-            if (statsToUi) config::writeStats(line);
-            if (statsToLog) logf("%s  [%ls]", line.c_str(), inputDesktopName().c_str());
+        ev.onStats = [&](const std::string& key, const std::string& line) {
+            if (statsToUi) {
+                std::lock_guard<std::mutex> lock(statsMutex);
+                stats[key] = line;
+                config::writeStats(stats);
+            }
+            if (statsToLog) logf("%s  %s  [%ls]", key.c_str(), line.c_str(), inputDesktopName().c_str());
         };
         Streamer streamer(opt, ev);
-        DWORD lastConnectNow = config::get(L"ConnectNow", 0);
+        streamer.setWatching(statsToUi);
+        DWORD lastCommand = config::commandId();
         std::thread worker([&] {
             CoInitializeEx(nullptr, COINIT_MULTITHREADED);  // STA gizli pencere açar; masaüstü değişemezdi
             streamer.run();
@@ -390,16 +410,20 @@ int runAgent() {
             }
             if (w != WAIT_OBJECT_0) continue;
             if (handleForget()) continue;
-            // Tepsideki "Şimdi bağlan": sayaç artar (kullanıcı HKLM'e yalnızca ayar yazabilir)
-            const DWORD cn = config::get(L"ConnectNow", 0);
-            if (cn != lastConnectNow) {
-                lastConnectNow = cn;
-                streamer.connectNow();
+            // Tepsiden komut: bağlan / kes (kullanıcı HKLM'e yalnızca ayar anahtarına yazabilir)
+            const DWORD cmdId = config::commandId();
+            if (cmdId != lastCommand) {
+                lastCommand = cmdId;
+                const std::string cmd = config::readCommand();
+                if (cmd.rfind("baglan ", 0) == 0) streamer.connect(cmd.substr(7));
+                else if (cmd.rfind("kes ", 0) == 0) streamer.disconnect(cmd.substr(4));
+                else if (cmd == "kes") streamer.disconnect({});
                 continue;
             }
             // Ayarlar bağlantıyı koparmadan uygulanır (Streamer::update)
             streamer.update(config::loadOptions());
             statsToUi = config::get(L"Izle", 0) != 0;
+            streamer.setWatching(statsToUi);  // pencere açıkken cihazlar listelensin
             statsToLog = config::get(L"Tani", 0) != 0;
             applyLanguage();
         }
@@ -407,7 +431,7 @@ int runAgent() {
         worker.join();
     }
 
-    config::writeStatus(SessionState{});
+    config::writeDevices({});
     logf("EkranLink ajanı kapandı");
     if (settings) RegCloseKey(settings);
     CloseHandle(regEv);

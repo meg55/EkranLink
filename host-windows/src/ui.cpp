@@ -147,6 +147,10 @@ private:
         std::function<void()> fn;
     };
     void buttons(const std::vector<Button>& list);
+    float buttonWidth(const std::wstring& text) { return textWidth(text, fControl_.get()) + 28; }
+    void button(float x, float y, const Button& b);
+    void deviceCard(int index);
+    void foundRow(int index);
 
     void statusPage();
     void connectionPage();
@@ -154,7 +158,8 @@ private:
     void inputPage();
     void generalPage();
 
-    std::wstring resolutionText(const Resolution& r) const;
+    std::wstring resolutionText(const Resolution& r, const DeviceView& d) const;
+    static const wchar_t* orientText(int rotation);
 
     Host* host_;
     HICON icon_;
@@ -354,10 +359,13 @@ void Window::sidebar(float height) {
     const float x = 16, w = kSide - 28;
     float y = 22;
     y += drawText(L"EkranLink", fApp_.get(), x + 6, y, w, t.text) + 6;
-    // Durum: nokta + kısa metin + cihaz adı
+    // Durum: nokta + kısa metin + cihaz adı (birden çok cihazda sayısı)
     dot(x + 11, y + 9, 5, m.connected ? t.ok : t.idle);
-    y += drawText(m.connected ? W(i18n::Connected) : W(i18n::Waiting), fBody_.get(), x + 24, y, w - 24, t.text) + 1;
-    if (m.connected) y += drawText(m.device, fHint_.get(), x + 24, y, w - 24, t.sub);
+    const std::wstring state = m.connected > 1 ? i18n::F(i18n::DevicesConnected, m.connected)
+                               : m.connected  ? std::wstring(W(i18n::Connected))
+                                              : std::wstring(W(i18n::Waiting));
+    y += drawText(state, fBody_.get(), x + 24, y, w - 24, t.text) + 1;
+    if (m.connected == 1 && !m.devices.empty()) y += drawText(m.devices[0].name, fHint_.get(), x + 24, y, w - 24, t.sub);
     y = std::max(y + 22, 118.f);
 
     struct Nav {
@@ -508,76 +516,143 @@ void Window::toggleRow(const wchar_t* text, const wchar_t* hintText, bool value,
     y_ = top + rowH + kRowGap;
 }
 
-void Window::buttons(const std::vector<Button>& list) {
+void Window::button(float x, float y, const Button& b) {
     const Theme& t = theme_;
+    const float bw = buttonWidth(b.text);
+    const D2D1_RECT_F r = D2D1::RectF(x, y, x + bw, y + kControlH);
+    const bool h = b.enabled && hot(r);
+    D2D1_COLOR_F bg = b.primary ? (h ? t.accentHot : t.accent) : (h ? t.controlHot : t.control);
+    D2D1_COLOR_F fg = b.primary ? t.onAccent : t.text;
+    if (!b.enabled) {
+        bg.a = 0.5f;
+        fg.a = 0.45f;
+    }
+    fillRound(r, 6, bg);
+    const float th = textHeight(b.text, fControl_.get(), bw);
+    drawText(b.text, fControl_.get(), x, y + (kControlH - th) / 2, bw, fg);
+    if (b.enabled) addHit(r, b.fn);
+}
+
+void Window::buttons(const std::vector<Button>& list) {
     float x = x_;
     for (const Button& b : list) {
-        const float bw = textWidth(b.text, fControl_.get()) + 28;
+        const float bw = buttonWidth(b.text);
         if (x > x_ && x + bw > x_ + w_) {  // sığmazsa alt satıra
             x = x_;
             y_ += kControlH + 8;
         }
-        const D2D1_RECT_F r = D2D1::RectF(x, y_, x + bw, y_ + kControlH);
-        const bool h = b.enabled && hot(r);
-        D2D1_COLOR_F bg = b.primary ? (h ? t.accentHot : t.accent) : (h ? t.controlHot : t.control);
-        D2D1_COLOR_F fg = b.primary ? t.onAccent : t.text;
-        if (!b.enabled) {
-            bg.a = 0.5f;
-            fg.a = 0.45f;
-        }
-        fillRound(r, 6, bg);
-        const float th = textHeight(b.text, fControl_.get(), bw);
-        drawText(b.text, fControl_.get(), x, y_ + (kControlH - th) / 2, bw, fg);
-        if (b.enabled) addHit(r, b.fn);
+        button(x, y_, b);
         x += bw + 8;
     }
     y_ += kControlH + kRowGap;
 }
 
 // Windows ekran ayarlarındaki biçim: "1600 × 940", cihazınki "(Önerilen)"; dikeyde boyutlar yer değiştirir
-std::wstring Window::resolutionText(const Resolution& r) const {
-    const bool portrait = model_.currentRotation % 180 != 0;
+std::wstring Window::resolutionText(const Resolution& r, const DeviceView& d) const {
+    const bool portrait = d.rotation % 180 != 0;
     std::wstring s = i18n::F(i18n::ResItem, portrait ? r.height : r.width, portrait ? r.width : r.height);
-    if (r.width == model_.deviceWidth && r.height == model_.deviceHeight) s += W(i18n::Recommended);
+    if (r.width == d.width && r.height == d.height) s += W(i18n::Recommended);
     return s;
 }
 
+const wchar_t* Window::orientText(int r) {
+    return W(r == 90    ? i18n::OrientPortrait
+             : r == 180 ? i18n::OrientLandscapeFlipped
+             : r == 270 ? i18n::OrientPortraitFlipped
+                        : i18n::OrientLandscape);
+}
+
 // --- Sayfalar ---
+
+// Bağlı bir cihaz: ayrıntılar ve "Bağlantıyı kes"
+void Window::deviceCard(int index) {
+    const Theme& t = theme_;
+    const DeviceView& d = model_.devices[size_t(index)];
+    card([&] {
+        // Başlık: ad, sağında "Bağlantıyı kes"
+        const std::wstring btn = W(i18n::Disconnect);
+        const float bw = buttonWidth(btn), top = y_;
+        const float th = textHeight(d.name, fSection_.get(), w_ - 20 - bw - 12);
+        const float ty = top + std::max(0.f, (kControlH - th) / 2);
+        dot(x_ + 6, ty + 11, 6, t.ok);
+        drawText(d.name, fSection_.get(), x_ + 20, ty, w_ - 20 - bw - 12, t.text);
+        button(x_ + w_ - bw, top, {btn, false, true, [this, index] { host_->act(Act::Disconnect, index); }});
+        y_ = std::max(ty + th, top + kControlH) + 12;
+        std::wstring link = d.link;
+        if (link.rfind(L"Wi-Fi", 0) == 0) link += std::wstring(L", ") + W(i18n::Encrypted);
+        keyValue(W(i18n::RowLink), link);
+        keyValue(W(i18n::RowMode), W(d.mode == DisplayMode::Mirror ? i18n::ModeMirror
+                                     : d.mode == DisplayMode::Only ? i18n::ModeOnly
+                                                                   : i18n::ModeExtend));
+        if (d.mode != DisplayMode::Mirror && d.current.width > 0)
+            keyValue(W(i18n::RowScreen), resolutionText(d.current, d) + L" · " + orientText(d.rotation));
+        const std::wstring pending = W(i18n::StatsPending);
+        if (model_.connected > 1) {
+            // Birden çok cihaz: kartlar sayfaya sığsın diye ölçümler tek satırda
+            keyValue(W(i18n::RowPerf), d.data.empty() ? pending
+                                                      : (d.latency.empty() ? std::wstring() : d.latency + L" · ") +
+                                                            d.data + L" · " + d.fps);
+        } else {
+            keyValue(W(i18n::RowLatency), d.latency.empty() ? pending : d.latency);
+            keyValue(W(i18n::RowData), d.data.empty() ? pending : d.data);
+            keyValue(W(i18n::RowFps), d.fps.empty() ? pending : d.fps);
+        }
+        y_ += kRowGap - 8;
+    });
+}
+
+// Bağlı olmayan bir cihaz: ad, durum ve "Bağlan"
+void Window::foundRow(int index) {
+    const Theme& t = theme_;
+    const DeviceView& d = model_.devices[size_t(index)];
+    const std::wstring btn = W(i18n::Connect);
+    const bool missing = d.state == DeviceState::AppMissing;
+    const float bw = missing ? 0 : buttonWidth(btn);
+    const float tw = w_ - bw - 16, top = y_;
+    float h = drawText(d.name, fLabel_.get(), x_, y_, tw, t.text);
+    const wchar_t* state = W(d.state == DeviceState::Connecting   ? i18n::StateConnecting
+                             : d.state == DeviceState::WaitingApp ? i18n::StateWaitingApp
+                             : missing                            ? i18n::StateAppMissing
+                                                                  : i18n::StateFound);
+    h += 2 + drawText(d.link + L" · " + state, fHint_.get(), x_, y_ + h + 2, tw,
+                      missing || d.state == DeviceState::WaitingApp ? t.warn : t.sub);
+    const float rowH = std::max(h, kControlH);
+    if (!missing)
+        button(x_ + w_ - bw, top + (rowH - kControlH) / 2,
+               {btn, true, d.state != DeviceState::Connecting, [this, index] { host_->act(Act::Connect, index); }});
+    y_ = top + rowH + kRowGap;
+}
 
 void Window::statusPage() {
     const Theme& t = theme_;
     const Model& m = model_;
     pageTitle(W(i18n::NavStatus));
 
-    card([&] {
-        dot(x_ + 6, y_ + 11, 6, m.connected ? t.ok : t.idle);
-        y_ += drawText(m.connected ? std::wstring(W(i18n::Connected)) + L" · " + m.device : W(i18n::Waiting),
-                       fSection_.get(), x_ + 20, y_, w_ - 20, t.text) + 12;
-        if (!m.connected) {
+    bool anyExtend = false, anyFound = false;
+    for (size_t i = 0; i < m.devices.size(); i++) {
+        if (m.devices[i].state != DeviceState::Connected) {
+            anyFound = true;
+            continue;
+        }
+        anyExtend |= m.devices[i].mode != DisplayMode::Mirror;
+        deviceCard(int(i));
+    }
+
+    if (anyFound) {
+        card([&] {
+            y_ += drawText(W(i18n::FoundDevices), fSection_.get(), x_, y_, w_, t.text) + 12;
+            for (size_t i = 0; i < m.devices.size(); i++)
+                if (m.devices[i].state != DeviceState::Connected) foundRow(int(i));
+        });
+    }
+
+    if (m.devices.empty()) {
+        card([&] {
+            dot(x_ + 6, y_ + 11, 6, t.idle);
+            y_ += drawText(W(i18n::Waiting), fSection_.get(), x_ + 20, y_, w_ - 20, t.text) + 12;
             y_ += drawText(W(i18n::WaitingHint), fBody_.get(), x_, y_, w_, t.sub) + kRowGap;
-            return;
-        }
-        std::wstring link = m.link;
-        if (link.rfind(L"Wi-Fi", 0) == 0) link += std::wstring(L", ") + W(i18n::Encrypted);
-        keyValue(W(i18n::RowLink), link);
-        const DisplayMode dm = m.activeMode;
-        keyValue(W(i18n::RowMode), W(dm == DisplayMode::Mirror ? i18n::ModeMirror
-                                     : dm == DisplayMode::Only ? i18n::ModeOnly
-                                                               : i18n::ModeExtend));
-        if (dm != DisplayMode::Mirror && m.current.width > 0) {
-            const int r = m.currentRotation;
-            const wchar_t* orient = W(r == 90    ? i18n::OrientPortrait
-                                      : r == 180 ? i18n::OrientLandscapeFlipped
-                                      : r == 270 ? i18n::OrientPortraitFlipped
-                                                 : i18n::OrientLandscape);
-            keyValue(W(i18n::RowScreen), resolutionText(m.current) + L" · " + orient);
-        }
-        const std::wstring pending = W(i18n::StatsPending);
-        keyValue(W(i18n::RowLatency), m.latency.empty() ? pending : m.latency);
-        keyValue(W(i18n::RowData), m.data.empty() ? pending : m.data);
-        keyValue(W(i18n::RowFps), m.fps.empty() ? pending : m.fps);
-        y_ += kRowGap - 8;
-    });
+        });
+    }
 
     if (m.notice != Notice(0)) {
         card(
@@ -602,9 +677,12 @@ void Window::statusPage() {
                 y_ += drawText(W(s), fBody_.get(), x_, y_, w_, t.text) + 6;
             y_ += kRowGap - 6;
         });
-        buttons({{W(i18n::ConnectNow), true, true, [this] { host_->act(Act::ConnectNow, 0); }}});
-    } else if (m.activeMode != DisplayMode::Mirror) {
-        buttons({{W(i18n::OpenDisplaySettings), false, true, [this] { host_->act(Act::OpenDisplaySettings, 0); }}});
+    } else {
+        std::vector<Button> list;
+        if (m.connected > 1) list.push_back({W(i18n::DisconnectAll), false, true, [this] { host_->act(Act::Disconnect, -1); }});
+        if (anyExtend)
+            list.push_back({W(i18n::OpenDisplaySettings), false, true, [this] { host_->act(Act::OpenDisplaySettings, 0); }});
+        if (!list.empty()) buttons(list);
     }
 }
 
@@ -619,7 +697,7 @@ void Window::connectionPage() {
         divider();
         toggleRow(W(i18n::AutoConnect), W(i18n::AutoConnectHint), m.opt.autoConnect, true,
                   [this, v = m.opt.autoConnect] { host_->act(Act::AutoConnect, v ? 0 : 1); });
-        buttons({{W(i18n::ConnectNow), true, !m.connected, [this] { host_->act(Act::ConnectNow, 0); }}});
+        y_ -= kRowGap - 6;
     });
 }
 
@@ -645,7 +723,24 @@ void Window::displayPage() {
         });
         return;
     }
+    const DeviceView* dev =
+        m.displayDevice >= 0 && m.displayDevice < int(m.devices.size()) ? &m.devices[size_t(m.displayDevice)] : nullptr;
     card([&] {
+        if (m.connected > 1) {
+            // Çözünürlük cihaza özel: hangi cihazınki
+            label(W(i18n::DisplayDevice));
+            std::vector<std::wstring> names;
+            std::vector<int> index;
+            int sel = -1;
+            for (size_t i = 0; i < m.devices.size(); i++) {
+                if (m.devices[i].state != DeviceState::Connected) continue;
+                if (int(i) == m.displayDevice) sel = int(names.size());
+                names.push_back(m.devices[i].name);
+                index.push_back(int(i));
+            }
+            dropdown(names, sel, true, [this, index](int k) { host_->act(Act::DisplayDevice, index[size_t(k)]); });
+            y_ += 6;
+        }
         label(W(i18n::Orientation));
         const int rot = m.opt.rotation < 0 ? 0 : m.opt.rotation / 90 + 1;
         dropdown({W(i18n::OrientAuto), W(i18n::OrientLandscape), W(i18n::OrientPortrait),
@@ -656,15 +751,15 @@ void Window::displayPage() {
         // Windows ekran ayarlarındaki listenin aynısı; cihaz bağlı değilken seçilemez
         std::vector<std::wstring> items;
         int sel = -1;
-        for (size_t i = 0; i < m.modes.size(); i++) {
-            items.push_back(resolutionText(m.modes[i]));
-            if (m.modes[i].width == m.current.width && m.modes[i].height == m.current.height) sel = int(i);
+        for (size_t i = 0; dev && i < m.modes.size(); i++) {
+            items.push_back(resolutionText(m.modes[i], *dev));
+            if (m.modes[i].width == dev->current.width && m.modes[i].height == dev->current.height) sel = int(i);
         }
-        if (items.empty()) {
+        if (items.empty()) {  // bağlı cihaz yok ya da yansıtmada
             items.push_back(W(i18n::ResUnavailable));
             sel = 0;
         }
-        dropdown(items, sel, !m.modes.empty(), [this](int i) { host_->act(Act::Resolution, i); });
+        dropdown(items, sel, dev && !m.modes.empty(), [this](int i) { host_->act(Act::Resolution, i); });
         y_ += 6;
         hint(W(i18n::DisplaySyncHint), t.sub);
         buttons({{W(i18n::OpenDisplaySettings), false, true, [this] { host_->act(Act::OpenDisplaySettings, 0); }}});

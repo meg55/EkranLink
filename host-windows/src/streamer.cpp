@@ -1,5 +1,9 @@
-// Hat: DXGI yakalama → GPU video işlemci (ölçek + NV12) → donanım H.264 → TCP → tablet.
+// Hat: DXGI yakalama → GPU video işlemci (ölçek + NV12) → donanım H.264 → TCP → cihaz.
 // Görüntü hiç CPU belleğine inmez. Ekran değişmiyorsa kodlama da gönderim de yapılmaz.
+//
+// Tarayıcı (run) USB'deki (adb) ve Wi-Fi'deki (UDP keşif) cihazları listeler; bağlanılacak her cihaz için ayrı
+// bir oturum iş parçacığı açar. Oturumlar birbirinden bağımsızdır: her biri kendi yakalama, kodlayıcı ve
+// (ikinci ekranda) sanal monitörüyle çalışır.
 
 #include "streamer.h"
 
@@ -82,20 +86,50 @@ bool makeNv12Pool(ID3D11Device* dev, int w, int h, ComPtr<ID3D11Texture2D> (&poo
     return true;
 }
 
+constexpr int64_t kSecond = 1'000'000;
+constexpr int64_t kGoneUs = 10 * kSecond;  // bu kadar görünmeyen cihaz listeden çıkar (kesme bekletmesi de biter)
+constexpr int64_t kWantUs = 60 * kSecond;  // "bağlan" isteği cihaz uygulamayı açana kadar bu kadar sürer
+
 }  // namespace
 
+// Bulunan bir cihaz ve (varsa) oturumu. m_ altında; busy iken oturum iş parçacığı da kullanır.
+struct Streamer::Dev {
+    DeviceInfo info;
+    bool usb = false;
+    std::string serial, ip;
+    bool present = false;
+    int64_t lastSeenUs = 0;
+    int64_t retryAtUs = 0;  // bundan önce yeniden denenmez
+    int64_t probeAtUs = 0;  // USB: uygulama yoksa yeniden sorma zamanı
+    bool probed = false;
+    int fails = 0;
+    std::atomic<bool> busy{false};  // oturum iş parçacığı çalışıyor
+    bool cancel = false;            // kullanıcı kesti: oturum kurulurken vazgeç
+    std::thread worker;
+    Connection* conn = nullptr;     // bağlıyken (kesmek için)
+};
+
 Streamer::Streamer(Options opt, StreamerEvents ev)
-    : opt_(std::move(opt)), ev_(std::move(ev)), mode_(opt_.mode), wake_(CreateEventW(nullptr, FALSE, FALSE, nullptr)) {
+    : opt_(std::move(opt)),
+      ev_(std::move(ev)),
+      mode_(opt_.mode),
+      wake_(CreateEventW(nullptr, FALSE, FALSE, nullptr)),
+      stopEvent_(CreateEventW(nullptr, TRUE, FALSE, nullptr)) {
     update(opt_);
 }
 
-Streamer::~Streamer() { CloseHandle(wake_); }
+Streamer::~Streamer() {
+    CloseHandle(wake_);
+    CloseHandle(stopEvent_);
+}
 
 void Streamer::stop() {
     stop_ = true;
+    SetEvent(stopEvent_);
     SetEvent(wake_);
-    std::lock_guard<std::mutex> lock(connMutex_);
-    if (conn_) conn_->close();
+    std::lock_guard<std::mutex> lock(m_);
+    for (auto& [k, d] : devs_)
+        if (d->conn) d->conn->close();
 }
 
 void Streamer::update(const Options& o) {
@@ -106,194 +140,451 @@ void Streamer::update(const Options& o) {
     output_ = o.output;
     fixedRotation_ = o.rotation;
     settingsGen_++;
-    setMode(o.mode);
+    if (o.mode != mode_) {
+        mode_ = o.mode;
+        rescan_ = true;
+        // Bağlantı türünün dışarıda bıraktığı oturumlar kapanır (ör. USB'deyken "sadece Wi-Fi")
+        std::lock_guard<std::mutex> lock(m_);
+        for (auto& [k, d] : devs_)
+            if (d->conn && !linkAllowed(*d)) d->conn->close();
+    }
+    SetEvent(wake_);
 }
 
-void Streamer::setMode(LinkMode m) {
-    mode_ = m;
+void Streamer::connect(const std::string& key) {
+    {
+        std::lock_guard<std::mutex> lock(m_);
+        held_.erase(key);
+        wanted_[key] = nowUs() + kWantUs;
+        auto it = devs_.find(key);
+        if (it != devs_.end()) {
+            Dev& d = *it->second;
+            d.retryAtUs = 0;
+            d.fails = 0;
+            d.cancel = false;
+            if (d.info.state == DeviceState::AppMissing) d.probeAtUs = 0;  // kurulmuş olabilir: yeniden sor
+        }
+    }
+    rescan_ = true;
     SetEvent(wake_);
-    // Şimdiki bağlantı yeni türe uyuyorsa sürer (ör. USB'deyken "otomatik"e geçildi)
-    const int link = currentLink_;
-    if (link < 0 || m == LinkMode::Auto || (m == LinkMode::Usb) == (link == 1)) return;
-    std::lock_guard<std::mutex> lock(connMutex_);
-    if (conn_) conn_->close();
+}
+
+void Streamer::disconnect(const std::string& key) {
+    {
+        std::lock_guard<std::mutex> lock(m_);
+        for (auto& [k, d] : devs_) {
+            if (!key.empty() && k != key) continue;
+            if (!key.empty() || d->busy) held_.insert(k);
+            wanted_.erase(k);
+            d->cancel = true;
+            if (d->conn) {
+                logf("Bağlantı kullanıcı tarafından kesiliyor: %s", d->info.name.c_str());
+                d->conn->close();
+            }
+        }
+        if (key.empty()) wanted_.clear();
+    }
+    SetEvent(wake_);
+}
+
+void Streamer::setWatching(bool on) {
+    if (watching_.exchange(on) == on) return;
+    if (on) rescan_ = true;
+    SetEvent(wake_);
+}
+
+bool Streamer::linkAllowed(const Dev& d) const {
+    const LinkMode m = mode_;
+    return m == LinkMode::Auto || (m == LinkMode::Usb) == d.usb;
+}
+
+// Aynı cihaz hem USB'de hem Wi-Fi'de görünüyorsa tek kayıt: bağlı olan, yoksa USB
+bool Streamer::suppressedLocked(const Dev& d) const {
+    if (d.busy || d.info.deviceId.empty()) return false;
+    for (const auto& [k, o] : devs_) {
+        if (o.get() == &d || o->usb == d.usb || o->info.deviceId != d.info.deviceId) continue;
+        if (o->busy) return true;                       // diğer bağlantıdan bağlı
+        if (!d.usb && o->present && linkAllowed(*o)) return true;  // ikisi de boşta: USB tercih
+    }
+    return false;
 }
 
 void Streamer::notice(Notice n, const std::string& arg, const char* logText) {
     // Bağlantı birkaç saniyede bir yeniden denenir: aynı uyarı 10 dakikada bir
-    const int64_t now = nowUs();
-    if (int(n) == lastNotice_ && now < lastNoticeUs_ + 600'000'000) return;
-    lastNotice_ = int(n);
-    lastNoticeUs_ = now;
+    {
+        std::lock_guard<std::mutex> lock(noticeMutex_);
+        const int64_t now = nowUs();
+        if (int(n) == lastNotice_ && now < lastNoticeUs_ + 600 * kSecond) return;
+        lastNotice_ = int(n);
+        lastNoticeUs_ = now;
+    }
     logf("%s", logText);
     if (ev_.onNotice) ev_.onNotice(n, arg);
 }
 
-void Streamer::sleepInterruptible(int ms) { WaitForSingleObject(wake_, DWORD(ms)); }
+void Streamer::publish() {
+    std::lock_guard<std::mutex> pub(publishMutex_);
+    std::vector<DeviceInfo> list;
+    {
+        std::lock_guard<std::mutex> lock(m_);
+        for (const auto& [k, d] : devs_) {
+            if (!d->present && !d->busy) continue;
+            if (!d->busy && (!linkAllowed(*d) || suppressedLocked(*d))) continue;
+            list.push_back(d->info);
+        }
+        std::stable_sort(list.begin(), list.end(), [](const DeviceInfo& a, const DeviceInfo& b) {
+            const bool ca = a.state == DeviceState::Connected, cb = b.state == DeviceState::Connected;
+            if (ca != cb) return ca;
+            return a.name < b.name;
+        });
+        if (list == published_) return;
+        published_ = list;
+    }
+    if (ev_.onDevices) ev_.onDevices(list);
+}
 
-void Streamer::connectNow() {
-    manualUntilUs_ = nowUs() + 30'000'000;  // 30 sn içinde bulunan tablete bir kez bağlan
-    SetEvent(wake_);
+void Streamer::scanUsb(const std::wstring& adbPath, bool usbWatchOk) {
+    // Cihaz takılı değilken adb çalıştırılmaz: Windows'un takılma bildirimi beklenir (bildirim yoksa 3 sn'de
+    // bir); takıldıktan sonraki birkaç saniye adb'nin görmesi beklenir.
+    const int64_t now = nowUs();
+    if (now < nextUsbPollUs_) return;
+    nextUsbPollUs_ = now + (now < usbBurstUntilUs_ ? kSecond : usbWatchOk ? 30 * kSecond : 3 * kSecond);
+    std::vector<std::string> serials = adb::devices(adbPath);
+    if (!opt_.serial.empty())
+        serials.erase(std::remove_if(serials.begin(), serials.end(), [&](const std::string& s) { return s != opt_.serial; }),
+                      serials.end());
+
+    std::vector<Dev*> toProbe;
+    {
+        std::lock_guard<std::mutex> lock(m_);
+        for (auto& [k, d] : devs_)
+            if (d->usb && std::find(serials.begin(), serials.end(), d->serial) == serials.end()) d->present = false;
+        for (const auto& s : serials) {
+            const std::string key = "usb:" + s;
+            auto& slot = devs_[key];
+            if (!slot) {
+                slot = std::make_unique<Dev>();
+                slot->usb = true;
+                slot->serial = s;
+                slot->info.key = key;
+                slot->info.link = "USB";
+                slot->info.name = s;
+            }
+            slot->present = true;
+            slot->lastSeenUs = now;
+            if (!slot->busy && (!slot->probed || (slot->info.state == DeviceState::AppMissing && now >= slot->probeAtUs)))
+                toProbe.push_back(slot.get());
+        }
+    }
+    // Cihazı tanı (uygulamayı açmadan): kimlik ve ad; uygulama yoksa 10 sn'de bir yeniden sorulur
+    for (Dev* d : toProbe) {
+        std::string id, name;
+        const adb::App app = adb::probe(adbPath, d->serial, id, name);
+        bool missingNow = false, wanted = false;
+        {
+            std::lock_guard<std::mutex> lock(m_);
+            if (!name.empty()) d->info.name = name;
+            if (!id.empty()) d->info.deviceId = id;
+            if (app == adb::App::Installed) {
+                d->probed = true;
+                if (d->info.state == DeviceState::AppMissing) d->info.state = DeviceState::Found;
+            } else if (app == adb::App::Missing) {
+                missingNow = d->info.state != DeviceState::AppMissing;
+                d->info.state = DeviceState::AppMissing;
+                d->probeAtUs = now + 10 * kSecond;
+                wanted = (autoConnect_ && !held_.count(d->info.key)) || wanted_.count(d->info.key);
+            } else {
+                d->probeAtUs = now + 3 * kSecond;  // ör. cihazda "USB hata ayıklamaya izin ver" bekleniyor
+                nextUsbPollUs_ = std::min(nextUsbPollUs_, now + 3 * kSecond);
+            }
+        }
+        if (missingNow) {
+            logf("USB: %s cihazında EkranLink uygulaması yok; APK cihaza ayrıca kurulmalı", d->info.name.c_str());
+            if (wanted) notice(Notice::AppMissing, {}, "USB: cihazda EkranLink uygulaması yok");
+        }
+    }
+    if (!toProbe.empty()) nextUsbPollUs_ = std::min(nextUsbPollUs_, now + 10 * kSecond);  // uygulama kurulabilir
+}
+
+void Streamer::scanWifi() {
+    const int64_t now = nowUs();
+    if (now < nextWifiUs_) return;
+    std::vector<std::string> known = config::knownAddresses();
+    if (!opt_.ip.empty()) known.insert(known.begin(), opt_.ip);
+    const std::vector<FoundDevice> found = discoverDevices(1000, known);
+    const int64_t after = nowUs();
+    bool anyConnected = false;
+    {
+        std::lock_guard<std::mutex> lock(m_);
+        for (const auto& f : found) {
+            const std::string key = "wifi:" + (f.id.empty() ? f.ip : f.id);
+            auto& slot = devs_[key];
+            if (!slot) {
+                slot = std::make_unique<Dev>();
+                slot->info.key = key;
+            }
+            slot->ip = f.ip;
+            if (!slot->busy) slot->info.link = "Wi-Fi " + f.ip;
+            if (!f.name.empty()) slot->info.name = f.name;
+            if (!f.id.empty()) slot->info.deviceId = f.id;
+            slot->present = true;
+            slot->lastSeenUs = after;
+        }
+        for (auto& [k, d] : devs_) {
+            if (!d->usb && d->present && after - d->lastSeenUs > kGoneUs) d->present = false;
+            anyConnected |= d->busy;
+        }
+    }
+    // Bağlıyken ve pencere kapalıyken yeni cihaz için daha seyrek bak (keşif çok hafif ama gereksiz)
+    nextWifiUs_ = after + (anyConnected && !watching_ ? 10 : 3) * kSecond;
+}
+
+void Streamer::prune() {
+    std::vector<std::thread> done;
+    {
+        std::lock_guard<std::mutex> lock(m_);
+        const int64_t now = nowUs();
+        for (auto it = devs_.begin(); it != devs_.end();) {
+            Dev& d = *it->second;
+            if (!d.busy && d.worker.joinable()) done.push_back(std::move(d.worker));
+            if (!d.present && !d.busy && now - d.lastSeenUs > kGoneUs) {
+                // Cihaz çıkarıldı / ağdan ayrıldı: kesme bekletmesi ve bağlan isteği de biter
+                held_.erase(it->first);
+                wanted_.erase(it->first);
+                it = devs_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        for (auto it = wanted_.begin(); it != wanted_.end();) it = it->second < now ? wanted_.erase(it) : std::next(it);
+    }
+    for (auto& t : done) t.join();
+}
+
+void Streamer::startSessions(const std::wstring& adbPath) {
+    std::lock_guard<std::mutex> lock(m_);
+    const int64_t now = nowUs();
+    const bool autoC = autoConnect_;
+    for (auto& [k, dp] : devs_) {
+        Dev& d = *dp;
+        if (!d.present || d.busy || now < d.retryAtUs || d.info.state == DeviceState::AppMissing) continue;
+        if (!linkAllowed(d) || suppressedLocked(d)) continue;
+        if (d.usb && adbPath.empty()) continue;
+        if (!((autoC && !held_.count(k)) || wanted_.count(k))) continue;
+        if (d.worker.joinable()) continue;  // önceki iş parçacığı henüz toplanmadı (prune)
+        d.busy = true;
+        d.cancel = false;
+        if (d.info.state != DeviceState::WaitingApp) d.info.state = DeviceState::Connecting;
+        d.worker = std::thread(&Streamer::sessionWorker, this, &d, adbPath);
+    }
 }
 
 void Streamer::run() {
     if (!displayPower_.start()) logf("Ekran güç bildirimi alınamıyor; uyku eşitleme kapalı");
     UsbWatch usb;
     std::wstring adbPath;
-    std::string prepared;  // uygulaması bulunup port yönlendirilmiş aygıt (her takılışta bir kez)
-    int64_t nextAdbLookupUs = 0, nextUsbPollUs = 0, usbBurstUntilUs = 0;
-    bool warnedNoAdb = false, declinedLogged = false, manualLogged = false;
+    int64_t nextAdbLookupUs = 0;
+    bool warnedNoAdb = false;
 
     while (!stop_) {
-        // Otomatik bağlanma kapalı: yalnızca "Şimdi bağlan" ile
-        if (!autoConnect_ && nowUs() >= manualUntilUs_) {
-            if (!manualLogged) logf("Otomatik bağlanma kapalı; bağlanmak için menüden \"Şimdi bağlan\"");
-            manualLogged = true;
-            WaitForSingleObject(wake_, INFINITE);
-            continue;
+        if (rescan_.exchange(false)) nextUsbPollUs_ = nextWifiUs_ = 0;
+        prune();
+        bool wantedAny;
+        {
+            std::lock_guard<std::mutex> lock(m_);
+            wantedAny = !wanted_.empty();
         }
-        manualLogged = false;
+        // Otomatik bağlanma kapalı, pencere kapalı, istek yok: hiç aramaz (bağlı oturumlar sürer)
+        const bool scan = autoConnect_ || watching_ || wantedAny;
         const LinkMode m = mode_;
-        bool tried = false, connected = false;
-
-        if (m != LinkMode::Wifi) {
+        if (scan && m != LinkMode::Wifi) {
             if (adbPath.empty() && nowUs() >= nextAdbLookupUs) {
                 adbPath = adb::find();
                 if (!adbPath.empty()) logf("USB: adb %ls", adbPath.c_str());
-                nextAdbLookupUs = nowUs() + 30'000'000;
+                nextAdbLookupUs = nowUs() + 30 * kSecond;
             }
             if (adbPath.empty()) {
                 if (!warnedNoAdb) logf("USB: adb bulunamadı (Android SDK platform-tools gerekli)");
                 warnedNoAdb = true;
-            } else if (nowUs() >= nextUsbPollUs) {
-                // Tablet takılı değilken adb çalıştırılmaz: Windows'un takılma bildirimi beklenir
-                // (bildirim yoksa 3 sn'de bir); takıldıktan sonraki birkaç saniye adb'nin görmesi beklenir.
-                const int64_t now = nowUs();
-                nextUsbPollUs = now + (now < usbBurstUntilUs ? 1'000'000 : usb.ok() ? 30'000'000 : 3'000'000);
-                // Birden çok cihaz takılıysa: hazırlanmış olan, yoksa EkranLink'i kurulu olan ilk cihaz
-                const std::vector<std::string> devs = adb::devices(adbPath);
-                std::string dev = devs.empty() ? std::string() : devs.front();
-                if (!opt_.serial.empty()) {
-                    dev = std::find(devs.begin(), devs.end(), opt_.serial) != devs.end() ? opt_.serial : std::string();
-                } else if (devs.size() > 1 && std::find(devs.begin(), devs.end(), prepared) != devs.end()) {
-                    dev = prepared;
-                } else if (devs.size() > 1) {
-                    for (const auto& d : devs)
-                        if (adb::appState(adbPath, d) == adb::App::Installed) {
-                            dev = d;
-                            break;
-                        }
-                    logf("USB: %d cihaz takılı; %s kullanılıyor", int(devs.size()), dev.c_str());
-                }
-                if (dev.empty()) {
-                    prepared.clear();
-                    declinedLogged = false;
-                } else if (dev != prepared && adb::appState(adbPath, dev) == adb::App::Missing) {
-                    notice(Notice::AppMissing, {}, "USB: tablette EkranLink uygulaması yok; APK tablete ayrıca kurulmalı");
-                    nextUsbPollUs = nowUs() + 10'000'000;  // kurulmasını bekle
-                } else if (!adb::prepareUsb(adbPath, dev, proto::kPort)) {
-                    nextUsbPollUs = nowUs() + 3'000'000;  // ör. tablette "USB hata ayıklamaya izin ver" bekleniyor
-                } else {
-                    prepared = dev;
-                    const adb::Launch l = adb::requestLaunch(adbPath, dev);
-                    if (l == adb::Launch::Declined) {
-                        if (!declinedLogged) logf("USB: tablet bağlanmak istemiyor (\"otomatik aç\" kapalı ya da bağlantı tabletten kesildi); bağlanmak için tablette EkranLink'i açın");
-                        declinedLogged = true;
-                        nextUsbPollUs = nowUs() + 4'000'000;  // takılıyken uygulamanın açılmasını bekle
-                    } else if (l != adb::Launch::Failed) {
-                        declinedLogged = false;
-                        if (l == adb::Launch::Started) sleepInterruptible(1500);  // tablet sunucusunu açsın
-                        tried = true;
-                        connected = runSession("127.0.0.1", "USB", adbPath, dev);
-                        // bağlantı bitince hemen yeniden bak; sürüm uyuşmuyorsa bir süre bekle
-                        nextUsbPollUs = incompatibleHost_ == "127.0.0.1" ? incompatibleUntilUs_ : 0;
-                    }
-                }
+            } else {
+                scanUsb(adbPath, usb.ok());
             }
         }
         if (stop_) break;
+        if (scan && m != LinkMode::Usb) scanWifi();
+        if (stop_) break;
+        if (scan) startSessions(adbPath);
+        publish();
 
-        if (!tried && m != LinkMode::Usb) {
-            std::string ip = opt_.ip;
-            if (ip.empty()) {
-                const int64_t now = nowUs();
-                for (const auto& dev : discoverDevices(1000, config::knownAddresses())) {
-                    auto it = rejectedUntil_.find(dev.id);
-                    if (it != rejectedUntil_.end() && it->second > now) continue;  // az önce reddedildi
-                    ip = dev.ip;
-                    break;
-                }
+        // Sıradaki iş: tarama zamanı ya da bekleyen cihazın yeniden denenmesi
+        DWORD waitMs = INFINITE;
+        if (scan) {
+            const int64_t now = nowUs();
+            int64_t next = now + 30 * kSecond;
+            if (m != LinkMode::Wifi && !adbPath.empty()) next = std::min(next, nextUsbPollUs_);
+            if (m != LinkMode::Usb) next = std::min(next, nextWifiUs_);
+            {
+                std::lock_guard<std::mutex> lock(m_);
+                for (auto& [k, d] : devs_)
+                    if (d->present && !d->busy && d->retryAtUs > now) next = std::min(next, d->retryAtUs);
             }
-            if (ip == incompatibleHost_ && nowUs() < incompatibleUntilUs_) ip.clear();
-            if (!ip.empty()) {
-                tried = true;
-                connected = runSession(ip, "Wi-Fi " + ip);
-            }
+            waitMs = DWORD(std::clamp<int64_t>((next - now) / 1000, 50, 30000));
         }
-        if (connected && !autoConnect_) manualUntilUs_ = 0;  // elle bağlanma bir kerelik
-        if (tried) {
-            if (!stop_) sleepInterruptible(1000);
-            continue;
-        }
-        // Kimse yok. Wi-Fi'de 3 sn'de bir sorulur (UDP, çok hafif); yalnız USB'de takılma beklenir.
-        const int64_t untilUsb = std::max<int64_t>(0, (nextUsbPollUs - nowUs()) / 1000);
-        const DWORD waitMs = m == LinkMode::Usb ? DWORD(std::min<int64_t>(untilUsb, 30'000)) : 3000;
         HANDLE hs[2] = {wake_, usb.event()};
         if (WaitForMultipleObjects(2, hs, FALSE, waitMs) == WAIT_OBJECT_0 + 1) {
-            nextUsbPollUs = 0;
-            usbBurstUntilUs = nowUs() + 10'000'000;
+            nextUsbPollUs_ = 0;
+            usbBurstUntilUs_ = nowUs() + 10 * kSecond;
         }
     }
+
+    // Kapanış: tüm oturumları kapat ve bekle
+    std::vector<std::thread> workers;
+    {
+        std::lock_guard<std::mutex> lock(m_);
+        for (auto& [k, d] : devs_) {
+            d->cancel = true;
+            if (d->conn) d->conn->close();
+            if (d->worker.joinable()) workers.push_back(std::move(d->worker));
+        }
+    }
+    for (auto& t : workers) t.join();
 }
 
-bool Streamer::runSession(const std::string& host, const std::string& link, const std::wstring& adbPath,
-                          const std::string& adbSerial) {
+void Streamer::sessionWorker(Dev* d, std::wstring adbPath) {
+    CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    auto finish = [&](int64_t retryUs, DeviceState st) {
+        {
+            std::lock_guard<std::mutex> lock(m_);
+            d->info.state = st;
+            d->info.gdiName.clear();
+            d->retryAtUs = std::max(d->retryAtUs, nowUs() + retryUs);
+            d->busy = false;
+        }
+        publish();
+        SetEvent(wake_);
+        CoUninitialize();
+    };
+    publish();  // "bağlanıyor"
+
+    // Tarayıcı aynı anda günceller (Wi-Fi adresi, ad): kilit altında kopyala
+    std::string ip, name;
+    bool wasWaiting;
+    unsigned local;
+    {
+        std::lock_guard<std::mutex> lock(m_);
+        ip = d->ip;
+        name = d->info.name;
+        wasWaiting = d->info.state == DeviceState::WaitingApp;
+        local = d->usb ? usbPorts_[d->serial] : 0;
+    }
+    std::string host;
+    unsigned port = proto::kPort;
+    if (d->usb) {
+        if (!adb::prepareUsb(adbPath, d->serial, local, proto::kPort)) return finish(3 * kSecond, DeviceState::Found);
+        {
+            std::lock_guard<std::mutex> lock(m_);
+            usbPorts_[d->serial] = local;
+        }
+        const adb::Launch l = adb::requestLaunch(adbPath, d->serial);
+        if (l == adb::Launch::Declined) {
+            if (!wasWaiting)
+                logf("USB: %s bağlanmak istemiyor (\"otomatik aç\" kapalı ya da bağlantı cihazdan kesildi); "
+                     "bağlanmak için cihazda EkranLink'i açın", name.c_str());
+            return finish(4 * kSecond, DeviceState::WaitingApp);
+        }
+        if (l == adb::Launch::Failed) return finish(3 * kSecond, DeviceState::Found);
+        if (l == adb::Launch::Started) {
+            {
+                std::lock_guard<std::mutex> lock(m_);
+                d->info.state = DeviceState::Connecting;
+            }
+            publish();
+            WaitForSingleObject(stopEvent_, 1500);  // cihaz sunucusunu açsın
+        }
+        host = "127.0.0.1";
+        port = local;
+    } else {
+        host = ip;
+    }
+    bool cancelled;
+    {
+        std::lock_guard<std::mutex> lock(m_);
+        cancelled = d->cancel || stop_;
+        d->cancel = false;
+    }
+    if (cancelled) return finish(0, DeviceState::Found);
+
+    const Result r = runSession(*d, host, port, adbPath);
+    int64_t retry;
+    {
+        std::lock_guard<std::mutex> lock(m_);
+        if (r == Result::Ended) {
+            wanted_.erase(d->info.key);  // elle bağlanma bir kerelik: kopunca yalnızca otomatikte yeniden bağlanır
+            d->fails = 0;
+            retry = kSecond;
+        } else {
+            d->fails = std::min(d->fails + 1, 5);
+            retry = std::min<int64_t>(30 * kSecond, (2 * kSecond) << (d->fails - 1));
+        }
+    }
+    finish(retry, DeviceState::Found);
+}
+
+Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned port, const std::wstring& adbPath) {
     Connection conn;
     proto::Hello hello;
     PairingHooks hooks;
     hooks.confirm = ev_.onPairRequest;
-    const bool usb = link == "USB";  // adb forward: kablo + adb yetkisi = güvenilir bağlantı
-    if (!conn.connect(host, proto::kPort, 2000)) return false;
+    std::string link, serial;
+    {
+        std::lock_guard<std::mutex> lock(m_);
+        link = d.info.link;
+        serial = d.serial;
+    }
+    const bool usb = d.usb;  // adb forward: kablo + adb yetkisi = güvenilir bağlantı
+    if (!conn.connect(host, uint16_t(port), 2000)) return Result::Failed;
     if (!conn.handshake(usb, hooks, hello)) {
-        if (conn.pairingRejected()) rejectedUntil_[conn.deviceId()] = nowUs() + 60'000'000;  // 1 dk sorma
+        {
+            std::lock_guard<std::mutex> lock(m_);
+            if (conn.pairingRejected()) {
+                d.retryAtUs = nowUs() + 60 * kSecond;  // 1 dk sorma
+            }
+            if (conn.peerVersion()) d.retryAtUs = nowUs() + 30 * kSecond;
+        }
         if (conn.peerVersion()) {
-            // Tablet protokol sürümümüzü desteklemiyor: hangi tarafın güncelleneceğini söyle;
-            // güncellenene kadar 30 sn'de bir dene (USB'de tablet yeniden takılınca hemen)
-            incompatibleHost_ = host;
-            incompatibleUntilUs_ = nowUs() + 30'000'000;
+            // Cihaz protokol sürümümüzü desteklemiyor: hangi tarafın güncelleneceğini söyle; güncellenene kadar
+            // 30 sn'de bir dene (USB'de cihaz yeniden takılınca hemen)
             const bool tabletOld = conn.peerVersion() < proto::kVersion;
             notice(tabletOld ? Notice::TabletOutdated : Notice::PcOutdated, conn.peerAppVersion(),
-                   tabletOld ? "Tabletteki EkranLink eski" : "Bu bilgisayardaki EkranLink eski");
-            logf("Sürüm uyuşmuyor: tablet protokol %u (uygulama %s), PC %u", conn.peerVersion(),
+                   tabletOld ? "Cihazdaki EkranLink eski" : "Bu bilgisayardaki EkranLink eski");
+            logf("Sürüm uyuşmuyor: cihaz protokol %u (uygulama %s), PC %u", conn.peerVersion(),
                  conn.peerAppVersion().c_str(), proto::kVersion);
         }
-        return false;
+        return Result::Failed;
     }
     if (!usb) config::rememberAddress(host);  // bir dahaki keşifte doğrudan sorulsun
     {
-        std::lock_guard<std::mutex> lock(connMutex_);
-        conn_ = &conn;
+        std::lock_guard<std::mutex> lock(m_);
+        if (d.cancel || stop_) return Result::Failed;
+        d.conn = &conn;
+        d.info.deviceId = conn.deviceId();
+        d.info.name = hello.model;
     }
     auto detach = [&] {
-        std::lock_guard<std::mutex> lock(connMutex_);
-        conn_ = nullptr;
+        std::lock_guard<std::mutex> lock(m_);
+        d.conn = nullptr;
     };
-    if (stop_) {
-        detach();
-        return false;
-    }
 
-    logf("Tablet: %s, Android API %u, yüzey %ux%u, %u dpi, çözücü %s (%s, %s)", hello.model.c_str(), hello.sdk,
+    logf("Cihaz: %s, Android API %u, yüzey %ux%u, %u dpi, çözücü %s (%s, %s)", hello.model.c_str(), hello.sdk,
          hello.surfaceW, hello.surfaceH, hello.dpi, hello.decoder.c_str(), link.c_str(),
          conn.encrypted() ? "şifreli" : "şifresiz");
 
     const int W = (hello.surfaceW ? hello.surfaceW : hello.screenW) & ~1;
     const int H = (hello.surfaceH ? hello.surfaceH : hello.screenH) & ~1;
-    currentLink_ = usb ? 1 : 0;
 
-    // Oturum boyunca kalanlar: sanal monitör (ikinci ekranda), dokunma, sayaçlar, tablet okuyucusu.
+    // Oturum boyunca kalanlar: sanal monitör (ikinci ekranda), dokunma, sayaçlar, cihaz okuyucusu.
     // Görüntü boru hattı (yakalama, ölçekleyici, kodlayıcı) aşağıdaki döngüde gerektikçe yeniden kurulur;
-    // bağlantı ve tabletteki çözücü (akış boyutu W×H) hiç değişmez.
+    // bağlantı ve cihazdaki çözücü (akış boyutu W×H) hiç değişmez.
     VirtualDisplay vdisp;  // yakalama nesnelerinden önce tanımlı → oturum biterken monitör en son kaldırılır
     std::wstring target;
     bool only = false;     // tek ekran uygulandı (diğer monitörler kapalı)
@@ -304,14 +595,14 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
     std::atomic<int> inFlight{0};
     std::atomic<int64_t> lastAckUs{nowUs()};
     HANDLE ackEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    std::atomic<int> wantRotation{-1};  // tabletin bildirdiği yön (-1: bildirmedi, dönüş kilitli)
-    std::atomic<bool> keyRequested{false};  // tablet çözücüsünü yeniden kurdu (ekranı kapanıp açıldı)
-    std::atomic<bool> tabletVisible{true};  // tablet uygulaması arka plandaysa görüntü üretilmez
+    std::atomic<int> wantRotation{-1};  // cihazın bildirdiği yön (-1: bildirmedi, dönüş kilitli)
+    std::atomic<bool> keyRequested{false};  // cihaz çözücüsünü yeniden kurdu (ekranı kapanıp açıldı)
+    std::atomic<bool> tabletVisible{true};  // cihaz uygulaması arka plandaysa görüntü üretilmez
 
     // Zaman damgası: gerçek kareler çift, itici kareler tek sayı (ayrı liste tutmadan ayırt etmek için).
     auto isPusher = [](int64_t pts) { return (pts & 1) != 0; };
 
-    // Tabletten gelenler: kare onayı, pong, dokunma
+    // Cihazdan gelenler: kare onayı, pong, dokunma
     std::thread reader([&] {
         uint8_t type;
         std::vector<uint8_t> payload;
@@ -343,7 +634,8 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
             } else if (type == proto::kVideoVisible) {
                 const bool v = r.u8() != 0;
                 if (r.ok() && v != tabletVisible.exchange(v))
-                    logf(v ? "Tablet uygulaması öne geldi" : "Tablet uygulaması arka planda: görüntü duraklatıldı");
+                    logf(v ? "%s: uygulama öne geldi" : "%s: uygulama arka planda, görüntü duraklatıldı",
+                         hello.model.c_str());
             } else if (type == proto::kOrientation) {
                 const int deg = r.u16();
                 if (r.ok() && deg % 90 == 0 && deg < 360) wantRotation = deg;
@@ -351,26 +643,31 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
         }
     });
 
-    SessionState state;
-    state.connected = true;
-    state.device = hello.model;
-    state.link = link;
-    state.width = W;
-    state.height = H;
-    state.deviceId = conn.deviceId();
-    bool reported = false;
+    // Bağlı cihazın durumu listeye (arayüz) yansır
+    auto report = [&](DisplayMode mode, const std::wstring& gdi) {
+        {
+            std::lock_guard<std::mutex> lock(m_);
+            d.info.state = DeviceState::Connected;
+            d.info.mode = mode;
+            d.info.width = W;
+            d.info.height = H;
+            d.info.gdiName = gdi;
+        }
+        publish();
+    };
 
     CursorState cursor;
     Waiter waiter;
     int appliedRotation = 0;
-    int tabletApplied = -1;  // en son uygulanan tablet bildirimi
+    int tabletApplied = -1;  // en son uygulanan cihaz bildirimi
     int lastFixed = -2;      // ayar değişimini fark etmek için (-2: monitör yeni)
     int appliedGen = -1;     // cihaza özel ayarların okunduğu update() sayısı (-1: monitör yeni)
     int expectW = 0, expectH = 0;  // beklenen çözünürlük (yatay yön): farklıysa Windows'tan değiştirildi
-    bool tabletAwake = true;  // tablet ekranı açık başlar
-    // Kare hızı sınırı: tabletin ekranı 60 Hz; daha fazlası iki cihazı da boşuna yorar.
+    bool tabletAwake = true;  // cihaz ekranı açık başlar
+    // Kare hızı sınırı: cihazın ekranı 60 Hz; daha fazlası iki cihazı da boşuna yorar.
     const int64_t minFrameUs = 1000000 / std::max(1, opt_.fps);
     bool started = false;
+    DisplayMode mode = DisplayMode::Extend;
 
     while (!stop_ && conn.alive()) {
         // --- Monitör: istenen moda göre ekle / kaldır / tek ekran ---
@@ -405,8 +702,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
             else vdisp.restoreLayout();
             only = want == DisplayMode::Only;
         }
-        state.mode = target.empty() ? DisplayMode::Mirror : only ? DisplayMode::Only : DisplayMode::Extend;
-        state.gdiName = target;
+        mode = target.empty() ? DisplayMode::Mirror : only ? DisplayMode::Only : DisplayMode::Extend;
         logMemory("el sıkışma sonrası");
 
         // --- Görüntü boru hattı ---
@@ -425,9 +721,9 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
                 if (!gpuOk) Sleep(100);
             }
         }
-        // Tablete giden görüntünün yönü ve boyutu. Yakalanan görüntü panel yönündedir (orientation.h):
-        //  - ikinci ekran: olduğu gibi gider (döndürme tabletin tutuluşundan; tablet paneli de öyle döner)
-        //  - yansıtma: PC monitörü dik kullanılıyorsa video işlemcide düzeltilir, tablette dik görünür
+        // Cihaza giden görüntünün yönü ve boyutu. Yakalanan görüntü panel yönündedir (orientation.h):
+        //  - ikinci ekran: olduğu gibi gider (döndürme cihazın tutuluşundan; cihaz paneli de öyle döner)
+        //  - yansıtma: PC monitörü dik kullanılıyorsa video işlemcide düzeltilir, cihazda dik görünür
         Orientation sent;
         int srcW = 0, srcH = 0;
         auto initScaler = [&] {
@@ -478,12 +774,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
         logMemory("kodlayıcı");
         logf("Kodlayıcı: %s | akış %dx%d, içerik %ldx%ld, %d kbps", enc.name().c_str(), W, H,
              content.right - content.left, content.bottom - content.top, opt_.kbps);
-        if (!reported) {
-            reported = true;
-            if (ev_.onState) ev_.onState(state);
-        } else if (ev_.onState) {
-            ev_.onState(state);  // görüntü modu değişti
-        }
+        report(mode, target);  // bağlandı ya da görüntü modu değişti
         started = true;
 
         // Yeni monitörü Windows kendi kaydından döndürmüş / boyutlandırmış olabilir: gerçek değerden başla
@@ -514,8 +805,8 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
                     if (wantOnly) vdisp.isolate();
                     else vdisp.restoreLayout();
                     only = wantOnly;
-                    state.mode = only ? DisplayMode::Only : DisplayMode::Extend;
-                    if (ev_.onState) ev_.onState(state);
+                    mode = only ? DisplayMode::Only : DisplayMode::Extend;
+                    report(mode, target);
                 }
             }
             if (touchAsMouse_ != touchMouse) {
@@ -529,19 +820,19 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
 
             // Monitör yönü ve çözünürlüğü (yakalama kendiliğinden yeniden kurulur). Yansıtmada PC'nin gerçek
             // ekranına dokunulmaz.
-            //  - yön: sabit seçiliyse o; otomatikte tablet çevrilince tabletin yönü, bildirmiyorsa en son kullanılan
-            //  - tablet bildirimi yalnızca değişince uygulanır: Windows ayarlarından yapılan değişikliği ezmesin
+            //  - yön: sabit seçiliyse o; otomatikte cihaz çevrilince cihazın yönü, bildirmiyorsa en son kullanılan
+            //  - cihaz bildirimi yalnızca değişince uygulanır: Windows ayarlarından yapılan değişikliği ezmesin
             if (!target.empty()) {
                 const int fixed = fixedRotation_;
                 const int tablet = wantRotation;
                 int rot = -1;
                 if (fixed >= 0) rot = fixed;
                 else if (tablet >= 0 && tablet != tabletApplied) rot = tabletApplied = tablet;
-                else if (fixed != lastFixed) rot = tablet >= 0 ? tablet : config::lastRotation();  // otomatiğe geçildi
+                else if (fixed != lastFixed) rot = tablet >= 0 ? tablet : config::lastRotation(conn.deviceId());  // otomatiğe geçildi
                 lastFixed = fixed;
                 if (rot >= 0 && rot != appliedRotation) {
                     appliedRotation = rot;
-                    if (vdisp.setRotation(rot) && fixed < 0) config::saveLastRotation(rot);
+                    if (vdisp.setRotation(rot) && fixed < 0) config::saveLastRotation(conn.deviceId(), rot);
                 }
                 const int gen = settingsGen_;
                 if (gen != appliedGen) {
@@ -557,31 +848,31 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
                 }
             }
 
-            // Uyku eşitleme: Windows ekranları kapatınca tablet de ekranını kapatır; açınca uyanır
+            // Uyku eşitleme: Windows ekranları kapatınca cihaz da ekranını kapatır; açınca uyanır
             if (displayPower_.on() != tabletAwake) {
                 tabletAwake = !tabletAwake;
                 proto::Writer w;
                 w.u8(tabletAwake ? 1 : 0);
                 conn.send(proto::kDisplayPower, w.buf);
-                // Tablette başka bir uygulama kullanılıyorsa ekranı kapatılmaz
-                if (!tabletAwake && !adbPath.empty() && tabletVisible) {
-                    // USB: tablet mesajı işleyip (uyku kilidi) hazırlansın, sonra ekranını kapat
-                    std::thread([adbPath, adbSerial, sdk = int(hello.sdk)] {
+                // Cihazda başka bir uygulama kullanılıyorsa ekranı kapatılmaz
+                if (!tabletAwake && usb && !adbPath.empty() && tabletVisible) {
+                    // USB: cihaz mesajı işleyip (uyku kilidi) hazırlansın, sonra ekranını kapat
+                    std::thread([adbPath, serial, sdk = int(hello.sdk)] {
                         Sleep(300);
-                        adb::screenOff(adbPath, adbSerial, sdk);
+                        adb::screenOff(adbPath, serial, sdk);
                     }).detach();
                 }
             }
             if (keyRequested.exchange(false)) {
-                logf("Tablet görüntüyü yeniden başlattı (anahtar kare)");
+                logf("%s: görüntü yeniden başladı (anahtar kare)", hello.model.c_str());
                 inFlight = 0;  // kapalıyken gönderilenler hiç onaylanmayacak
                 dirty = forceKey = true;
-                cursor.shapeChanged = cursor.w > 0 && cursor.h > 0;  // tablet imleci de unutmuş olabilir
+                cursor.shapeChanged = cursor.w > 0 && cursor.h > 0;  // cihaz imleci de unutmuş olabilir
                 cursor.posChanged = true;
             }
 
-            // Tablet uygulaması arka planda: yakalama ve kodlama durur (iki cihaz da boşta); öne gelince
-            // tablet anahtar kare ister ve görüntü kaldığı yerden sürer.
+            // Cihaz uygulaması arka planda: yakalama ve kodlama durur (iki cihaz da boşta); öne gelince
+            // cihaz anahtar kare ister ve görüntü kaldığı yerden sürer.
             if (!tabletVisible) {
                 WaitForSingleObject(ackEvent, 200);
                 continue;
@@ -617,7 +908,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
                         config::saveRotation(now);
                         saved = true;
                     } else {
-                        config::saveLastRotation(now);
+                        config::saveLastRotation(conn.deviceId(), now);
                     }
                     logf("Yön Windows ayarlarından değişti: %d° (kaydedildi)", now);
                 }
@@ -630,6 +921,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
                     logf("Çözünürlük Windows ayarlarından değişti: %dx%d (kaydedildi)", cw, ch);
                 }
                 if (saved && ev_.onSettingsChanged) ev_.onSettingsChanged();
+                if (saved) report(mode, target);  // arayüz yeni çözünürlüğü / yönü okusun
                 if (sent.rotation != r0 || srcW != w0) {
                     logf("Görüntü: %dx%d, yön %d°%s", srcW, srcH, cap.orientation().rotation,
                          scaler.rotated() ? " (görüntü düzeltildi)" : "");
@@ -645,7 +937,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
                 if (!lowLatency) pushersLeft = 0;  // dengeli: yeni görüntü geliyorsa itici kareye gerek yok
             }
 
-            // İmleç masaüstü yönünde gelir; tablete yakalanan görüntünün (panel) yönünde gönderilir.
+            // İmleç masaüstü yönünde gelir; cihaza yakalanan görüntünün (panel) yönünde gönderilir.
             const Orientation& orient = sent;
             if (cursor.shapeChanged && (cursor.w <= 0 || cursor.h <= 0)) cursor.shapeChanged = false;
             if (cursor.shapeChanged) {
@@ -739,7 +1031,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
                               "%3d kare +%3d itici  %6.2f Mbit/s  RTT %5.1f ms  PC→çizim %5.1f ms  çözme %5.1f ms",
                               stats.frames.exchange(0), stats.pushers.exchange(0), stats.bytes.exchange(0) * 8 / 1e6,
                               stats.rttUs / 1000.0, acks ? e2e / 1000.0 / acks : 0.0, acks ? dec / 1000.0 / acks : 0.0);
-                if (ev_.onStats) ev_.onStats(line);
+                if (ev_.onStats) ev_.onStats(d.info.key, line);
                 logMemory("yayın sürerken");
                 nextStatsUs = now + 1000000;
             }
@@ -756,13 +1048,10 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
     conn.close();
     if (reader.joinable()) reader.join();
     CloseHandle(ackEvent);
-    currentLink_ = -1;
     detach();
-    if (!started) return false;
-    logf("Bağlantı kapandı (%s)", link.c_str());
-    state.connected = false;
-    if (ev_.onState) ev_.onState(state);
-    return true;
+    if (!started) return Result::Failed;
+    logf("Bağlantı kapandı: %s (%s)", hello.model.c_str(), link.c_str());
+    return Result::Ended;
 }
 
 }  // namespace ekran

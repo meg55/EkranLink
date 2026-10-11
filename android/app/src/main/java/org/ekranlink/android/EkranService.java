@@ -71,9 +71,7 @@ public final class EkranService extends Service implements Session.Host {
         super.onCreate();
         stats = new Stats(getResources());
         instance = this;
-        String androidId = android.provider.Settings.Secure.getString(getContentResolver(),
-                android.provider.Settings.Secure.ANDROID_ID);
-        deviceId = androidId != null ? androidId : Build.SERIAL;
+        deviceId = AutoStartReceiver.deviceId(this);
         pairStore = new PairStore(this);
         discovery = new DiscoveryResponder(Build.MANUFACTURER + " " + Build.MODEL, deviceId);
         discovery.start();

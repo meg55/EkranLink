@@ -220,7 +220,14 @@ Yapılanlar:
       USB'de PC tablet ekranını adb ile hemen kapatır (geliştirici seçeneklerindeki "uyanık kal" açıkken
       zaman aşımı hiç işlemez). Kararıkken tablete dokunmak Windows'u uyandırır.
       Ölçüldü (S6000, USB): tablet ekranı ~3 sn'de kapanır, fare oynatınca ~4 sn'de görüntü döner, bağlantı kopmaz
-- [ ] Çoklu tablet
+- [x] Birden çok cihaz aynı anda: her biri ayrı oturum ve ayrı sanal monitör; USB'de cihaz başına ayrı adb
+      portu; dokunmalar süreç genelinde tek tabloda (Windows'a giden her çerçeve tüm cihazların parmaklarını
+      içerir); tek ekran düzeni ortak (EkranLink monitörleri açık kalır, son çıkan geri yükler); çözünürlük ve
+      son yön cihaz başına. Pencerede cihaz başına *Bağlan* / *Bağlantıyı kes*; kesilen cihaza kullanıcı yeniden
+      bağlanana ya da cihaz çıkarılana kadar otomatik bağlanılmaz. Aynı cihaz USB'de ve Wi-Fi'de tek kayıt.
+      Ölçüldü (S6000 + Android 16 öykünücüsü, USB, hizmet modu): iki monitör, ayrı ayrı kesme / bağlama
+      (~3 sn), tümünü kes, tek ekran ↔ ikinci ekran (düzen birebir geri geldi), biri kaydırılırken diğerine
+      dokunma (±1 px)
 
 ## Faz 4 – Her cihaz
 

@@ -10,7 +10,8 @@ namespace ekran {
 // Takibi aç (yalnızca ajan: SYSTEM). Kapalıyken followInputDesktop hiçbir şey yapmaz (tepsi, konsol).
 void enableDesktopFollowing(bool on);
 
-// Çağıran iş parçacığını şimdiki giriş masaüstüne bağlar. Masaüstü değiştiyse true.
+// Çağıran iş parçacığını şimdiki giriş masaüstüne bağlar. Masaüstü değiştiyse true (iş parçacığının ilk
+// bağlanışı değişiklik sayılmaz).
 // Erişim yoksa hiçbir şey yapmaz. İş parçacığının penceresi olmamalı.
 bool followInputDesktop();
 

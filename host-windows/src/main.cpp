@@ -88,7 +88,18 @@ int main(int argc, char** argv) {
     setLogSink([](const std::string& s) { std::printf("\r%-110s\n", s.c_str()); std::fflush(stdout); });
 
     StreamerEvents ev;
-    ev.onStats = [](const std::string& line) { std::printf("\r%s   ", line.c_str()); std::fflush(stdout); };
+    // Birden çok cihaz bağlıyken her satırın başında cihaz anahtarı
+    ev.onStats = [](const std::string& key, const std::string& line) {
+        std::printf("\r%s  %s   ", key.c_str(), line.c_str());
+        std::fflush(stdout);
+    };
+    ev.onDevices = [](const std::vector<DeviceInfo>& list) {
+        static const char* states[] = {"bulundu", "bağlanıyor", "bağlı", "cihazda açılması bekleniyor", "uygulama yok"};
+        std::string s;
+        for (const auto& d : list)
+            s += (s.empty() ? "" : " · ") + d.name + " (" + d.link + ", " + states[int(d.state) % 5] + ")";
+        logf("Cihazlar: %s", s.empty() ? "yok" : s.c_str());
+    };
     ev.onPairRequest = [](const std::string& device, const std::string& code, HANDLE) {
         std::printf("\n\n  Eşleştirme: %s\n  Tabletteki kod:  %s\n  Aynı mı? Onaylıyor musunuz? (e/h): ", device.c_str(), code.c_str());
         std::fflush(stdout);

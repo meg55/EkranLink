@@ -45,9 +45,15 @@ Tablet Windows'a çoklu dokunmatik ekran olarak bağlanır: kaydırma, iki parma
 hizmeti olarak açılışta başlar; kilit ekranı ve şifre ekranı tablette görünür, tabletten açılır (kilit
 perdesini yukarı kaydırın). Windows kilit ekranını yalnızca ana monitörde gösterir.
 
-**Otomatik bağlanma:** PC'de *Bağlantı > Tablet bulununca otomatik bağlan*, tablette karşılama ekranındaki
-*Bilgisayara takılınca otomatik aç*. İkisi de açıksa tableti takmanız yeterli; biri kapalıysa PC'de
-*Şimdi bağlan*'a tıklayın ya da tablette EkranLink'i açın.
+**Otomatik bağlanma:** PC'de *Bağlantı > Cihaz bulununca otomatik bağlan*, tablette karşılama ekranındaki
+*Bilgisayara takılınca otomatik aç*. İkisi de açıksa tableti takmanız yeterli; biri kapalıysa pencerenin
+*Durum* sayfasındaki listeden *Bağlan*'a tıklayın ya da tablette EkranLink'i açın.
+
+**Birden çok cihaz:** Birden çok tablet ya da telefon aynı anda bağlanabilir; her biri Windows'ta ayrı bir
+monitör olur. *Durum* sayfasında her bağlı cihazın *Bağlantıyı kes* düğmesi, bulunan ama bağlı olmayan
+cihazların *Bağlan* düğmesi vardır (sağ tık menüsünde de). Bağlantısını kestiğiniz cihaza, siz yeniden
+bağlanana ya da cihaz çıkarılana kadar otomatik bağlanılmaz. Çözünürlük ve son kullanılan yön cihaz başına
+hatırlanır.
 
 **Arka plan:** Tabletteki uygulamayı alta alıp başka uygulama kullanabilirsiniz; Windows'taki monitör
 kopmaz, dönünce görüntü kaldığı yerden sürer. Bağlantıyı kesmek için bildirimdeki ya da ölçüm kartındaki

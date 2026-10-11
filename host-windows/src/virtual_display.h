@@ -37,11 +37,13 @@ public:
     bool setResolution(int width, int height);
     // Şimdiki çözünürlük, yatay yöndeki boyut olarak (bilinmiyorsa false)
     bool resolution(int& width, int& height) const;
-    // Tek ekran: diğer monitörleri geçici kapatır, tablet ana ekran olur. remove() eski düzeni geri yükler.
-    // Kalıcı kaydedilmez: program çökerse sürücünün bekçi köpeği monitörü kaldırır, Windows da kayıtlı
-    // (tabletsiz) düzene döner.
+    // Tek ekran: EkranLink dışındaki monitörleri geçici kapatır, bu cihaz ana ekran olur. remove() eski düzeni
+    // geri yükler. Birden çok cihaz bağlıyken düzen süreç genelinde ortaktır: ilk tek ekrana geçen kaydeder, son
+    // çıkan geri yükler; diğer EkranLink monitörleri açık kalır. Kalıcı kaydedilmez: program çökerse sürücünün
+    // bekçi köpeği monitörleri kaldırır, Windows da kayıtlı (cihazsız) düzene döner.
     bool isolate();
-    // Tek ekrandan çık: diğer monitörler geri gelir (tabletin şimdiki çözünürlüğü ve yönü korunur)
+    // Tek ekrandan çık: son çıkan cihazsa diğer monitörler geri gelir (cihazların şimdiki çözünürlüğü ve yönü
+    // korunur)
     void restoreLayout();
     bool isolated() const { return isolated_; }
     bool added() const { return added_; }
@@ -53,8 +55,6 @@ private:
     LUID adapter_{};
     UINT targetId_ = 0;
     bool isolated_ = false;
-    std::vector<DISPLAYCONFIG_PATH_INFO> savedPaths_;
-    std::vector<DISPLAYCONFIG_MODE_INFO> savedModes_;
 
     DWORD persistFlags() const;
     bool added_ = false;

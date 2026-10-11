@@ -106,6 +106,17 @@ da kullanıcı bağlantıyı tabletten kesti — kablo 30 sn çıkarılana ya da
 **3** uygulama zaten açık (PC bağlanır). PC'de de "otomatik bağlan" ayarı vardır: ikisi de açıksa tablet
 takılınca kendiliğinden ekran olur.
 
+Sonuç verisi `kimlik|ad` (ör. `9774d56d682e549c|LENOVO Vodafone Smart Tab III 10`): kimlik, el sıkışmada ve
+Wi-Fi keşfinde gönderilenin aynısıdır. PC cihaz bulurken uygulamayı açmadan da sorar (`--ez kimlik true`; bu
+soru "bağlantı kesildi" bekletmesini uzatmaz): birden çok cihazı ayırt eder, aynı cihazı USB'de ve Wi-Fi'de
+iki kez listelemez (ikisinde de varsa USB, biri bağlıysa o).
+
+### Birden çok cihaz
+
+Her cihaz ayrı bir oturumdur (ayrı TCP bağlantısı, kodlayıcı ve ikinci ekranda ayrı sanal monitör). USB'de
+her cihaz için PC'de ayrı bir yerel port açılır (`adb -s SERİ forward tcp:0 tcp:27183`; adb boş bir port
+seçer). Tek ekran modunda EkranLink'in tüm monitörleri açık kalır, yalnızca diğerleri kapanır.
+
 ### Döndürme
 
 Tablet uygulaması hep yatay kalır. Tablet dik tutulunca `Orientation` gönderir; PC ikinci ekran modunda sanal

@@ -8,6 +8,7 @@
 
 #include <windows.h>
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -32,10 +33,10 @@ DWORD get(const wchar_t* name, DWORD def);
 void set(const wchar_t* name, DWORD v);
 Options loadOptions();
 // Monitör yönü. "Orientation": 0 tabletle döner, 1–4 sabit 0/90/180/270°.
-// "LastRotation": otomatikte en son kullanılan yön (tablet yön bildirmezse bununla açılır).
+// "SonYon-<cihaz>": otomatikte o cihazın en son kullanılan yönü (cihaz yön bildirmezse bununla açılır).
 void saveRotation(int degrees);  // -1: otomatik
-int lastRotation();              // yoksa 0
-void saveLastRotation(int degrees);
+int lastRotation(const std::string& deviceId);  // yoksa 0
+void saveLastRotation(const std::string& deviceId, int degrees);
 // İkinci ekranın çözünürlüğü, cihaz başına ("Cozunurluk-<cihaz>" = "1600x940", yatay yöndeki boyut).
 // Yoksa cihazın kendi çözünürlüğü (sürücünün önerdiği mod) kullanılır.
 bool resolutionFor(const std::string& deviceId, int& width, int& height);
@@ -51,13 +52,19 @@ std::wstring pairsPath();    // cihaz kimliği → anahtar
 std::vector<std::string> knownAddresses();
 void rememberAddress(const std::string& ip);
 
-// Durum (ajan yazar, tepsi okur)
-void writeStatus(const SessionState& s);
-bool readStatus(SessionState& s);
-DWORD statusSeq();  // her writeStatus'ta artar (bağlantı ya da görüntü modu değişti)
-// Saniyelik ölçüm satırı: ajan yalnızca ayar penceresi açıkken yazar ("Izle" = 1), tepsi okur
-void writeStats(const std::string& line);
-std::string readStats();
+// Cihaz listesi (ajan yazar, tepsi okur): "Cihazlar" (REG_MULTI_SZ, satır başına bir cihaz), "Connected"
+// (bağlı cihaz sayısı) ve ilk bağlı cihazın ayrıntıları (Device, Link, ...: tanı betikleri için)
+void writeDevices(const std::vector<DeviceInfo>& list);
+bool readDevices(std::vector<DeviceInfo>& list);
+DWORD statusSeq();  // her writeDevices'ta artar
+// Saniyelik ölçüm satırları (cihaz anahtarı → satır): ajan yalnızca ayar penceresi açıkken yazar ("Izle" = 1)
+void writeStats(const std::map<std::string, std::string>& byKey);
+std::map<std::string, std::string> readStats();
+// Tepsiden ajana komut ("baglan <anahtar>", "kes <anahtar>", "kes"): kullanıcı HKLM'e yalnızca ayar
+// anahtarına yazabilir; komut "Komut", ardından sayaç "KomutNo" yazılır, ajan sayacı izler.
+void sendCommand(const std::string& cmd);
+DWORD commandId();
+std::string readCommand();
 // Kullanıcıya gösterilecek uyarı (ajan yazar, tepsi kendi dilinde bildirim olarak gösterir).
 // code: Notice (streamer.h). Her yazışta numara artar.
 void writeNotice(int code, const std::string& arg);

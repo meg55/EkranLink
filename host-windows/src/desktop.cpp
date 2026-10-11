@@ -45,9 +45,11 @@ bool followInputDesktop() {
     }
     if (held) CloseDesktop(held);  // artık bu iş parçacığı ona bağlı değil
     held = d;
-    if (current[0]) logf("Masaüstü: %ls", n.c_str());
+    // İş parçacığının ilk bağlanışı değişiklik sayılmaz: o anda basılı parmak gerçekten basılı
+    const bool switched = current[0] != 0;
+    if (switched) logf("Masaüstü: %ls", n.c_str());
     wcscpy(current, n.c_str());
-    return true;
+    return switched;
 }
 
 }  // namespace ekran

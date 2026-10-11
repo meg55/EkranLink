@@ -28,6 +28,7 @@ namespace ekran::i18n {
     X(RowLatency, L"Gecikme", L"Latency")                                                                           \
     X(RowData, L"Veri", L"Data")                                                                                    \
     X(RowFps, L"Kare hızı", L"Frame rate")                                                                          \
+    X(RowPerf, L"Ölçümler", L"Performance")                                                                         \
     X(StatsPending, L"ölçülüyor…", L"measuring…")                                                                   \
     X(StepsTitle, L"Bağlanmak için", L"To connect")                                                                 \
     X(StepApp, L"1.  Cihaza EkranLink'in Android uygulamasını (APK) kurun ve açın.",                                    \
@@ -41,12 +42,26 @@ namespace ekran::i18n {
     X(LinkAuto, L"Otomatik", L"Automatic")                                                                          \
     X(LinkUsb, L"USB", L"USB")                                                                                      \
     X(LinkWifi, L"Wi-Fi", L"Wi-Fi")                                                                                 \
-    X(LinkHint, L"Otomatik: önce USB'deki cihaz, yoksa aynı ağdaki cihaz.",                                         \
-      L"Automatic: a device on USB first, otherwise one on the same network.")                                      \
+    X(LinkHint, L"Otomatik: USB'deki ve aynı ağdaki cihazlar; aynı cihaz ikisinde de varsa USB.",                  \
+      L"Automatic: devices on USB and on the same network; USB if a device is on both.")                           \
     X(AutoConnect, L"Cihaz bulununca otomatik bağlan", L"Connect automatically when a device is found")             \
-    X(AutoConnectHint, L"Kapalıyken yalnızca \"Şimdi bağlan\" ile bağlanır.",                                       \
-      L"When off, it connects only when you press \"Connect now\".")                                                \
-    X(ConnectNow, L"Şimdi bağlan", L"Connect now")                                                                  \
+    X(AutoConnectHint, L"Kapalıyken Durum sayfasındaki listeden \"Bağlan\" ile bağlanılır. Bağlantısını "        \
+      L"kestiğiniz cihaza, siz yeniden bağlanana ya da cihaz çıkarılana kadar otomatik bağlanılmaz.",               \
+      L"When off, connect from the list on the Status page. A device you disconnect is not reconnected "          \
+      L"automatically until you connect it again or unplug it.")                                                    \
+    X(Connect, L"Bağlan", L"Connect")                                                                               \
+    X(Disconnect, L"Bağlantıyı kes", L"Disconnect")                                                                 \
+    X(DisconnectAll, L"Tümünün bağlantısını kes", L"Disconnect all")                                                \
+    X(DevicesConnected, L"%d cihaz bağlı", L"%d devices connected")                                                 \
+    X(FoundDevices, L"Bağlanabilecek cihazlar", L"Available devices")                                               \
+    X(StateFound, L"Bağlanmaya hazır", L"Ready to connect")                                                         \
+    X(StateConnecting, L"Bağlanıyor…", L"Connecting…")                                                              \
+    X(StateWaitingApp, L"Cihazda EkranLink'i açın (cihazdaki \"otomatik aç\" kapalı)",                            \
+      L"Open EkranLink on the device (\"open automatically\" is off there)")                                       \
+    X(StateAppMissing, L"Cihazda EkranLink kurulu değil", L"EkranLink is not installed on the device")              \
+    X(DisplayDevice, L"Cihaz", L"Device")                                                                           \
+    X(MenuConnectTo, L"Bağlan: %ls", L"Connect: %ls")                                                               \
+    X(MenuDisconnectFrom, L"Bağlantıyı kes: %ls", L"Disconnect: %ls")                                               \
     X(SecDisplay, L"Görüntü", L"Display")                                                                           \
     X(DisplayMode, L"Görüntü modu", L"Display mode")                                                                \
     X(ModeExtend, L"İkinci ekran", L"Extend")                                                                       \
