@@ -1,5 +1,5 @@
-// EKRAN sanal ekran sürücüsü — sürücü ile PC programı arasındaki komutlar.
-// SudoVDA'nın (MIT) arayüzünden türetildi; kimlikler EKRAN'a özel (SudoVDA/Apollo ile çakışmasın).
+// EkranLink sanal ekran sürücüsü — sürücü ile PC programı arasındaki komutlar.
+// SudoVDA'nın (MIT) arayüzünden türetildi; kimlikler EkranLink'e özel (SudoVDA/Apollo ile çakışmasın).
 // Bu dosya hem sürücüde (MSVC) hem host-windows'ta (MinGW) derlenir.
 #pragma once
 
@@ -29,7 +29,7 @@ typedef struct _EKRANVD_PROTOCOL_VERSION {
 // Komutlar değişince artır
 static const EKRANVD_PROTOCOL_VERSION EkranVdProtocolVersion = { 1, 0, 0, 0 };
 
-#define EKRANVD_HARDWARE_ID L"Root\\EKRAN\\VirtualDisplay"
+#define EKRANVD_HARDWARE_ID L"Root\\EkranLink\\VirtualDisplay"
 
 // {b1a52822-f3e2-4092-b7ee-abebada70d27}
 static const GUID EKRANVD_INTERFACE_GUID = { 0xb1a52822, 0xf3e2, 0x4092, { 0xb7, 0xee, 0xab, 0xeb, 0xad, 0xa7, 0x0d, 0x27 } };

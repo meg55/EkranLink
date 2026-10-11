@@ -1,9 +1,9 @@
 // Ayarların ve eşleşme anahtarlarının yeri.
-//  - Kullanıcı (tepsi, konsol): HKCU\Software\EKRAN, eşleşmeler HKCU\Software\EKRAN\Pairs
+//  - Kullanıcı (tepsi, konsol): HKCU\Software\EkranLink, eşleşmeler HKCU\Software\EkranLink\Pairs
 //  - Makine (hizmet/ajan; oturum açılmadan önce de çalışır):
-//      HKLM\SOFTWARE\EKRAN\Ayarlar   ayarlar (kullanıcılar okuyup yazabilir: tepsi menüsü)
-//      HKLM\SOFTWARE\EKRAN\Durum     bağlantı durumu (ajan yazar, tepsi okur)
-//      HKLM\SOFTWARE\EKRAN\Gizli     PC kimliği ve eşleşmeler (yalnızca SYSTEM ve yöneticiler)
+//      HKLM\SOFTWARE\EkranLink\Ayarlar   ayarlar (kullanıcılar okuyup yazabilir: tepsi menüsü)
+//      HKLM\SOFTWARE\EkranLink\Durum     bağlantı durumu (ajan yazar, tepsi okur)
+//      HKLM\SOFTWARE\EkranLink\Gizli     PC kimliği ve eşleşmeler (yalnızca SYSTEM ve yöneticiler)
 #pragma once
 
 #include <windows.h>
@@ -12,16 +12,17 @@
 #include <vector>
 
 #include "streamer.h"
+#include "version.h"
 
 namespace ekran::config {
 
-constexpr const wchar_t* kVersion = L"0.4.3";
+constexpr const wchar_t* kVersion = L"" EKRANLINK_VERSION;
 
-constexpr const wchar_t* kUserKey = L"Software\\EKRAN";
-constexpr const wchar_t* kMachineKey = L"SOFTWARE\\EKRAN";
-constexpr const wchar_t* kSettingsKey = L"SOFTWARE\\EKRAN\\Ayarlar";
-constexpr const wchar_t* kStatusKey = L"SOFTWARE\\EKRAN\\Durum";
-constexpr const wchar_t* kSecretKey = L"SOFTWARE\\EKRAN\\Gizli";
+constexpr const wchar_t* kUserKey = L"Software\\EkranLink";
+constexpr const wchar_t* kMachineKey = L"SOFTWARE\\EkranLink";
+constexpr const wchar_t* kSettingsKey = L"SOFTWARE\\EkranLink\\Ayarlar";
+constexpr const wchar_t* kStatusKey = L"SOFTWARE\\EkranLink\\Durum";
+constexpr const wchar_t* kSecretKey = L"SOFTWARE\\EkranLink\\Gizli";
 
 void useMachineStore(bool on);
 bool machineStore();
@@ -63,7 +64,7 @@ void writeNotice(int code, const std::string& arg);
 DWORD noticeId();
 DWORD readNotice(int& code, std::string& arg);  // numarayı döndürür
 
-// %ProgramData%\EKRAN
+// %ProgramData%\EkranLink
 std::wstring programDataDir();
 
 }  // namespace ekran::config

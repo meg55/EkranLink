@@ -1,4 +1,4 @@
-# EKRAN
+# <img src="art/ekranlink.svg" width="48" align="top" alt=""> EkranLink
 
 Eski tablet ve telefonlarınızı bilgisayarınız için ekran yapın: **yansıtma**, **ikinci ekran** veya
 **Windows'un tek ekranı** olarak, **USB** ya da **Wi-Fi** ile. Android 4.1'e kadar eski cihazları destekler.
@@ -27,27 +27,27 @@ tools/          Geliştirme ve ölçüm betikleri
 
 ## Kullanım
 
-1. `dist\EKRAN-<sürüm>-windows.zip` dosyasını açın, `ekran.exe`'yi çalıştırın (kurulum gerekmez).
+1. `dist\EkranLink-<sürüm>-windows.zip` dosyasını açın, `EkranLink.exe`'yi çalıştırın (kurulum gerekmez).
    Ayar penceresi açılır ve saatin yanında bir monitör simgesi belirir. Pencerenin solundaki menüyle
    sayfalar arasında geçilir: *Durum, Bağlantı, Görüntü, Dokunma ve performans, Genel*. Pencereyi
-   kapatmak EKRAN'ı kapatmaz; simgeye tıklayınca yeniden açılır (sağ tık: kısa menü, çıkış).
-2. Tablet uygulaması ayrı indirilir: `EKRAN-<sürüm>-android.apk` dosyasını tablete kurun (tabletin
+   kapatmak EkranLink'i kapatmaz; simgeye tıklayınca yeniden açılır (sağ tık: kısa menü, çıkış).
+2. Tablet uygulaması ayrı indirilir: `EkranLink-<sürüm>-android.apk` dosyasını tablete kurun (tabletin
    tarayıcısıyla indirip açın ya da USB ile kopyalayıp dosya yöneticisinden açın). PC tablete uygulama
    kurmaz. İki uygulamanın sürümü uyuşmazsa ikisi de hangisinin güncelleneceğini söyler.
    USB ile bağlanmak için tablette *Geliştirici seçenekleri > USB hata ayıklama* açık olmalı.
-3. Tablette EKRAN açıkken bilgisayar tableti kendiliğinden bulur (önce USB, yoksa Wi-Fi).
+3. Tablette EkranLink açıkken bilgisayar tableti kendiliğinden bulur (önce USB, yoksa Wi-Fi).
    Wi-Fi ile ilk bağlantıda iki cihazda aynı 6 haneli kod görünür; ikisinde de onaylayın.
 
 Tablet Windows'a çoklu dokunmatik ekran olarak bağlanır: kaydırma, iki parmakla yakınlaştırma, basılı tutunca sağ tık.
 Üç parmakla dokunmak ölçümleri gösterir/gizler.
 
-**Ekransız mini PC:** pencerede *Genel > Oturum açılmadan önce başlat* (bir kez yönetici izni ister). EKRAN Windows
+**Ekransız mini PC:** pencerede *Genel > Oturum açılmadan önce başlat* (bir kez yönetici izni ister). EkranLink Windows
 hizmeti olarak açılışta başlar; kilit ekranı ve şifre ekranı tablette görünür, tabletten açılır (kilit
 perdesini yukarı kaydırın). Windows kilit ekranını yalnızca ana monitörde gösterir.
 
 **Otomatik bağlanma:** PC'de *Bağlantı > Tablet bulununca otomatik bağlan*, tablette karşılama ekranındaki
 *Bilgisayara takılınca otomatik aç*. İkisi de açıksa tableti takmanız yeterli; biri kapalıysa PC'de
-*Şimdi bağlan*'a tıklayın ya da tablette EKRAN'ı açın.
+*Şimdi bağlan*'a tıklayın ya da tablette EkranLink'i açın.
 
 **Arka plan:** Tabletteki uygulamayı alta alıp başka uygulama kullanabilirsiniz; Windows'taki monitör
 kopmaz, dönünce görüntü kaldığı yerden sürer. Bağlantıyı kesmek için bildirimdeki ya da ölçüm kartındaki
@@ -63,7 +63,7 @@ bağlanışta aynı yönde açılır.
 
 **Ekran çözünürlüğü** (*Görüntü*): Windows Ayarlar > Ekran'daki listenin aynısı, aynı biçimde
 ("1600 × 940"); cihazın kendi çözünürlüğü *(Önerilen)* diye işaretlidir. Seçim cihaz başına hatırlanır
-(tablet ve telefon ayrı). Windows'tan yapılan değişiklik EKRAN'da da görünür ve kaydedilir.
+(tablet ve telefon ayrı). Windows'tan yapılan değişiklik EkranLink'te de görünür ve kaydedilir.
 
 Ayarlar bağlantıyı koparmadan uygulanır: dokunma, performans, otomatik bağlan, yön, çözünürlük ve ikinci
 ekran ↔ tek ekran anında; yansıtma ↔ ikinci ekran ve yansıtılan ekran görüntü yeniden kurularak (tablet
@@ -81,8 +81,8 @@ Gerekenler: JDK 17+ ve Android SDK (Android Studio ile gelir), MinGW-w64 GCC + C
 ```powershell
 .\tools\paketle.ps1                          # her şeyi derler, testleri çalıştırır, zip üretir
 .\host-windows\build.ps1                     # yalnızca Windows tarafı
-.\host-windows\build\ekran-host.exe          # konsol sürümü, saniyelik ölçümlerle (--usb / --wifi / --ip)
-.\host-windows\build\ekran-test.exe          # şifreleme test vektörleri (RFC 8439)
+.\host-windows\build\ekranlink-host.exe          # konsol sürümü, saniyelik ölçümlerle (--usb / --wifi / --ip)
+.\host-windows\build\ekranlink-test.exe          # şifreleme test vektörleri (RFC 8439)
 ```
 
 Tanı için ham akış testi: `.\tools\faz0.ps1` (ffmpeg gerekir).

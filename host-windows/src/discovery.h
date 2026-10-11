@@ -1,4 +1,4 @@
-// Wi-Fi / USB internet paylaşımı ağında EKRAN tabletlerini bulma (UDP).
+// Wi-Fi / USB internet paylaşımı ağında EkranLink tabletlerini bulma (UDP).
 // Soru her ağ arayüzünden (o arayüze bağlı ayrı soketle) kendi yayın adresine gönderilir; böylece aynı
 // ağa iki kartla (Ethernet + Wi-Fi) bağlı PC'de de, USB internet paylaşımıyla açılan ağda da (ör.
 // 192.168.42.x) soru her yere çıkar. Wi-Fi yayını onaysızdır ve güç tasarrufundaki tablet kaçırabilir:

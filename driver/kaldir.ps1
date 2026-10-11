@@ -1,13 +1,13 @@
 <#
 .SYNOPSIS
-    EKRAN sanal ekran sürücüsünü tamamen kaldırır: aygıt, sürücü paketi, sertifika, ayarlar. Yönetici olarak çalışır.
+    EkranLink sanal ekran sürücüsünü tamamen kaldırır: aygıt, sürücü paketi, sertifika, ayarlar. Yönetici olarak çalışır.
 #>
 param(
-    [string] $Arac = (Join-Path $PSScriptRoot '..\host-windows\build\ekran-surucu.exe')
+    [string] $Arac = (Join-Path $PSScriptRoot '..\host-windows\build\ekranlink-surucu.exe')
 )
 
 $ErrorActionPreference = 'Stop'
-$konu = 'CN=EKRAN Yerel Surucu Imzasi'
+$konu = 'CN=EkranLink Yerel Surucu Imzasi'
 
 $yonetici = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -21,7 +21,7 @@ if (-not $yonetici) {
 if (Test-Path $Arac) { & $Arac kaldir }
 
 # 2) Sürücü paketi (oemNN.inf)
-$paketler = (pnputil /enum-drivers) -join "`n" -split "`n`n" | Where-Object { $_ -match 'ekranvd\.inf' }
+$paketler = (pnputil /enum-drivers) -join "`n" -split "`n`n" | Where-Object { $_ -match 'ekranlinkvd\.inf' }
 foreach ($p in $paketler) {
     if ($p -match '(oem\d+\.inf)') {
         Write-Host "Sürücü paketi siliniyor: $($matches[1])"
@@ -38,6 +38,6 @@ foreach ($depo in 'Cert:\LocalMachine\Root', 'Cert:\LocalMachine\TrustedPublishe
 }
 
 # 4) Ayarlar
-Remove-Item 'HKLM:\SOFTWARE\EKRAN' -Recurse -ErrorAction SilentlyContinue
+Remove-Item 'HKLM:\SOFTWARE\EkranLink' -Recurse -ErrorAction SilentlyContinue
 
-Write-Host 'EKRAN sanal ekran sürücüsü kaldırıldı.' -ForegroundColor Green
+Write-Host 'EkranLink sanal ekran sürücüsü kaldırıldı.' -ForegroundColor Green

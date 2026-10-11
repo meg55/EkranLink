@@ -1,4 +1,4 @@
-// EKRAN sunucusu — konsol sürümü (geliştirme ve tanı için). Günlük kullanım: ekran.exe (tepsi).
+// EkranLink sunucusu — konsol sürümü (geliştirme ve tanı için). Günlük kullanım: EkranLink.exe (tepsi).
 
 #include <winsock2.h>
 #include <windows.h>
@@ -24,7 +24,7 @@ BOOL WINAPI onCtrl(DWORD) {
 
 void usage() {
     std::printf(
-        "Kullanım: ekran-host [seçenekler]\n"
+        "Kullanım: ekranlink-host [seçenekler]\n"
         "  (seçeneksiz)      Otomatik: USB'deki tablet, yoksa Wi-Fi'de aranan tablet\n"
         "  --usb             Sadece USB (adb)\n"
         "  --wifi            Sadece Wi-Fi (ağda otomatik aranır)\n"
@@ -99,12 +99,12 @@ int main(int argc, char** argv) {
     // Hizmet çalışıyorsa tablete iki yayıncı bağlanmaya çalışmasın
     if (SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT)) {
         SERVICE_STATUS st{};
-        SC_HANDLE svc = OpenServiceW(scm, L"EKRAN", SERVICE_QUERY_STATUS);
+        SC_HANDLE svc = OpenServiceW(scm, L"EkranLink", SERVICE_QUERY_STATUS);
         const bool running = svc && QueryServiceStatus(svc, &st) && st.dwCurrentState != SERVICE_STOPPED;
         if (svc) CloseServiceHandle(svc);
         CloseServiceHandle(scm);
         if (running) {
-            logf("EKRAN hizmeti çalışıyor; yayını o yapıyor. Konsol için önce durdurun: sc stop EKRAN");
+            logf("EkranLink hizmeti çalışıyor; yayını o yapıyor. Konsol için önce durdurun: sc stop EkranLink");
             return 1;
         }
     }
@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
     SetConsoleCtrlHandler(onCtrl, TRUE);
 
     const char* mode = opt.mode == LinkMode::Usb ? "USB" : opt.mode == LinkMode::Wifi ? "Wi-Fi" : "otomatik";
-    logf("EKRAN sunucusu — %s%s%s. Tablet bekleniyor... (Ctrl+C: çıkış)", mode, opt.ip.empty() ? "" : " ",
+    logf("EkranLink sunucusu — %s%s%s. Tablet bekleniyor... (Ctrl+C: çıkış)", mode, opt.ip.empty() ? "" : " ",
          opt.ip.c_str());
     streamer.run();
     g_streamer = nullptr;

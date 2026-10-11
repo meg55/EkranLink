@@ -232,7 +232,7 @@ bool Window::create() {
         };
         wc.hInstance = GetModuleHandleW(nullptr);
         wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-        wc.lpszClassName = L"EkranAyarlar";
+        wc.lpszClassName = L"EkranLinkAyarlar";
         RegisterClassExW(&wc);
         registered = true;
     }
@@ -252,12 +252,16 @@ bool Window::create() {
     const RECT& wa = mi.rcWork;
     const int w = std::min(int(kWidth * s), int(wa.right - wa.left));
     const int h = std::min(int(kHeight * s), int(wa.bottom - wa.top));
-    hwnd_ = CreateWindowExW(0, L"EkranAyarlar", L"EKRAN", WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX,
+    hwnd_ = CreateWindowExW(0, L"EkranLinkAyarlar", L"EkranLink", WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX,
                             wa.left + (wa.right - wa.left - w) / 2, wa.top + (wa.bottom - wa.top - h) / 2, w, h,
                             nullptr, nullptr, GetModuleHandleW(nullptr), this);
     if (!hwnd_) return false;
     SendMessageW(hwnd_, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(icon_));
-    SendMessageW(hwnd_, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(icon_));
+    // Görev çubuğu ve Alt+Tab büyük simgeyi kullanır: küçüğü büyütülmesin
+    const int big = GetSystemMetricsForDpi(SM_CXICON, GetDpiForWindow(hwnd_));
+    SendMessageW(hwnd_, WM_SETICON, ICON_BIG,
+                 reinterpret_cast<LPARAM>(LoadImageW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(1), IMAGE_ICON, big,
+                                                     big, LR_DEFAULTCOLOR | LR_SHARED)));
     dpi_ = float(GetDpiForWindow(hwnd_));
     applyTitleBarTheme();
     ShowWindow(hwnd_, SW_SHOWNORMAL);
@@ -349,7 +353,7 @@ void Window::sidebar(float height) {
     fixed_ = true;
     const float x = 16, w = kSide - 28;
     float y = 22;
-    y += drawText(L"EKRAN", fApp_.get(), x + 6, y, w, t.text) + 6;
+    y += drawText(L"EkranLink", fApp_.get(), x + 6, y, w, t.text) + 6;
     // Durum: nokta + kısa metin + cihaz adı
     dot(x + 11, y + 9, 5, m.connected ? t.ok : t.idle);
     y += drawText(m.connected ? W(i18n::Connected) : W(i18n::Waiting), fBody_.get(), x + 24, y, w - 24, t.text) + 1;

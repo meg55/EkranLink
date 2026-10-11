@@ -1,4 +1,4 @@
-// EKRAN — bildirim alanı (tepsi) uygulaması. Saatin yanındaki simge: sol tık ayar penceresini açar,
+// EkranLink — bildirim alanı (tepsi) uygulaması. Saatin yanındaki simge: sol tık ayar penceresini açar,
 // sağ tık kısa menü. Boştayken hiçbir şey yapmaz: tablet yoklaması 3 saniyede bir, yayın yalnızca bağlıyken;
 // ayar penceresi yalnızca açıkken var olur.
 
@@ -91,7 +91,7 @@ std::wstring exePath() {
 bool autostartEnabled() {
     wchar_t v[MAX_PATH * 2];
     DWORD size = sizeof v;
-    return RegGetValueW(HKEY_CURRENT_USER, kRunKey, L"EKRAN", RRF_RT_REG_SZ, nullptr, v, &size) == 0;
+    return RegGetValueW(HKEY_CURRENT_USER, kRunKey, L"EkranLink", RRF_RT_REG_SZ, nullptr, v, &size) == 0;
 }
 
 void setAutostart(bool on) {
@@ -99,10 +99,10 @@ void setAutostart(bool on) {
     if (RegOpenKeyExW(HKEY_CURRENT_USER, kRunKey, 0, KEY_SET_VALUE, &k) != 0) return;
     if (on) {
         std::wstring cmd = L"\"" + exePath() + L"\" " + kBackgroundArg;
-        RegSetValueExW(k, L"EKRAN", 0, REG_SZ, reinterpret_cast<const BYTE*>(cmd.c_str()),
+        RegSetValueExW(k, L"EkranLink", 0, REG_SZ, reinterpret_cast<const BYTE*>(cmd.c_str()),
                        DWORD((cmd.size() + 1) * sizeof(wchar_t)));
     } else {
-        RegDeleteValueW(k, L"EKRAN");
+        RegDeleteValueW(k, L"EkranLink");
     }
     RegCloseKey(k);
 }
@@ -122,59 +122,25 @@ void applyLanguage() {
 void openLog() {
     wchar_t dir[MAX_PATH];
     GetEnvironmentVariableW(L"LOCALAPPDATA", dir, MAX_PATH);
-    std::wstring d = std::wstring(dir) + L"\\EKRAN";
+    std::wstring d = std::wstring(dir) + L"\\EkranLink";
     CreateDirectoryW(d.c_str(), nullptr);
-    g_logPath = d + L"\\ekran.log";
+    g_logPath = d + L"\\ekranlink.log";
     logToFile(g_logPath);
 }
 
-// --- Simge: kodla çizilmiş küçük monitör ---
+// --- Simge: res/app.rc (1: renkli, bağlıyken; 2: gri, bağlı değilken). Kaynak çizim: tools/simge.py ---
 
-HICON makeIcon(COLORREF screen) {
-    const int S = 32;
-    BITMAPV5HEADER bh{};
-    bh.bV5Size = sizeof bh;
-    bh.bV5Width = S;
-    bh.bV5Height = -S;
-    bh.bV5Planes = 1;
-    bh.bV5BitCount = 32;
-    bh.bV5Compression = BI_BITFIELDS;
-    bh.bV5RedMask = 0x00FF0000;
-    bh.bV5GreenMask = 0x0000FF00;
-    bh.bV5BlueMask = 0x000000FF;
-    bh.bV5AlphaMask = 0xFF000000;
-    void* bits = nullptr;
-    HDC dc = GetDC(nullptr);
-    HBITMAP color = CreateDIBSection(dc, reinterpret_cast<BITMAPINFO*>(&bh), DIB_RGB_COLORS, &bits, nullptr, 0);
-    ReleaseDC(nullptr, dc);
-    auto* px = static_cast<uint32_t*>(bits);
-    const uint32_t frame = 0xFFF0F0F0;
-    const uint32_t fill = 0xFF000000 | (uint32_t(GetRValue(screen)) << 16) | (uint32_t(GetGValue(screen)) << 8) |
-                          GetBValue(screen);
-    for (int y = 0; y < S; y++)
-        for (int x = 0; x < S; x++) {
-            uint32_t c = 0;
-            const bool inBody = x >= 2 && x <= 29 && y >= 5 && y <= 23;
-            const bool inScreen = x >= 5 && x <= 26 && y >= 8 && y <= 20;
-            if (inBody) c = inScreen ? fill : frame;
-            if (x >= 13 && x <= 18 && y >= 24 && y <= 26) c = frame;  // ayak
-            if (x >= 8 && x <= 23 && y >= 27 && y <= 28) c = frame;   // taban
-            px[y * S + x] = c;
-        }
-    HBITMAP mask = CreateBitmap(S, S, 1, 1, nullptr);
-    ICONINFO ii{TRUE, 0, 0, mask, color};
-    HICON icon = CreateIconIndirect(&ii);
-    DeleteObject(mask);
-    DeleteObject(color);
-    return icon;
+HICON loadIcon(int id, int size) {
+    return static_cast<HICON>(
+        LoadImageW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(id), IMAGE_ICON, size, size, LR_DEFAULTCOLOR));
 }
 
 // --- Tepsi ---
 
 void updateTray() {
     g_nid.hIcon = g_connected ? g_iconOn : g_iconIdle;
-    std::wstring tip = g_connected ? L"EKRAN — " + g_device + L" (" + g_link + L")"
-                                   : std::wstring(L"EKRAN — ") + W(i18n::Waiting);
+    std::wstring tip = g_connected ? L"EkranLink — " + g_device + L" (" + g_link + L")"
+                                   : std::wstring(L"EkranLink — ") + W(i18n::Waiting);
     if (g_connected && !g_latency.empty()) tip += L"\n" + std::wstring(W(i18n::Latency)) + L" " + g_latency + L" · " + g_data;
     wcsncpy(g_nid.szTip, tip.c_str(), ARRAYSIZE(g_nid.szTip) - 1);
     g_nid.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE;
@@ -355,7 +321,7 @@ void reloadCaches() {
 
 void installOrRemoveService(bool update) {
     const bool remove = g_serviceMode && !g_serviceStale && !update;
-    if (remove && MessageBoxW(ui::window(), W(i18n::ServiceRemoveConfirm), L"EKRAN", MB_YESNO | MB_ICONQUESTION) != IDYES)
+    if (remove && MessageBoxW(ui::window(), W(i18n::ServiceRemoveConfirm), L"EkranLink", MB_YESNO | MB_ICONQUESTION) != IDYES)
         return;
     // Kurulumda tablete aynı anda iki yayıncı bağlanmasın: önce kendi yayınımızı durdur
     stopStreamer();
@@ -369,10 +335,10 @@ void installOrRemoveService(bool update) {
         logf("Hizmet işlemi iptal edildi");
     } else if (code != 0) {
         logf("Hizmet işlemi başarısız (%lu)", code);
-        MessageBoxW(ui::window(), W(i18n::ServiceFailed), L"EKRAN", MB_OK | MB_ICONWARNING);
+        MessageBoxW(ui::window(), W(i18n::ServiceFailed), L"EkranLink", MB_OK | MB_ICONWARNING);
     } else {
         logf(g_serviceMode ? "Hizmet kuruldu: yayını artık hizmet yapıyor" : "Hizmet kaldırıldı");
-        notify(L"EKRAN", W(g_serviceMode ? i18n::ServiceInstalled : i18n::ServiceRemoved));
+        notify(L"EkranLink", W(g_serviceMode ? i18n::ServiceInstalled : i18n::ServiceRemoved));
     }
     startStreamer();
     updateTray();
@@ -479,7 +445,7 @@ public:
                 g_outputs = listOutputs();
                 break;
             case ui::Act::Forget:
-                if (MessageBoxW(ui::window(), W(i18n::ForgetConfirm), L"EKRAN", MB_YESNO | MB_ICONQUESTION) == IDYES) {
+                if (MessageBoxW(ui::window(), W(i18n::ForgetConfirm), L"EkranLink", MB_YESNO | MB_ICONQUESTION) == IDYES) {
                     if (g_serviceMode) {
                         config::set(L"ForgetPairs", 1);  // eşleşmeleri hizmet tutar (kullanıcı okuyamaz)
                     } else {
@@ -647,10 +613,10 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
         background = role == kBackgroundArg;
     }
 
-    HANDLE single = CreateMutexW(nullptr, TRUE, L"EKRAN-tepsi");
+    HANDLE single = CreateMutexW(nullptr, TRUE, L"EkranLink-tepsi");
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
         // Zaten çalışıyor: onun penceresini aç
-        if (HWND other = FindWindowExW(HWND_MESSAGE, nullptr, L"EkranTray", nullptr)) {
+        if (HWND other = FindWindowExW(HWND_MESSAGE, nullptr, L"EkranLinkTray", nullptr)) {
             DWORD pid = 0;
             GetWindowThreadProcessId(other, &pid);
             AllowSetForegroundWindow(pid);
@@ -665,31 +631,31 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);
     openLog();
-    logf("EKRAN tepsi uygulaması başladı");
+    logf("EkranLink tepsi uygulaması başladı");
 
     g_serviceMode = service::installed();
     config::useMachineStore(g_serviceMode);
     applyLanguage();
     g_opt = config::loadOptions();
-    if (g_serviceMode) logf("EKRAN hizmeti kurulu: yayını hizmet yapıyor, bu uygulama yalnızca ayar ve durum");
+    if (g_serviceMode) logf("EkranLink hizmeti kurulu: yayını hizmet yapıyor, bu uygulama yalnızca ayar ve durum");
     if (autostartEnabled()) setAutostart(true);  // eski kayıtta pencereyi açmama bayrağı yok
 
     WNDCLASSW wc{};
     wc.lpfnWndProc = wndProc;
     wc.hInstance = inst;
-    wc.lpszClassName = L"EkranTray";
+    wc.lpszClassName = L"EkranLinkTray";
     RegisterClassW(&wc);
-    g_wnd = CreateWindowW(wc.lpszClassName, L"EKRAN", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, inst, nullptr);
+    g_wnd = CreateWindowW(wc.lpszClassName, L"EkranLink", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, inst, nullptr);
 
-    g_iconIdle = makeIcon(RGB(110, 110, 110));
-    g_iconOn = makeIcon(RGB(40, 160, 90));
+    g_iconIdle = loadIcon(2, GetSystemMetrics(SM_CXSMICON));
+    g_iconOn = loadIcon(1, GetSystemMetrics(SM_CXSMICON));
     g_nid.cbSize = sizeof g_nid;
     g_nid.hWnd = g_wnd;
     g_nid.uID = kTrayId;
     g_nid.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE;
     g_nid.uCallbackMessage = WM_TRAY;
     g_nid.hIcon = g_iconIdle;
-    wcsncpy(g_nid.szTip, (std::wstring(L"EKRAN — ") + W(i18n::Waiting)).c_str(), ARRAYSIZE(g_nid.szTip) - 1);
+    wcsncpy(g_nid.szTip, (std::wstring(L"EkranLink — ") + W(i18n::Waiting)).c_str(), ARRAYSIZE(g_nid.szTip) - 1);
     Shell_NotifyIconW(NIM_ADD, &g_nid);
 
     // Önceki tepsi pencere açıkken kapanmış (çökmüş) olabilir: ajan boşuna ölçüm yazmasın
@@ -705,7 +671,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
 
     stopStreamer();
     if (g_serviceMode) config::set(L"Izle", 0);
-    logf("EKRAN kapandı");
+    logf("EkranLink kapandı");
     WSACleanup();
     MFShutdown();
     CoUninitialize();

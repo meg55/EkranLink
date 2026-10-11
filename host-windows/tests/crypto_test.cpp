@@ -1,5 +1,5 @@
 // ChaCha20 / Poly1305 / AEAD doğrulaması: RFC 8439 test vektörleri + Android tarafıyla çapraz kontrol.
-// Çalıştır: build\ekran-test.exe  (tümü GEÇTİ olmalı)
+// Çalıştır: build\ekranlink-test.exe  (tümü GEÇTİ olmalı)
 
 #include <cstdio>
 #include <cstring>
@@ -107,7 +107,7 @@ int main() {
         for (int i = 0; i < 32; i++) key[size_t(i)] = uint8_t(i);
         crypto::DirectionKey dk;
         dk.init(key);
-        uint8_t msg[] = "EKRAN capraz test";
+        uint8_t msg[] = "EkranLink capraz test";
         uint8_t tag[16];
         dk.encrypt(5, msg, sizeof msg - 1, tag);
         std::printf("Çapraz kontrol (seq=5): %s %s\n", tohex(msg, sizeof msg - 1).c_str(), tohex(tag, 16).c_str());

@@ -36,8 +36,8 @@ std::wstring to(const std::string& serial) { return L"-s " + std::wstring(serial
 App appState(const std::wstring& adbPath, const std::string& serial) {
     // adb başarısızsa (ör. tablette "USB hata ayıklamaya izin ver" bekleniyor) bilinmiyor
     std::string out;
-    if (!run(adbPath, to(serial) + L"shell pm list packages org.ekran.android", &out)) return App::Unknown;
-    return out.find("package:org.ekran.android") != std::string::npos ? App::Installed : App::Missing;
+    if (!run(adbPath, to(serial) + L"shell pm list packages org.ekranlink.android", &out)) return App::Unknown;
+    return out.find("package:org.ekranlink.android") != std::string::npos ? App::Installed : App::Missing;
 }
 
 std::wstring find() {
@@ -140,7 +140,7 @@ Launch requestLaunch(const std::wstring& adbPath, const std::string& serial) {
     // Sonuç kodu tabletin kararı (AutoStartReceiver): 1 izin var, 2 otomatik açma kapalı, 3 zaten açık.
     // Uygulamayı tablet değil biz başlatırız: Android 10+ arka plandan ekran açılmasına izin vermez, adb verir.
     std::string out;
-    if (!run(adbPath, to(serial) + L"shell am broadcast -f 32 -n org.ekran.android/.AutoStartReceiver", &out))
+    if (!run(adbPath, to(serial) + L"shell am broadcast -f 32 -n org.ekranlink.android/.AutoStartReceiver", &out))
         return Launch::Failed;
     const size_t p = out.find("result=");
     const int r = p == std::string::npos ? -1 : std::atoi(out.c_str() + p + 7);
@@ -150,7 +150,7 @@ Launch requestLaunch(const std::wstring& adbPath, const std::string& serial) {
     if (run(adbPath, to(serial) + L"shell dumpsys power", &out) &&
         (out.find("mScreenOn=false") != std::string::npos || out.find("Display Power: state=OFF") != std::string::npos))
         run(adbPath, to(serial) + L"shell input keyevent 26");
-    run(adbPath, to(serial) + L"shell am start -n org.ekran.android/.MainActivity");
+    run(adbPath, to(serial) + L"shell am start -n org.ekranlink.android/.MainActivity");
     return Launch::Started;
 }
 

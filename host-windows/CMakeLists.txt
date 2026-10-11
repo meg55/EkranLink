@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(ekran_host CXX)
+project(ekranlink_host CXX RC)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -37,29 +37,30 @@ target_compile_definitions(ekran_core PUBLIC
 target_link_libraries(ekran_core PUBLIC
   d3d11 dxgi mfplat mfuuid mf ole32 oleaut32 ws2_32 iphlpapi user32 bcrypt advapi32 setupapi psapi shell32 cfgmgr32)
 
-# ekran-host.exe: konsol (geliştirme / tanı)
-add_executable(ekran-host src/main.cpp)
-target_link_libraries(ekran-host PRIVATE ekran_core)
+# ekranlink-host.exe: konsol (geliştirme / tanı)
+add_executable(ekranlink-host src/main.cpp res/app.rc)
+target_link_libraries(ekranlink-host PRIVATE ekran_core)
 
-# ekran.exe: bildirim alanı uygulaması (günlük kullanım)
-add_executable(ekran WIN32 src/tray.cpp src/ui.cpp src/service.cpp)
-target_link_libraries(ekran PRIVATE ekran_core shell32 advapi32 gdi32 d2d1 dwrite dwmapi)
+# EkranLink.exe: bildirim alanı uygulaması (günlük kullanım)
+# Simge ve sürüm bilgisi: res/ (simgeler tools/simge.py ile üretilir)
+add_executable(EkranLink WIN32 src/tray.cpp src/ui.cpp src/service.cpp res/app.rc)
+target_link_libraries(EkranLink PRIVATE ekran_core shell32 advapi32 gdi32 d2d1 dwrite dwmapi)
 
-# ekran-surucu.exe: sanal ekran sürücüsü aygıtını kur/kaldır (yönetici)
-add_executable(ekran-surucu src/driver_tool.cpp)
-target_compile_definitions(ekran-surucu PRIVATE UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
-target_link_libraries(ekran-surucu PRIVATE setupapi newdev cfgmgr32)
+# ekranlink-surucu.exe: sanal ekran sürücüsü aygıtını kur/kaldır (yönetici)
+add_executable(ekranlink-surucu src/driver_tool.cpp)
+target_compile_definitions(ekranlink-surucu PRIVATE UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+target_link_libraries(ekranlink-surucu PRIVATE setupapi newdev cfgmgr32)
 
-# ekran-test.exe: şifreleme test vektörleri
-add_executable(ekran-test tests/crypto_test.cpp)
-target_link_libraries(ekran-test PRIVATE ekran_core)
+# ekranlink-test.exe: şifreleme test vektörleri
+add_executable(ekranlink-test tests/crypto_test.cpp)
+target_link_libraries(ekranlink-test PRIVATE ekran_core)
 
 if(MINGW)
   target_compile_options(ekran_core PUBLIC -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers)
-  target_link_options(ekran PRIVATE -municode)
-  target_link_options(ekran-surucu PRIVATE -municode)
+  target_link_options(EkranLink PRIVATE -municode)
+  target_link_options(ekranlink-surucu PRIVATE -municode)
   # Tek dosya: MinGW çalışma zamanı DLL'lerine bağımlılık yok
-  foreach(t ekran-host ekran ekran-test ekran-surucu)
+  foreach(t ekranlink-host EkranLink ekranlink-test ekranlink-surucu)
     target_link_options(${t} PRIVATE -static -s)
   endforeach()
 endif()

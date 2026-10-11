@@ -261,7 +261,7 @@ void VirtualDisplay::restoreLayout() {
 }
 
 // Yön / çözünürlük Windows'un kaydına da yazılır: monitör bir sonraki bağlanışta doğrudan bu modla açılır
-// (yoksa Windows eski kaydıyla açar, EKRAN hemen düzeltir ve ekran fazladan bir kez gidip gelir).
+// (yoksa Windows eski kaydıyla açar, EkranLink hemen düzeltir ve ekran fazladan bir kez gidip gelir).
 // Tek ekrandayken yazılmaz: o düzen geçicidir, Windows'un kaydına girmemeli.
 DWORD VirtualDisplay::persistFlags() const { return isolated_ ? 0 : CDS_UPDATEREGISTRY; }
 

@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    EKRAN sanal ekran sürücüsünü derler: driver\out\ (EkranVD.dll, ekranvd.inf, ekranvd.cat)
+    EkranLink sanal ekran sürücüsünü derler: driver\out\ (EkranLinkVD.dll, ekranlinkvd.inf, ekranlinkvd.cat)
 
 .DESCRIPTION
     Gerekenler: Visual Studio Build Tools (MSVC, x64) + Windows Driver Kit (WDK 10.0.26100).
@@ -49,14 +49,14 @@ if ($LASTEXITCODE -ne 0) { throw 'cl başarısız' }
 
 $libs = @("/LIBPATH:$wdk\Lib\wdf\umdf\x64\$umdf", "/LIBPATH:$wdk\Lib\$sdk\um\x64\iddcx\$iddcx", "/LIBPATH:$wdk\Lib\$sdk\um\x64")
 & link.exe /nologo /DLL /MACHINE:X64 /SUBSYSTEM:WINDOWS /NXCOMPAT /DYNAMICBASE /OPT:REF /OPT:ICF `
-    "/OUT:$out\EkranVD.dll" (Join-Path $obj 'Driver.obj') @libs `
+    "/OUT:$out\EkranLinkVD.dll" (Join-Path $obj 'Driver.obj') @libs `
     WdfDriverStubUm.lib IddCxStub.lib OneCoreUAP.lib avrt.lib d3d11.lib dxgi.lib ntdll.lib
 if ($LASTEXITCODE -ne 0) { throw 'link başarısız' }
 
 # --- INF: sürüm, mimari ve UMDF sürümü damgası ---
-Copy-Item (Join-Path $src 'ekranvd.inf') $out -Force
+Copy-Item (Join-Path $src 'ekranlinkvd.inf') $out -Force
 $stampinf = Join-Path $wdk "bin\$sdk\x64\stampinf.exe"
-& $stampinf -f (Join-Path $out 'ekranvd.inf') -a amd64 -d * -v $Surum -u "$umdf.0" | Out-Null
+& $stampinf -f (Join-Path $out 'ekranlinkvd.inf') -a amd64 -d * -v $Surum -u "$umdf.0" | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'stampinf başarısız' }
 
 Get-ChildItem $out | Select-Object Name, Length | Format-Table -AutoSize

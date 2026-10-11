@@ -1,4 +1,4 @@
-# EKRAN yol haritası
+# EkranLink yol haritası
 
 Eski tablet ve telefonları bilgisayar için ekran yapan açık kaynak uygulama: yansıtma, ikinci ekran
 ve Windows'un tek ekranı olarak; USB veya Wi-Fi ile.
@@ -7,6 +7,7 @@ ve Windows'un tek ekranı olarak; USB veya Wi-Fi ile.
 
 | Konu | Karar | Neden |
 |---|---|---|
+| Ad | EkranLink (paket `org.ekranlink.android`, Windows hizmeti `EkranLink`); 0.4.x'e kadar EKRAN | Daha genel, uluslararası bir ad; çakışan uygulama ya da marka bulunmadı (2026-10) |
 | Lisans | GPL-3.0 | Moonlight/Sunshine gibi GPL projelerden kod ve eski cihaz düzeltmeleri alabilmek; türevlerin açık kalması |
 | Windows tarafı | C++ (servis, yakalama, kodlama, sürücü) | IddCx sürücüsü zaten C++; DXGI/NVENC/AMF örneklerinin tamamı C/C++ |
 | Android istemci | Java, minSdk 16 (4.1), AndroidX yok | MediaCodec 4.1'de geldi; güncel AndroidX/NDK 4.x'i desteklemiyor |
@@ -74,12 +75,12 @@ Derleme için Visual Studio gerekmez: MinGW-w64 (GCC) yeterli.
 - [x] Otomatik mod: önce USB, yoksa Wi-Fi; kopunca yeniden bağlanma (USB'de tablet uygulamasını da yeniden başlatır)
 - [x] Eşleştirme + şifreleme: geçici ECDH P-256; Wi-Fi'de ilk eşleştirmede iki tarafta aynı 6 haneli
       kod onayı, USB'de onaysız; Wi-Fi verisi ChaCha20-Poly1305 (RFC 8439 test vektörleriyle doğrulandı,
-      `ekran-test.exe`), USB şifresiz. Ayrıntı: [PROTOCOL.md](PROTOCOL.md)
+      `ekranlink-test.exe`), USB şifresiz. Ayrıntı: [PROTOCOL.md](PROTOCOL.md)
 - [x] PC'deki eşleştirme sorusu, tablet reddedince kendiliğinden kapanır
 - [x] Tablette "Eşleşmeleri unut" düğmesi (yalnızca bağlı değilken görünür)
-- [x] Bildirim alanı uygulaması `ekran.exe`: durum, bağlantı türü, ekran seçimi, Windows ile başlat, günlük
+- [x] Bildirim alanı uygulaması `EkranLink.exe`: durum, bağlantı türü, ekran seçimi, Windows ile başlat, günlük
 - [x] Ayrı indirmeler (0.3.1): PC tablete uygulama kurmaz/sunmaz. `tools\paketle.ps1` →
-      `dist\EKRAN-<sürüm>-windows.zip` (exe'ler + adb) ve `dist\EKRAN-<sürüm>-android.apk`.
+      `dist\EkranLink-<sürüm>-windows.zip` (exe'ler + adb) ve `dist\EkranLink-<sürüm>-android.apk`.
       USB'de uygulama yoksa PC bildirimle söyler; protokol sürümü uyuşmazsa tablet `Incompatible`
       gönderir, iki taraf da hangi uygulamanın güncelleneceğini gösterir
 - [x] Ayar penceresi (0.4.0): Direct2D, Windows'un açık/koyu temasına ve DPI'ına uyar, yalnızca açıkken
@@ -101,7 +102,7 @@ Derleme için Visual Studio gerekmez: MinGW-w64 (GCC) yeterli.
       (hizmet modunda yalnızca pencere açıkken aktarılır), çözülene kadar kalan uyarılar, Windows ekran ayarları kısayolu
 - [x] Yön / çözünürlük Windows'un kaydına da yazılır (0.4.3, tek ekranda değil): monitör bir sonraki bağlanışta
       doğrudan doğru modla açılır, fazladan mod değişimi olmaz
-- [x] Birden çok adb cihazı takılıyken: hazırlanmış olan, yoksa EKRAN'ı kurulu olan cihaz seçilir; tüm adb komutları `-s` ile
+- [x] Birden çok adb cihazı takılıyken: hazırlanmış olan, yoksa EkranLink'i kurulu olan cihaz seçilir; tüm adb komutları `-s` ile
       o cihaza gider (tam çoklu cihaz yol haritasında)
 - [x] Güvenilir Wi-Fi keşfi: arayüz başına soket, 3 kez yineleme, bilinen tablet adreslerine doğrudan soru
       (yayın güvenlik duvarıyla engellenip denendi: 1,2 sn'de bağlandı). Tablet UDP/TCP portu boşalana kadar dener
@@ -124,8 +125,8 @@ Derleme için Visual Studio gerekmez: MinGW-w64 (GCC) yeterli.
 |---|---|---|
 | AES-128-CTR | BouncyCastle (saf Java) | 1,4 MB/s |
 | HMAC-SHA256 | BouncyCastle (saf Java) | 1,7 MB/s |
-| ChaCha20 | EKRAN (Dalvik için elle açılmış) | 15,4 MB/s |
-| Poly1305 | EKRAN | 18,1 MB/s |
+| ChaCha20 | EkranLink (Dalvik için elle açılmış) | 15,4 MB/s |
+| Poly1305 | EkranLink | 18,1 MB/s |
 
 Sürekli harekette (116 kare/s, 6,6 Mbit/s) tablet uygulamasının CPU'su: USB %33, Wi-Fi AES+HMAC %104,
 Wi-Fi ChaCha20-Poly1305 %48. Not: Dalvik JIT küçük metotları (ör. `Integer.rotateLeft`) satır içine
@@ -139,7 +140,7 @@ başına ekle/çıkar API'si var ama imzalı sürümü yok), HDMI sahte takı (s
 çalışır). Seçim: **SudoVDA tabanlı kendi sürücümüz** → [driver/](../driver/README.md), bu bilgisayarda
 MSVC + WDK ile derlenip yerel sertifikayla imzalanıyor.
 
-- [x] EKRAN sanal ekran sürücüsü (IddCx/UMDF): tablet başına tak-çıkar, sabit monitör kimliği
+- [x] EkranLink sanal ekran sürücüsü (IddCx/UMDF): tablet başına tak-çıkar, sabit monitör kimliği
       (Windows yerleşimi hatırlar), EDID'de fiziksel boyut, 3 sn bekçi köpeği (program çökse de monitör kalkar)
 - [x] Kurulum/kaldırma: `driver\kur.ps1` (özel anahtarı imzadan hemen sonra silen yerel imza), `driver\kaldir.ps1`
 - [x] PC programı: tablet bağlanınca 1280×752 monitör aç → onu yakala; ayrılınca kaldır; sürücü yoksa yansıt

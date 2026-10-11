@@ -10,8 +10,8 @@ namespace ekran::i18n {
 #define EKRAN_STRINGS(X)                                                                                            \
     X(Waiting, L"Cihaz bekleniyor", L"Waiting for a device")                                                        \
     X(Connected, L"Bağlı", L"Connected")                                                                            \
-    X(WaitingHint, L"Tablette ya da telefonda EKRAN'ı açın; USB ile takın ya da aynı Wi-Fi ağına bağlayın.",        \
-      L"Open EKRAN on the tablet or phone, then plug it in over USB or join the same Wi-Fi network.")              \
+    X(WaitingHint, L"Tablette ya da telefonda EkranLink'i açın; USB ile takın ya da aynı Wi-Fi ağına bağlayın.",        \
+      L"Open EkranLink on the tablet or phone, then plug it in over USB or join the same Wi-Fi network.")              \
     X(NotifyConnected, L"Cihaz bağlandı", L"Device connected")                                                      \
     X(NotifyDisconnected, L"Cihaz ayrıldı", L"Device disconnected")                                                 \
     X(ModeExtendShort, L"ikinci ekran", L"extended display")                                                        \
@@ -19,7 +19,7 @@ namespace ekran::i18n {
     X(ModeMirrorShort, L"yansıtma", L"mirroring")                                                                   \
     X(Encrypted, L"şifreli", L"encrypted")                                                                          \
     X(Latency, L"gecikme", L"latency")                                                                              \
-    X(MenuOpen, L"EKRAN'ı aç", L"Open EKRAN")                                                                       \
+    X(MenuOpen, L"EkranLink'i aç", L"Open EkranLink")                                                                       \
     X(MenuExit, L"Çıkış", L"Exit")                                                                                  \
     X(NavStatus, L"Durum", L"Status")                                                                               \
     X(RowLink, L"Bağlantı", L"Connection")                                                                          \
@@ -30,8 +30,8 @@ namespace ekran::i18n {
     X(RowFps, L"Kare hızı", L"Frame rate")                                                                          \
     X(StatsPending, L"ölçülüyor…", L"measuring…")                                                                   \
     X(StepsTitle, L"Bağlanmak için", L"To connect")                                                                 \
-    X(StepApp, L"1.  Cihaza EKRAN'ın Android uygulamasını (APK) kurun ve açın.",                                    \
-      L"1.  Install the EKRAN Android app (APK) on the device and open it.")                                       \
+    X(StepApp, L"1.  Cihaza EkranLink'in Android uygulamasını (APK) kurun ve açın.",                                    \
+      L"1.  Install the EkranLink Android app (APK) on the device and open it.")                                       \
     X(StepUsb, L"2.  USB: kabloyla takın (cihazda USB hata ayıklama açık olmalı).",                                 \
       L"2.  USB: plug in the cable (USB debugging must be on on the device).")                                     \
     X(StepWifi, L"     Wi-Fi: cihazı bu bilgisayarla aynı ağa bağlayın; kendiliğinden bulunur.",                    \
@@ -106,17 +106,17 @@ namespace ekran::i18n {
     X(ForgetConfirm, L"Tüm eşleşmiş cihazlar unutulsun mu?\nWi-Fi ile bağlanırken yeniden kod onayı istenir.",     \
       L"Forget all paired devices?\nA code confirmation will be needed again when connecting over Wi-Fi.")         \
     X(ServiceRemoveConfirm,                                                                                         \
-      L"EKRAN hizmeti kaldırılsın mı?\n\nOturum açma ekranı ve UAC pencereleri artık cihazda görünmez; yayını "  \
+      L"EkranLink hizmeti kaldırılsın mı?\n\nOturum açma ekranı ve UAC pencereleri artık cihazda görünmez; yayını "  \
       L"yine bu uygulama yapar.",                                                                                   \
-      L"Remove the EKRAN service?\n\nThe sign-in screen and UAC prompts will no longer appear on the device; this " \
+      L"Remove the EkranLink service?\n\nThe sign-in screen and UAC prompts will no longer appear on the device; this " \
       L"app keeps streaming.")                                                                                      \
-    X(ServiceFailed, L"Hizmet kurulamadı ya da kaldırılamadı.\nAyrıntı: C:\\ProgramData\\EKRAN\\hizmet.log",        \
-      L"Could not install or remove the service.\nDetails: C:\\ProgramData\\EKRAN\\hizmet.log")                    \
+    X(ServiceFailed, L"Hizmet kurulamadı ya da kaldırılamadı.\nAyrıntı: C:\\ProgramData\\EkranLink\\hizmet.log",        \
+      L"Could not install or remove the service.\nDetails: C:\\ProgramData\\EkranLink\\hizmet.log")                    \
     X(ServiceInstalled, L"Cihaz artık oturum açma ekranını da gösterecek.",                                        \
       L"The device will now also show the sign-in screen.")                                                         \
     X(ServiceRemoved, L"Hizmet kaldırıldı; yayını bu uygulama yapıyor.",                                            \
       L"Service removed; this app is streaming now.")                                                               \
-    X(PairTitle, L"EKRAN — eşleştirme", L"EKRAN — pairing")                                                         \
+    X(PairTitle, L"EkranLink — eşleştirme", L"EkranLink — pairing")                                                         \
     X(PairText,                                                                                                     \
       L"\"%ls\" bu bilgisayarla eşleşmek istiyor.\n\nCihazda görünen kod:\n\n        %ls\n\nKodlar aynıysa "      \
       L"Evet'e basın ve cihazda da onaylayın.\nFarklıysa Hayır'a basın: ağda başka biri araya girmeye "           \
@@ -124,16 +124,16 @@ namespace ekran::i18n {
       L"\"%ls\" wants to pair with this computer.\n\nCode shown on the device:\n\n        %ls\n\nIf the codes "    \
       L"match, press Yes and confirm on the device too.\nIf they differ, press No: someone on the network may "    \
       L"be trying to intercept the connection.")                                                                    \
-    X(NoticeAppMissingTitle, L"Cihazda EKRAN uygulaması yok", L"EKRAN app not found on the device")                \
+    X(NoticeAppMissingTitle, L"Cihazda EkranLink uygulaması yok", L"EkranLink app not found on the device")                \
     X(NoticeAppMissing,                                                                                             \
-      L"EKRAN'ın Android uygulamasını (APK) cihaza indirip kurun. Kurulunca bağlantı kendiliğinden kurulur.",     \
-      L"Download and install the EKRAN Android app (APK) on the device. It connects by itself once installed.")    \
-    X(NoticeTabletOldTitle, L"Cihazdaki EKRAN eski", L"EKRAN on the device is outdated")                           \
-    X(NoticeTabletOld, L"Cihaza EKRAN'ın Android uygulamasının yeni sürümünü (APK) kurun.",                        \
-      L"Install the new version of the EKRAN Android app (APK) on the device.")                                     \
-    X(NoticePcOldTitle, L"Bu bilgisayardaki EKRAN eski", L"EKRAN on this computer is outdated")                     \
-    X(NoticePcOld, L"Bilgisayara EKRAN'ın yeni sürümünü kurun (cihazda %ls var).",                                 \
-      L"Install the new version of EKRAN on this computer (the device has %ls).")
+      L"EkranLink'in Android uygulamasını (APK) cihaza indirip kurun. Kurulunca bağlantı kendiliğinden kurulur.",     \
+      L"Download and install the EkranLink Android app (APK) on the device. It connects by itself once installed.")    \
+    X(NoticeTabletOldTitle, L"Cihazdaki EkranLink eski", L"EkranLink on the device is outdated")                           \
+    X(NoticeTabletOld, L"Cihaza EkranLink'in Android uygulamasının yeni sürümünü (APK) kurun.",                        \
+      L"Install the new version of the EkranLink Android app (APK) on the device.")                                     \
+    X(NoticePcOldTitle, L"Bu bilgisayardaki EkranLink eski", L"EkranLink on this computer is outdated")                     \
+    X(NoticePcOld, L"Bilgisayara EkranLink'in yeni sürümünü kurun (cihazda %ls var).",                                 \
+      L"Install the new version of EkranLink on this computer (the device has %ls).")
 
 enum Str : int {
 #define EKRAN_ENUM(name, tr, en) name,

@@ -1,8 +1,8 @@
-// ekran-surucu.exe — EKRAN sanal ekran sürücüsü için kök aygıt kurma/kaldırma (devcon benzeri, yönetici gerekir).
+// ekranlink-surucu.exe — EkranLink sanal ekran sürücüsü için kök aygıt kurma/kaldırma (devcon benzeri, yönetici gerekir).
 //
-//   ekran-surucu kur <yol\ekranvd.inf>   aygıtı oluştur (yoksa) ve sürücüyü kur/güncelle
-//   ekran-surucu kaldir                  aygıtı kaldır (sürücü paketi ayrıca: pnputil /delete-driver)
-//   ekran-surucu durum                   aygıt var mı, çalışıyor mu
+//   ekranlink-surucu kur <yol\ekranlinkvd.inf>   aygıtı oluştur (yoksa) ve sürücüyü kur/güncelle
+//   ekranlink-surucu kaldir                  aygıtı kaldır (sürücü paketi ayrıca: pnputil /delete-driver)
+//   ekranlink-surucu durum                   aygıt var mı, çalışıyor mu
 
 #include <windows.h>
 #include <cfgmgr32.h>
@@ -122,7 +122,7 @@ int status() {
         else if (st & DN_HAS_PROBLEM) std::printf("%ls: SORUN (kod %lu)\n", id, problem);
         else std::printf("%ls: %s\n", id, (st & DN_STARTED) ? "çalışıyor" : "başlatılmadı");
     });
-    if (n == 0) std::printf("EKRAN sanal ekran aygıtı yok\n");
+    if (n == 0) std::printf("EkranLink sanal ekran aygıtı yok\n");
     return n > 0 ? 0 : 2;
 }
 
@@ -133,6 +133,6 @@ int wmain(int argc, wchar_t** argv) {
     if (argc >= 3 && _wcsicmp(argv[1], L"kur") == 0) return install(argv[2]);
     if (argc >= 2 && _wcsicmp(argv[1], L"kaldir") == 0) return uninstall();
     if (argc >= 2 && _wcsicmp(argv[1], L"durum") == 0) return status();
-    std::printf("Kullanım: ekran-surucu kur <ekranvd.inf> | kaldir | durum\n");
+    std::printf("Kullanım: ekranlink-surucu kur <ekranlinkvd.inf> | kaldir | durum\n");
     return 2;
 }

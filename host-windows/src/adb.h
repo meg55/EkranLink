@@ -16,7 +16,7 @@ bool run(const std::wstring& adbPath, const std::wstring& args, std::string* out
 // Sonraki komutlar seri numarasıyla o cihaza gider.
 std::vector<std::string> devices(const std::wstring& adbPath);
 
-// Cihazda EKRAN uygulaması kurulu mu. PC uygulama kurmaz: APK ayrıca indirilip cihaza kurulur.
+// Cihazda EkranLink uygulaması kurulu mu. PC uygulama kurmaz: APK ayrıca indirilip cihaza kurulur.
 enum class App { Installed, Missing, Unknown };
 App appState(const std::wstring& adbPath, const std::string& serial);
 

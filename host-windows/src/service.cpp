@@ -28,8 +28,8 @@ namespace ekran::service {
 
 namespace {
 
-constexpr const wchar_t* kAgentStopEvent = L"Global\\EKRAN-ajan-dur";
-constexpr const wchar_t* kAgentMutex = L"Global\\EKRAN-ajan";
+constexpr const wchar_t* kAgentStopEvent = L"Global\\EkranLink-ajan-dur";
+constexpr const wchar_t* kAgentMutex = L"Global\\EkranLink-ajan";
 
 std::wstring selfPath() {
     wchar_t p[MAX_PATH];
@@ -42,7 +42,7 @@ std::wstring dirOf(const std::wstring& path) { return path.substr(0, path.find_l
 std::wstring installDir() {
     wchar_t p[MAX_PATH] = L"C:\\Program Files";
     SHGetFolderPathW(nullptr, CSIDL_PROGRAM_FILES, nullptr, 0, p);  // FOLDERID_*: bkz. config.cpp
-    return std::wstring(p) + L"\\EKRAN";
+    return std::wstring(p) + L"\\EkranLink";
 }
 
 bool exists(const std::wstring& p) { return GetFileAttributesW(p.c_str()) != INVALID_FILE_ATTRIBUTES; }
@@ -170,7 +170,7 @@ void WINAPI serviceMain(DWORD, LPWSTR*) {
     g_sessionChanged = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     CreateDirectoryW(config::programDataDir().c_str(), nullptr);
     logToFile(config::programDataDir() + L"\\hizmet.log");
-    logf("EKRAN hizmeti başladı (%ls)", config::kVersion);
+    logf("EkranLink hizmeti başladı (%ls)", config::kVersion);
     setState(SERVICE_RUNNING);
 
     {
@@ -197,7 +197,7 @@ void WINAPI serviceMain(DWORD, LPWSTR*) {
         }
         agent.stop();
     }
-    logf("EKRAN hizmeti durdu");
+    logf("EkranLink hizmeti durdu");
     setState(SERVICE_STOPPED);
 }
 
@@ -304,7 +304,7 @@ int runService() {
     return StartServiceCtrlDispatcherW(table) ? 0 : int(GetLastError());
 }
 
-std::wstring agentLogPath() { return config::programDataDir() + L"\\ekran.log"; }
+std::wstring agentLogPath() { return config::programDataDir() + L"\\ekranlink.log"; }
 
 int runAgent() {
     HANDLE single = CreateMutexW(nullptr, TRUE, kAgentMutex);
@@ -316,7 +316,7 @@ int runAgent() {
     logToFile(agentLogPath());
     DWORD sid = 0;
     ProcessIdToSessionId(GetCurrentProcessId(), &sid);
-    logf("EKRAN ajanı başladı (oturum %lu, masaüstü %ls)", sid, inputDesktopName().c_str());
+    logf("EkranLink ajanı başladı (oturum %lu, masaüstü %ls)", sid, inputDesktopName().c_str());
 
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -408,7 +408,7 @@ int runAgent() {
     }
 
     config::writeStatus(SessionState{});
-    logf("EKRAN ajanı kapandı");
+    logf("EkranLink ajanı kapandı");
     if (settings) RegCloseKey(settings);
     CloseHandle(regEv);
     if (stopEv) CloseHandle(stopEv);
@@ -449,12 +449,10 @@ int install() {
     SC_HANDLE svc = OpenServiceW(scm, kName, SERVICE_ALL_ACCESS);
     if (svc) stopAndWait(svc);
 
-    // 1) Dosyalar: C:\Program Files\EKRAN (hizmet sabit bir yoldan çalışmalı; zip klasörü silinebilir)
+    // 1) Dosyalar: C:\Program Files\EkranLink (hizmet sabit bir yoldan çalışmalı; zip klasörü silinebilir)
     const std::wstring dir = installDir();
     CreateDirectoryW(dir.c_str(), nullptr);
-    if (!copyFile(selfPath(), dir + L"\\ekran.exe")) return 2;
-    // Eski sürümün kopyaladığı tablet uygulaması: PC artık tablete uygulama kurmuyor
-    for (const wchar_t* f : {L"\\ekran-android.apk", L"\\ekran-android.version"}) DeleteFileW((dir + f).c_str());
+    if (!copyFile(selfPath(), dir + L"\\EkranLink.exe")) return 2;
     const std::wstring adbPath = adb::find();
     if (!adbPath.empty()) {
         CreateDirectoryW((dir + L"\\adb").c_str(), nullptr);
@@ -493,9 +491,9 @@ int install() {
     }
 
     // 4) Hizmet: açılışta, oturum açılmadan başlar
-    const std::wstring bin = L"\"" + dir + L"\\ekran.exe\" --hizmet";
+    const std::wstring bin = L"\"" + dir + L"\\EkranLink.exe\" --hizmet";
     if (!svc) {
-        svc = CreateServiceW(scm, kName, L"EKRAN tablet ekranı", SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
+        svc = CreateServiceW(scm, kName, L"EkranLink tablet ekranı", SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
                              SERVICE_AUTO_START, SERVICE_ERROR_NORMAL, bin.c_str(), nullptr, nullptr, nullptr,
                              nullptr, nullptr);
         if (!svc) {
@@ -551,8 +549,7 @@ int uninstall() {
     for (const wchar_t* f : {L"adbkey", L"adbkey.pub"}) DeleteFileW((keyDir + L"\\" + f).c_str());
     RemoveDirectoryW(keyDir.c_str());
     const std::wstring dir = installDir();
-    for (const wchar_t* f : {L"adb\\adb.exe", L"adb\\AdbWinApi.dll", L"adb\\AdbWinUsbApi.dll", L"ekran-android.apk",
-                             L"ekran-android.version", L"ekran.exe"}) {
+    for (const wchar_t* f : {L"adb\\adb.exe", L"adb\\AdbWinApi.dll", L"adb\\AdbWinUsbApi.dll", L"EkranLink.exe"}) {
         const std::wstring p = dir + L"\\" + f;
         if (exists(p) && !DeleteFileW(p.c_str())) MoveFileExW(p.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
     }

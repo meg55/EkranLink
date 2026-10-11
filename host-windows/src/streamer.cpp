@@ -170,7 +170,7 @@ void Streamer::run() {
                 // (bildirim yoksa 3 sn'de bir); takıldıktan sonraki birkaç saniye adb'nin görmesi beklenir.
                 const int64_t now = nowUs();
                 nextUsbPollUs = now + (now < usbBurstUntilUs ? 1'000'000 : usb.ok() ? 30'000'000 : 3'000'000);
-                // Birden çok cihaz takılıysa: hazırlanmış olan, yoksa EKRAN'ı kurulu olan ilk cihaz
+                // Birden çok cihaz takılıysa: hazırlanmış olan, yoksa EkranLink'i kurulu olan ilk cihaz
                 const std::vector<std::string> devs = adb::devices(adbPath);
                 std::string dev = devs.empty() ? std::string() : devs.front();
                 if (!opt_.serial.empty()) {
@@ -189,7 +189,7 @@ void Streamer::run() {
                     prepared.clear();
                     declinedLogged = false;
                 } else if (dev != prepared && adb::appState(adbPath, dev) == adb::App::Missing) {
-                    notice(Notice::AppMissing, {}, "USB: tablette EKRAN uygulaması yok; APK tablete ayrıca kurulmalı");
+                    notice(Notice::AppMissing, {}, "USB: tablette EkranLink uygulaması yok; APK tablete ayrıca kurulmalı");
                     nextUsbPollUs = nowUs() + 10'000'000;  // kurulmasını bekle
                 } else if (!adb::prepareUsb(adbPath, dev, proto::kPort)) {
                     nextUsbPollUs = nowUs() + 3'000'000;  // ör. tablette "USB hata ayıklamaya izin ver" bekleniyor
@@ -197,7 +197,7 @@ void Streamer::run() {
                     prepared = dev;
                     const adb::Launch l = adb::requestLaunch(adbPath, dev);
                     if (l == adb::Launch::Declined) {
-                        if (!declinedLogged) logf("USB: tablet bağlanmak istemiyor (\"otomatik aç\" kapalı ya da bağlantı tabletten kesildi); bağlanmak için tablette EKRAN'ı açın");
+                        if (!declinedLogged) logf("USB: tablet bağlanmak istemiyor (\"otomatik aç\" kapalı ya da bağlantı tabletten kesildi); bağlanmak için tablette EkranLink'i açın");
                         declinedLogged = true;
                         nextUsbPollUs = nowUs() + 4'000'000;  // takılıyken uygulamanın açılmasını bekle
                     } else if (l != adb::Launch::Failed) {
@@ -263,7 +263,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
             incompatibleUntilUs_ = nowUs() + 30'000'000;
             const bool tabletOld = conn.peerVersion() < proto::kVersion;
             notice(tabletOld ? Notice::TabletOutdated : Notice::PcOutdated, conn.peerAppVersion(),
-                   tabletOld ? "Tabletteki EKRAN eski" : "Bu bilgisayardaki EKRAN eski");
+                   tabletOld ? "Tabletteki EkranLink eski" : "Bu bilgisayardaki EkranLink eski");
             logf("Sürüm uyuşmuyor: tablet protokol %u (uygulama %s), PC %u", conn.peerVersion(),
                  conn.peerAppVersion().c_str(), proto::kVersion);
         }
@@ -383,7 +383,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
             s.height = H;
             s.refreshHz = 60;
             s.monitorGuid = VirtualDisplay::guidFor(conn.deviceId());
-            s.name = "EKRAN Tablet";
+            s.name = "EkranLink Tablet";
             s.serial = conn.deviceId().substr(0, 13);
             const double dpi = hello.dpi ? hello.dpi : 160;  // Windows ölçeklemeyi bu boyuta göre önerir
             s.widthMm = int(W * 25.4 / dpi + 0.5);

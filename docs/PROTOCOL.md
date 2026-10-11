@@ -1,4 +1,4 @@
-# EKRAN protokolü v2
+# EkranLink protokolü v2
 
 Tek TCP bağlantısı, varsayılan port **27183**. Bağlantıyı her zaman PC açar (Android 4.x'te
 `adb reverse` yok): USB'de `adb forward tcp:27183 tcp:27183`, Wi-Fi'de tabletin IP'si.
@@ -99,7 +99,7 @@ PC dokunmayı bunun tersine göre masaüstüne çevirir.
 
 ### USB'de otomatik açılma
 
-PC, adb ile tablete sorar: `am broadcast -f 32 -n org.ekran.android/.AutoStartReceiver`. Sonuç kodu
+PC, adb ile tablete sorar: `am broadcast -f 32 -n org.ekranlink.android/.AutoStartReceiver`. Sonuç kodu
 tabletin kararıdır: **1** izin var (PC uygulamayı `am start` ile başlatır; Android 10+ arka plandan ekran
 açmaya izin vermediği için başlatan PC'dir), **2** reddedildi ("bilgisayara takılınca otomatik aç" kapalı ya
 da kullanıcı bağlantıyı tabletten kesti — kablo 30 sn çıkarılana ya da uygulama elle açılana kadar),

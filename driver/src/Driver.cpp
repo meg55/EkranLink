@@ -4,8 +4,8 @@ Copyright (c) Microsoft Corporation
 
 Abstract:
 
-	EKRAN sanal ekran sürücüsü. SudoVDA'dan (SudoMaker, MIT) türetilmiştir; o da Microsoft'un Indirect Display
-	Driver örneğine (MS-PL) dayanır. EKRAN değişiklikleri: kimlikler, sınır denetimleri, fiziksel boyut, öncelik.
+	EkranLink sanal ekran sürücüsü. SudoVDA'dan (SudoMaker, MIT) türetilmiştir; o da Microsoft'un Indirect Display
+	Driver örneğine (MS-PL) dayanır. EkranLink değişiklikleri: kimlikler, sınır denetimleri, fiziksel boyut, öncelik.
 
 	This module contains a sample implementation of an indirect display driver. See the included README.md file and the
 	various TODO blocks throughout this file and all accompanying files for information on building a production driver.
@@ -298,7 +298,7 @@ void LoadSettings() {
 	LONG lResult;
 
 	// Open the registry key
-	lResult = RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\EKRAN\\VirtualDisplay", 0, KEY_READ, &hKey);
+	lResult = RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\EkranLink\\VirtualDisplay", 0, KEY_READ, &hKey);
 	if (lResult != ERROR_SUCCESS) {
 		return;
 	}
@@ -800,9 +800,9 @@ void IndirectDeviceContext::InitAdapter()
 	AdapterCaps.EndPointDiagnostics.TransmissionType = IDDCX_TRANSMISSION_TYPE_WIRED_OTHER;
 
 	// Declare your device strings for telemetry (required)
-	AdapterCaps.EndPointDiagnostics.pEndPointFriendlyName = L"EKRAN Sanal Ekran";
-	AdapterCaps.EndPointDiagnostics.pEndPointManufacturerName = L"EKRAN";
-	AdapterCaps.EndPointDiagnostics.pEndPointModelName = L"EKRAN Tablet";
+	AdapterCaps.EndPointDiagnostics.pEndPointFriendlyName = L"EkranLink Sanal Ekran";
+	AdapterCaps.EndPointDiagnostics.pEndPointManufacturerName = L"EkranLink";
+	AdapterCaps.EndPointDiagnostics.pEndPointModelName = L"EkranLink Tablet";
 
 	// Declare your hardware and firmware versions (required)
 	IDDCX_ENDPOINT_VERSION Version = {};
@@ -983,9 +983,9 @@ void IndirectMonitorContext::UnassignSwapChain()
 void IndirectDeviceContext::_TestCreateMonitor() {
 	auto connectorIndex = freeConnectorSlots.front();
 	std::string idx = std::to_string(connectorIndex);
-	std::string serialStr = "EKRAN";
+	std::string serialStr = "EkranLink";
 	serialStr += idx;
-	std::string dispName = "EKRAN #";
+	std::string dispName = "EkranLink #";
 	dispName += idx;
 	GUID containerId;
 	CoCreateGuid(&containerId);

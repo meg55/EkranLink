@@ -1,0 +1,32 @@
+// EkranLink.exe, ekranlink-host.exe: icons and file properties (Details tab)
+#include <winver.h>
+#include "../src/version.h"
+
+// 1: application (shown by Explorer; tray while connected), 2: tray while not connected (gray)
+1 ICON "ekranlink.ico"
+2 ICON "ekranlink-bosta.ico"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION EKRANLINK_VERSION_MAJOR, EKRANLINK_VERSION_MINOR, EKRANLINK_VERSION_PATCH, 0
+PRODUCTVERSION EKRANLINK_VERSION_MAJOR, EKRANLINK_VERSION_MINOR, EKRANLINK_VERSION_PATCH, 0
+FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "EkranLink"
+            VALUE "FileDescription", "EkranLink"
+            VALUE "FileVersion", EKRANLINK_VERSION
+            VALUE "LegalCopyright", "GPL-3.0"
+            VALUE "ProductName", "EkranLink"
+            VALUE "ProductVersion", EKRANLINK_VERSION
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

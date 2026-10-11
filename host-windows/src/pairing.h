@@ -1,4 +1,4 @@
-// Eşleşmiş tabletlerin kalıcı anahtarları: HKCU\Software\EKRAN\Pairs\<cihaz kimliği>
+// Eşleşmiş tabletlerin kalıcı anahtarları: HKCU\Software\EkranLink\Pairs\<cihaz kimliği>
 #pragma once
 
 #include <array>

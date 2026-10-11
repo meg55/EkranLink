@@ -1,17 +1,17 @@
-# EKRAN sanal ekran sürücüsü
+# EkranLink sanal ekran sürücüsü
 
 Tablet bağlanınca Windows'a tabletin kendi çözünürlüğünde gerçek bir monitör ekleyen, ayrılınca
 kaldıran IddCx (Indirect Display) sürücüsü. Kullanıcı modunda (UMDF 2) çalışır; çekirdeğe kod yüklemez.
 
 ## Kaynak ve lisans
 
-Bu klasör **EKRAN'ın geri kalanından ayrı lisanslıdır.**
+Bu klasör **EkranLink'in geri kalanından ayrı lisanslıdır.**
 
 - [SudoVDA](https://github.com/SudoMaker/SudoVDA) (SudoMaker) tabanlıdır — lisansı: *"MIT and CC0 or
   Public Domain … choose the least restrictive option"*.
 - SudoVDA, Microsoft'un [Indirect Display Driver örneğine](https://github.com/microsoft/Windows-driver-samples/tree/main/video/IndirectDisplay)
   dayanır — lisansı: MS-PL.
-- EKRAN değişiklikleri (MIT): EKRAN'a özel donanım kimliği / arayüz GUID'i / kayıt defteri yolu
+- EkranLink değişiklikleri (MIT): EkranLink'e özel donanım kimliği / arayüz GUID'i / kayıt defteri yolu
   (SudoVDA veya Apollo kurulu makinelerde çakışmasın), dış girdiler için sınır denetimleri ve
   sonlandırılmış dizgiler (EDID'e kopyalanan 14 baytlık alanlar), tabletin fiziksel boyutunun EDID'e
   yazılması (Windows ölçeklemeyi buna göre önerir), "EKR" üretici kodu, gereksiz yüksek süreç önceliğinin
@@ -34,8 +34,8 @@ her tabletin ekran yerleşimini ve ölçeğini ayrı hatırlar.
 Gerekenler: Visual Studio Build Tools (MSVC x64) + WDK 10.0.26100. MSBuild'in sürücü araç setine gerek yok.
 
 ```powershell
-.\build.ps1      # out\EkranVD.dll + ekranvd.inf
-.\kur.ps1        # yönetici: imzala + güven + kök aygıtı oluştur (host-windows\build\ekran-surucu.exe gerekir)
+.\build.ps1      # out\EkranLinkVD.dll + ekranlinkvd.inf
+.\kur.ps1        # yönetici: imzala + güven + kök aygıtı oluştur (host-windows\build\ekranlink-surucu.exe gerekir)
 .\kaldir.ps1     # yönetici: aygıt, sürücü paketi, sertifika ve ayarları tamamen kaldırır
 ```
 

@@ -236,7 +236,7 @@ std::wstring programDataDir() {
     // SHGetKnownFolderPath değil: FOLDERID_* sabitleri libuuid'in 80 KB'lık nesnesini exe'ye çeker
     wchar_t p[MAX_PATH] = L"C:\\ProgramData";
     SHGetFolderPathW(nullptr, CSIDL_COMMON_APPDATA, nullptr, 0, p);
-    return std::wstring(p) + L"\\EKRAN";
+    return std::wstring(p) + L"\\EkranLink";
 }
 
 }  // namespace ekran::config

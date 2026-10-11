@@ -1,4 +1,4 @@
-// EKRAN protokol v1 sabitleri. Ayrıntı: docs/PROTOCOL.md
+// EkranLink protokol v1 sabitleri. Ayrıntı: docs/PROTOCOL.md
 #pragma once
 
 #include <cstdint>

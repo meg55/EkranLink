@@ -1,4 +1,4 @@
-// EKRAN sanal ekran sürücüsü (driver/) ile konuşur: tablet başına Windows'a gerçek bir monitör ekler/kaldırır.
+// EkranLink sanal ekran sürücüsü (driver/) ile konuşur: tablet başına Windows'a gerçek bir monitör ekler/kaldırır.
 #pragma once
 
 #include <windows.h>

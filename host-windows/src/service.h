@@ -1,4 +1,4 @@
-// "Oturum açılmadan önce başlat": EKRAN Windows hizmeti.
+// "Oturum açılmadan önce başlat": EkranLink Windows hizmeti.
 //
 //   hizmet (Oturum 0, SYSTEM)  →  ekrandaki oturumda ajanı başlatır, çökerse yeniden başlatır,
 //                                  kullanıcı değişince yeni oturuma taşır
@@ -13,7 +13,7 @@
 
 namespace ekran::service {
 
-constexpr const wchar_t* kName = L"EKRAN";
+constexpr const wchar_t* kName = L"EkranLink";
 
 int runService();  // --hizmet (hizmet denetleyicisi başlatır)
 int runAgent();    // --ajan

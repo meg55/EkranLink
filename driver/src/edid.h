@@ -5,7 +5,7 @@
 #define EDID_OFFSET_PRODNAME 0x71
 #define EDID_STRING_FIELD_SIZE 13
 
-// Not: bu dosya SudoVDA'dan (MIT) türetilmiştir; EKRAN: üretici kodu, fiziksel boyut.
+// Not: bu dosya SudoVDA'dan (MIT) türetilmiştir; EkranLink: üretici kodu, fiziksel boyut.
 
 const BYTE edid_base[] = {
 	0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x4d, 0xab, 0xce, 0xd1, 0xef, 0x2d, 0xbc, 0x1a,

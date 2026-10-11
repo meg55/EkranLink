@@ -13,11 +13,11 @@ if (releaseSigningPath && file(releaseSigningPath).exists()) {
 }
 
 android {
-    namespace 'org.ekran.android'
+    namespace 'org.ekranlink.android'
     compileSdk 36
 
     defaultConfig {
-        applicationId 'org.ekran.android'
+        applicationId 'org.ekranlink.android'
         // 16 = Android 4.1: MediaCodec (donanım video çözücü) bu sürümde geldi.
         minSdk 16
         // Android 14+ çok eski targetSdk'li APK'ları kurmuyor; Google Play de güncel hedef istiyor.

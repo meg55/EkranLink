@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">EKRAN</string>
+    <string name="app_name" translatable="false">EkranLink</string>
 
     <!-- Karşılama ekranı -->
     <string name="welcome_tagline">This device is ready to be your computer\'s screen.</string>
-    <string name="welcome_usb_step">Plug in the cable. EKRAN must be running on the computer and USB debugging must be enabled on this device.</string>
+    <string name="welcome_usb_step">Plug in the cable. EkranLink must be running on the computer and USB debugging must be enabled on this device.</string>
     <string name="welcome_wifi_found">A computer on the same network finds this device automatically.\nThis device\'s address: %1$s</string>
     <string name="welcome_wifi_none">This device is not connected to a Wi-Fi network. You can connect over USB.</string>
     <string name="auto_open_title">Open automatically when plugged into a computer</string>
-    <string name="auto_open_hint">In EKRAN on the computer, \"Connect automatically\" must also be on</string>
+    <string name="auto_open_hint">In EkranLink on the computer, \"Connect automatically\" must also be on</string>
     <string name="toggle_on">On</string>
     <string name="toggle_off">Off</string>
     <string name="footer_version">%1$s · version %2$s</string>
@@ -23,8 +23,8 @@
     <string name="status_connected_usb">Connected · USB</string>
     <string name="status_connection_lost">Connection lost</string>
     <string name="status_port_busy">Port %1$d is used by another app; will connect once it closes</string>
-    <string name="status_pc_newer">EKRAN on the computer is newer: install the new version of EKRAN on this device</string>
-    <string name="status_pc_older">EKRAN on the computer is outdated: install the new version of EKRAN on the computer</string>
+    <string name="status_pc_newer">EkranLink on the computer is newer: install the new version of EkranLink on this device</string>
+    <string name="status_pc_older">EkranLink on the computer is outdated: install the new version of EkranLink on the computer</string>
 
     <!-- Ölçüm kartı -->
     <string name="stat_video">Video</string>
@@ -52,6 +52,6 @@
 
     <!-- Bildirim -->
     <string name="notif_channel">Computer connection</string>
-    <string name="notif_title">EKRAN · connected to computer (%1$s)</string>
+    <string name="notif_title">EkranLink · connected to computer (%1$s)</string>
     <string name="notif_text">Tap to return to the screen</string>
 </resources>
