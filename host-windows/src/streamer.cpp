@@ -383,7 +383,7 @@ bool Streamer::runSession(const std::string& host, const std::string& link, cons
             s.height = H;
             s.refreshHz = 60;
             s.monitorGuid = VirtualDisplay::guidFor(conn.deviceId());
-            s.name = "EkranLink Tablet";
+            s.name = "EkranLink";  // EDID monitör adı en çok 13 karakter
             s.serial = conn.deviceId().substr(0, 13);
             const double dpi = hello.dpi ? hello.dpi : 160;  // Windows ölçeklemeyi bu boyuta göre önerir
             s.widthMm = int(W * 25.4 / dpi + 0.5);
