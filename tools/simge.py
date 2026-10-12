@@ -176,28 +176,33 @@ def svg():
         f.write(metin)
 
 
-def tanitim(dil, alt_yazi):
-    W, H = 1024, 500
+def tanitim(ad, alt_yazi, W=1024, H=500):
+    # Yerleşim 1024x500 için; başka boyutta oranlanır ve dikeyde ortalanır
+    o = W / 1024
+    dy = (H - 500 * o) / 2
+    p = lambda x, y: (round(x * o), round(y * o + dy))
     im = egim(W // 4, H // 4, ARKA_UST, ARKA_ALT).resize((W, H), Image.BILINEAR).convert('RGBA')
-    logo = ciz(300, arka=None)
-    im.alpha_composite(logo, (70, 100))
+    logo = ciz(round(300 * o), arka=None)
+    im.alpha_composite(logo, p(70, 100))
     yazi_yolu = r'C:\Program Files\Android\Android Studio\jbr\lib\fonts'
-    kalin = ImageFont.truetype(os.path.join(yazi_yolu, 'DroidSans-Bold.ttf'), 104)
-    normal = ImageFont.truetype(os.path.join(yazi_yolu, 'DroidSans.ttf'), 38)
+    kalin = ImageFont.truetype(os.path.join(yazi_yolu, 'DroidSans-Bold.ttf'), round(104 * o))
+    normal = ImageFont.truetype(os.path.join(yazi_yolu, 'DroidSans.ttf'), round(38 * o))
     d = ImageDraw.Draw(im)
-    d.text((410, 150), 'EkranLink', font=kalin, fill=BEYAZ)
+    d.text(p(410, 150), 'EkranLink', font=kalin, fill=BEYAZ)
     y = 290
     for satir in alt_yazi:
-        d.text((414, y), satir, font=normal, fill=(225, 236, 255))
+        d.text(p(414, y), satir, font=normal, fill=(225, 236, 255))
         y += 50
-    im.convert('RGB').save(yol('art', 'play-feature-%s.png' % dil))
+    im.convert('RGB').save(yol('art', ad + '.png'))
 
 
 def main():
     svg()
     ciz(512, arka='kare').convert('RGB').save(yol('art', 'play-icon-512.png'))
-    tanitim('tr', ['Eski tablet ve telefonları', 'bilgisayarınıza ekran yapın'])
-    tanitim('en', ['Turn old tablets and phones', 'into displays for your PC'])
+    tanitim('play-feature-tr', ['Tablet ve telefonunuzu', 'bilgisayarınıza ekran yapın'])
+    tanitim('play-feature-en', ['Use your tablet or phone', 'as a display for your PC'])
+    # GitHub depo önizlemesi (Settings > Social preview; elle yüklenir)
+    tanitim('github-social-preview', ['Use your tablet or phone', 'as a display for your PC'], 1280, 640)
     ico('ekranlink.ico')
     ico('ekranlink-bosta.ico', gri)
     for yogunluk, olcu in (('mdpi', 1), ('hdpi', 1.5), ('xhdpi', 2), ('xxhdpi', 3), ('xxxhdpi', 4)):

@@ -74,7 +74,7 @@ foreach ($f in 'adb.exe', 'AdbWinApi.dll', 'AdbWinUsbApi.dll', 'NOTICE.txt') {
 Copy-Item (Join-Path $kok 'LICENSE') $hedef
 
 @"
-EkranLink $versionName — eski tabletleri bilgisayar ekranı yapın
+EkranLink $versionName — Android tablet ve telefonunuzu bilgisayar ekranı yapın
 ===========================================================
 
 Kurulum gerekmez. EkranLink.exe'yi çalıştırın: ayar penceresi açılır (soldaki menü: Durum, Bağlantı,

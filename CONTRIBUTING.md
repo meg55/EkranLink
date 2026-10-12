@@ -15,11 +15,11 @@ Yeni bir cihazda çalıştıysa ya da çalışmadıysa bu da değerli: [docs/DEV
 
 ## Kod katkısı
 
-- Derleme: [README](README.md#derlemek). Göndermeden önce `.\tools\paketle.ps1` hatasız bitmeli (testleri de
+- Derleme: [README](README.tr.md#kaynaktan-derlemek). Göndermeden önce `.\tools\paketle.ps1` hatasız bitmeli (testleri de
   çalıştırır).
 - Küçük, tek konulu değişiklikler tercih edilir. Büyük bir değişiklikten önce issue açıp konuşalım.
 - Öncelikler: kullanıcı deneyimi (ayar değiştirmek ekranı kırpıştırmamalı, adlar Windows'la tutarlı) ve
-  düşük sistem yükü (eski cihazlar ve ekransız mini PC'ler hedefte).
+  düşük sistem yükü (düşük güçlü cihazlar ve ekransız mini PC'ler de hedefte).
 - Kod çevresindeki koda benzesin: yorumlar ve günlük satırları Türkçe, kullanıcıya görünen metinler hem
   Türkçe hem İngilizce (`host-windows/src/i18n.h`, `android/app/src/main/res/values*/strings.xml`).
 - Android tarafı Android 4.1'de (API 16) de çalışmalı; yeni API'leri sürüm denetimiyle kullanın.

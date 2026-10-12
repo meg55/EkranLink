@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     EkranLink sanal ekran sürücüsünü tamamen kaldırır: aygıt, sürücü paketi, sertifika, ayarlar. Yönetici olarak çalışır.
 #>

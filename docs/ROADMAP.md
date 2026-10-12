@@ -1,6 +1,6 @@
 # EkranLink yol haritası
 
-Eski tablet ve telefonları bilgisayar için ekran yapan açık kaynak uygulama: yansıtma, ikinci ekran
+Android tablet ve telefonları Windows bilgisayar için ekran yapan açık kaynak uygulama: yansıtma, ikinci ekran
 ve Windows'un tek ekranı olarak; USB veya Wi-Fi ile.
 
 ## Kararlar

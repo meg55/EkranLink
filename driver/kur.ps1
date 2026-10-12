@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     EkranLink sanal ekran sürücüsünü bu bilgisayar için imzalar ve kurar. Yönetici olarak çalışır.
 

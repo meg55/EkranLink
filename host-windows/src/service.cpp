@@ -531,7 +531,7 @@ int install() {
                              nullptr, nullptr, nullptr, nullptr, nullptr);
     }
     SERVICE_DESCRIPTIONW desc{const_cast<wchar_t*>(
-        L"Eski tabletleri bu bilgisayarın ekranı yapar; oturum açma ekranı ve UAC dahil.")};
+        L"Android tablet ve telefonları bu bilgisayarın ekranı yapar; oturum açma ekranı ve UAC dahil.")};
     ChangeServiceConfig2W(svc, SERVICE_CONFIG_DESCRIPTION, &desc);
     SC_ACTION actions[3] = {{SC_ACTION_RESTART, 5000}, {SC_ACTION_RESTART, 5000}, {SC_ACTION_RESTART, 30000}};
     SERVICE_FAILURE_ACTIONSW fa{};

@@ -1,128 +1,194 @@
-# <img src="art/ekranlink.svg" width="48" align="top" alt=""> EkranLink
+<p align="center">
+  <img src="art/ekranlink.svg" width="96" alt="EkranLink logo">
+</p>
 
-[![Derleme](https://github.com/meg55/EkranLink/actions/workflows/derle.yml/badge.svg)](https://github.com/meg55/EkranLink/actions/workflows/derle.yml)
+<h1 align="center">EkranLink</h1>
 
-Eski tablet ve telefonlarınızı bilgisayarınız için ekran yapın: **yansıtma**, **ikinci ekran** veya
-**Windows'un tek ekranı** olarak, **USB** ya da **Wi-Fi** ile. Android 4.1'e kadar eski cihazları destekler.
+<p align="center">
+  <b>Use your Android tablet or phone as a monitor for your Windows PC — over USB or Wi-Fi.</b><br>
+  Extend your desktop, make the device the PC's only screen, or mirror. Free and open source.
+</p>
 
-*Turn old tablets and phones into displays for your PC — mirror, extend, or use as the only screen,
-over USB or Wi-Fi. Supports devices as old as Android 4.1.*
+<p align="center">
+  <b>English</b> · <a href="README.tr.md">Türkçe</a>
+</p>
 
-> **Durum:** yansıtma ve **ikinci ekran** (USB ve şifreli Wi-Fi), dokunmatik fare, otomatik bulma ve kurulum çalışıyor.
-> İkinci ekran için sanal ekran sürücüsü şimdilik yalnızca derlendiği bilgisayarda kurulabiliyor ([driver/](driver/README.md)).
-> Plan ve ölçümler: [docs/ROADMAP.md](docs/ROADMAP.md) · Test edilen cihazlar: [docs/DEVICES.md](docs/DEVICES.md)
+<p align="center">
+  <a href="https://github.com/meg55/EkranLink/actions/workflows/derle.yml"><img src="https://github.com/meg55/EkranLink/actions/workflows/derle.yml/badge.svg" alt="Build"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License: GPL-3.0"></a>
+  <img src="https://img.shields.io/badge/Windows-10%201809%2B%20%7C%2011-0078D4" alt="Windows 10 1809+ / 11">
+  <img src="https://img.shields.io/badge/Android-4.1%2B-3DDC84" alt="Android 4.1+">
+</p>
 
-## Neden?
+<p align="center">
+  <img src="art/screenshots/display-en.png" width="620" alt="EkranLink settings window, Display page: Extend, Only this, Mirror">
+</p>
 
-- Mevcut çözümlerin çoğu kapalı kaynak ve Android 5.0+ istiyor; çekmecedeki 4.x tabletler dışarıda kalıyor.
-- Hedef, "eski tableti tak, harici monitör olsun" deneyimi: USB'yi takınca Windows'ta yeni bir monitör belirir.
+EkranLink turns an Android tablet or phone into a real monitor for a Windows PC. With the virtual display
+driver, Windows sees an ordinary monitor at the device's native resolution: you can drag windows onto it,
+rotate it and set its resolution in Windows Settings. Touch on the device works like a Windows touch
+screen.
 
-## Depo yapısı
+It works with current tablets and phones and with devices as old as Android 4.1. No account, no
+internet connection, no ads, nothing to configure on most setups.
 
+## Features
+
+- **Three display modes:** *Extend* (a separate monitor), *Only this* (the device becomes the PC's only
+  screen and the other monitors turn off while it is connected, handy for a headless mini PC) and *Mirror*.
+- **USB or Wi-Fi.** Devices are found automatically. Wi-Fi traffic is encrypted (ECDH P-256 +
+  ChaCha20-Poly1305); the first Wi-Fi connection is confirmed with the same 6-digit code on both screens.
+- **Touch:** real Windows multi-touch (up to 10 fingers: scroll, pinch to zoom, press and hold for right
+  click, touch keyboard) or a simple mouse mode.
+- **Several devices at once,** each as its own monitor. Connect or disconnect each one from the window or
+  the tray menu.
+- **Follows the device:** turn the tablet upright and the Windows monitor turns portrait. Resolution and
+  orientation are remembered per device.
+- **Sign-in screen:** optionally runs as a Windows service, so the lock screen, sign-in screen and UAC
+  prompts appear on the device too.
+- **Light on the system:** the picture never leaves the GPU on the PC (capture, scaling, hardware H.264
+  encoding); nothing is sent while the screen is still; the mouse cursor is drawn on the device. Idle CPU use is
+  practically zero.
+- **Low latency:** about 20–40 ms from PC to screen over USB, measured on a 2013 tablet
+  ([measurements](docs/ROADMAP.md)).
+- **Bilingual:** English and Turkish user interface.
+
+## Status
+
+| | |
+|---|---|
+| Mirror, extend, only-this-screen, USB, Wi-Fi, touch, several devices, service mode | Working |
+| Windows installer and portable zip | Working; first public release in preparation |
+| Virtual display driver (needed for *Extend* and *Only this*) | Working, but **not yet code-signed** for distribution: for now it can only be installed by building it yourself ([driver/](driver/README.md)). Without the driver, EkranLink mirrors. |
+| Android app on Google Play | Planned; meanwhile the APK is a separate download |
+| macOS, Linux, iPad | Not yet |
+
+The plan and measurements are in [docs/ROADMAP.md](docs/ROADMAP.md); tested devices in [docs/DEVICES.md](docs/DEVICES.md).
+
+## Getting started
+
+1. **PC:** download `EkranLink-<version>-windows-setup.exe` from [Releases](https://github.com/meg55/EkranLink/releases)
+   and install it. To try it without installing, unzip `EkranLink-<version>-windows.zip` and run `EkranLink.exe`.
+   A settings window opens and an icon appears next to the clock.
+2. **Device:** install `EkranLink-<version>-android.apk` on the tablet or phone (open the download on the
+   device, or copy it over USB and open it with a file manager). The PC never installs apps on the device.
+   For USB, turn on *Developer options > USB debugging* on the device.
+3. **Connect:** open EkranLink on the device. Plug in the USB cable, or join the same Wi-Fi network as the PC.
+   The PC finds the device by itself (USB first). On the first Wi-Fi connection, confirm the 6-digit code
+   on both screens.
+
+Three-finger tap on the device shows or hides the performance overlay.
+
+## Using EkranLink
+
+**Display modes** (*Display* page): *Extend*, *Only this* (other monitors turn off while the device is
+connected and come back when it leaves) and *Mirror*. When Windows turns the screens off, the device
+screen goes dark too.
+
+**Orientation and resolution** (*Display* page): with *Automatic*, turning the device upright turns the
+Windows monitor portrait (auto-rotate must be on on the device). The resolution list is the same as in
+Windows Settings > Display, with the device's own resolution marked *(Recommended)*. Changes made in
+either place show up in the other and are remembered per device.
+
+**Connecting automatically:** *Connection > Connect automatically when a device is found* on the PC and
+*Open automatically when plugged into a computer* on the device's welcome screen. With both on, plugging
+in the device is enough. Otherwise click *Connect* in the *Status* page list, or open EkranLink on the device.
+
+**Several devices:** each connected device has a *Disconnect* button on the *Status* page; devices that
+were found but are not connected have *Connect* (also in the tray's right-click menu). A device you
+disconnect is not reconnected automatically until you connect it again or unplug it.
+
+**In the background:** you can switch to another app on the device; the Windows monitor stays, and the
+picture resumes when you come back. To disconnect from the device, use the notification or the
+three-finger overlay.
+
+**Headless mini PC:** *General > Start before sign-in* (asks for administrator permission once). EkranLink
+then runs as a Windows service from boot; the lock and sign-in screens appear on the device (swipe up on
+the lock screen). Windows shows the lock screen only on the main monitor.
+
+Settings apply without dropping the connection: touch, performance, auto-connect, orientation, resolution
+and *Extend ↔ Only this* apply instantly; *Mirror ↔ Extend* rebuilds the picture while the device stays
+connected.
+
+**Language:** *General > Language* on the PC (System / Türkçe / English); the device uses its own language.
+
+## FAQ
+
+**Does it only work with old tablets?** No. It works with current Android tablets and phones; support for
+devices back to Android 4.1 is a bonus, not a requirement.
+
+**Does it need the internet or an account?** No. Everything stays between your PC and your device. Over
+Wi-Fi both must be on the same local network.
+
+**Why Android 4.1?** That is when Android got the hardware video decoder API (MediaCodec) that EkranLink
+uses. The app is written without AndroidX so it keeps working there.
+
+**Is Wi-Fi safe?** Each Wi-Fi connection uses fresh ECDH keys and authenticated encryption, and a new PC
+must be approved on the device with a 6-digit code. USB connections are local and not encrypted. See
+[docs/PROTOCOL.md](docs/PROTOCOL.md) and [SECURITY.md](SECURITY.md).
+
+**Can I use an iPad or a Mac?** Not yet. A Windows PC and an Android device are required for now.
+
+## How it works
+
+```mermaid
+flowchart LR
+  subgraph PC["Windows PC"]
+    VD["Virtual display driver<br/>(IddCx, Extend / Only this)"]
+    CAP["DXGI Desktop Duplication"]
+    VP["GPU video processor<br/>scale + NV12"]
+    ENC["Hardware H.264 encoder<br/>(Media Foundation)"]
+    INJ["Touch injection"]
+    VD --> CAP --> VP --> ENC
+  end
+  subgraph DEV["Android device"]
+    DEC["MediaCodec hardware decoder"] --> SURF["Full-screen surface<br/>+ local cursor"]
+    TOUCH["Touch"]
+  end
+  ENC -- "TCP 27183<br/>USB: adb forward · Wi-Fi: encrypted" --> DEC
+  TOUCH -- "touch events" --> INJ
 ```
-android/        Android istemci (Java, minSdk 16)
-host-windows/   Windows sunucusu (C++, MinGW ile derlenir)
-driver/         Sanal ekran sürücüsü (IddCx, SudoVDA tabanlı, MSVC + WDK ile derlenir; ayrı lisans)
-docs/           Yol haritası, protokol, cihaz listesi
-tools/          Geliştirme ve ölçüm betikleri
-```
 
-## Kullanım
+The PC always opens the connection (USB through `adb forward`, Wi-Fi directly to the device), so the
+same code path works on Android 4.x, which has no `adb reverse`. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+and the wire protocol in [docs/PROTOCOL.md](docs/PROTOCOL.md).
 
-1. [Sürümler](https://github.com/meg55/EkranLink/releases) sayfasından `EkranLink-<sürüm>-windows-setup.exe`'yi
-   indirip kurun (Program Files'a kurulur; Başlat menüsünde ve *Uygulamalar* listesinde görünür, oradan
-   kaldırılır). Kurmadan denemek için `EkranLink-<sürüm>-windows.zip`'i açıp `EkranLink.exe`'yi çalıştırın.
-   Ayar penceresi açılır ve saatin yanında bir monitör simgesi belirir. Pencerenin solundaki menüyle
-   sayfalar arasında geçilir: *Durum, Bağlantı, Görüntü, Dokunma ve performans, Genel*. Pencereyi
-   kapatmak EkranLink'i kapatmaz; simgeye tıklayınca yeniden açılır (sağ tık: kısa menü, çıkış).
-2. Tablet uygulaması ayrı indirilir: `EkranLink-<sürüm>-android.apk` dosyasını tablete kurun (tabletin
-   tarayıcısıyla indirip açın ya da USB ile kopyalayıp dosya yöneticisinden açın). PC tablete uygulama
-   kurmaz. İki uygulamanın sürümü uyuşmazsa ikisi de hangisinin güncelleneceğini söyler.
-   USB ile bağlanmak için tablette *Geliştirici seçenekleri > USB hata ayıklama* açık olmalı.
-3. Tablette EkranLink açıkken bilgisayar tableti kendiliğinden bulur (önce USB, yoksa Wi-Fi).
-   Wi-Fi ile ilk bağlantıda iki cihazda aynı 6 haneli kod görünür; ikisinde de onaylayın.
+## Building from source
 
-Tablet Windows'a çoklu dokunmatik ekran olarak bağlanır: kaydırma, iki parmakla yakınlaştırma, basılı tutunca sağ tık.
-Üç parmakla dokunmak ölçümleri gösterir/gizler.
-
-**Ekransız mini PC:** pencerede *Genel > Oturum açılmadan önce başlat* (bir kez yönetici izni ister). EkranLink Windows
-hizmeti olarak açılışta başlar; kilit ekranı ve şifre ekranı tablette görünür, tabletten açılır (kilit
-perdesini yukarı kaydırın). Windows kilit ekranını yalnızca ana monitörde gösterir.
-
-**Otomatik bağlanma:** PC'de *Bağlantı > Cihaz bulununca otomatik bağlan*, tablette karşılama ekranındaki
-*Bilgisayara takılınca otomatik aç*. İkisi de açıksa tableti takmanız yeterli; biri kapalıysa pencerenin
-*Durum* sayfasındaki listeden *Bağlan*'a tıklayın ya da tablette EkranLink'i açın.
-
-**Birden çok cihaz:** Birden çok tablet ya da telefon aynı anda bağlanabilir; her biri Windows'ta ayrı bir
-monitör olur. *Durum* sayfasında her bağlı cihazın *Bağlantıyı kes* düğmesi, bulunan ama bağlı olmayan
-cihazların *Bağlan* düğmesi vardır (sağ tık menüsünde de). Bağlantısını kestiğiniz cihaza, siz yeniden
-bağlanana ya da cihaz çıkarılana kadar otomatik bağlanılmaz. Çözünürlük ve son kullanılan yön cihaz başına
-hatırlanır.
-
-**Arka plan:** Tabletteki uygulamayı alta alıp başka uygulama kullanabilirsiniz; Windows'taki monitör
-kopmaz, dönünce görüntü kaldığı yerden sürer. Bağlantıyı kesmek için bildirimdeki ya da ölçüm kartındaki
-(üç parmak) *Bağlantıyı kes*.
-
-Görüntü modları (pencerede *Görüntü*): **İkinci ekran**, **Tek ekran** (tablet bağlıyken diğer monitörler
-kapanır, tablet ayrılınca geri gelir) ve **Yansıtma**. Windows ekranı kapatınca tablet de kararır.
-
-**Monitör yönü** (*Görüntü > Monitör yönü*): *Otomatik*te tableti dik çevirmek Windows'taki monitörü de
-dikey yapar (tablette *Otomatik döndür* açık olmalı). *Yatay / Dikey / ters* seçilirse tablet ne gösterirse
-göstersin o yön kullanılır. Seçim ve Windows ekran ayarlarından yapılan değişiklik hatırlanır; tablet her
-bağlanışta aynı yönde açılır.
-
-**Ekran çözünürlüğü** (*Görüntü*): Windows Ayarlar > Ekran'daki listenin aynısı, aynı biçimde
-("1600 × 940"); cihazın kendi çözünürlüğü *(Önerilen)* diye işaretlidir. Seçim cihaz başına hatırlanır
-(tablet ve telefon ayrı). Windows'tan yapılan değişiklik EkranLink'te de görünür ve kaydedilir.
-
-Ayarlar bağlantıyı koparmadan uygulanır: dokunma, performans, otomatik bağlan, yön, çözünürlük ve ikinci
-ekran ↔ tek ekran anında; yansıtma ↔ ikinci ekran ve yansıtılan ekran görüntü yeniden kurularak (tablet
-bağlı kalır). Bağlantı yalnızca bağlantı türü şimdiki bağlantıyı dışarıda bırakırsa (ör. USB'deyken
-"Sadece Wi-Fi") yeniden kurulur.
-
-**Dil:** Bilgisayarda pencerede *Genel > Dil* (Sistem / Türkçe / English); tablet ve telefonda cihazın
-dili kullanılır. Uygulama telefonlarda da çalışır (küçük ekranda düzen sıkışır, gerekirse kayar).
-
-## Derlemek
-
-Gerekenler: JDK 17+ ve Android SDK (Android Studio ile gelir), MinGW-w64 GCC + CMake + Ninja
-(`winget install BrechtSanders.WinLibs.POSIX.MSVCRT`). Visual Studio gerekmez.
+Requirements: JDK 17+ and the Android SDK (Android Studio includes both), MinGW-w64 GCC + CMake + Ninja
+(`winget install BrechtSanders.WinLibs.POSIX.MSVCRT`), Inno Setup 6 for the installer. Visual Studio is not
+needed except for the driver (MSVC + WDK, see [driver/README.md](driver/README.md)).
 
 ```powershell
-.\tools\paketle.ps1                          # her şeyi derler, testleri çalıştırır, zip üretir
-.\host-windows\build.ps1                     # yalnızca Windows tarafı
-.\host-windows\build\ekranlink-host.exe          # konsol sürümü, saniyelik ölçümlerle (--usb / --wifi / --ip)
-.\host-windows\build\ekranlink-test.exe          # şifreleme test vektörleri (RFC 8439)
+.\tools\paketle.ps1                         # builds everything, runs tests, writes dist\ (setup, zip, apk)
+.\host-windows\build.ps1                    # Windows side only
+.\host-windows\build\ekranlink-host.exe     # console version with per-second stats (--usb / --wifi / --ip)
+.\host-windows\build\ekranlink-test.exe     # encryption test vectors (RFC 8439)
 ```
 
-Tanı için ham akış testi: `.\tools\faz0.ps1` (ffmpeg gerekir).
+Every push is built by [GitHub Actions](.github/workflows/derle.yml).
 
-## Katkı ve güvenlik
+## Repository layout
 
-Hata bildirimi ve katkı: [CONTRIBUTING.md](CONTRIBUTING.md). Güvenlik açıklarını herkese açık issue yerine
-gizli bildirin: [SECURITY.md](SECURITY.md).
+```
+android/        Android app (Java, minSdk 16, no AndroidX)
+host-windows/   Windows app (C++20, MinGW): tray app + settings window, Windows service, console tool, installer
+driver/         Virtual display driver (IddCx, based on SudoVDA; MSVC + WDK; separately licensed)
+docs/           Architecture, wire protocol, roadmap and measurements, device list
+tools/          Packaging, icon generation and measurement scripts
+art/            Logo, store graphics, screenshots
+```
 
-## Lisans
+Source comments, log lines and most docs are in Turkish; user-facing text is in English and Turkish. A
+glossary of the Turkish names used in code is in [AGENTS.md](AGENTS.md).
 
-EkranLink [GPL-3.0](LICENSE) ile lisanslıdır. Sanal ekran sürücüsü ([driver/](driver/)) ayrı bir programdır;
-Microsoft örneğine dayandığı için MS-PL, EkranLink değişiklikleri MIT ile lisanslıdır
-([driver/LICENSE](driver/LICENSE)).
+## Contributing
 
-## English
+Bug reports, device test results and pull requests are welcome, in English or Turkish. See
+[CONTRIBUTING.md](CONTRIBUTING.md). Please report security issues privately as described in
+[SECURITY.md](SECURITY.md). If you use an AI coding assistant, point it to [AGENTS.md](AGENTS.md).
 
-EkranLink turns old Android tablets and phones (Android 4.1+) into displays for a Windows PC, over USB or
-encrypted Wi-Fi: as a **second screen** (a real virtual monitor, via an IddCx driver), as the **only screen**
-(e.g. for a headless mini PC, including the Windows sign-in screen), or as a **mirror**. Touch is sent back
-as Windows multi-touch. Several devices can be connected at once, each as its own monitor.
+## License
 
-1. Install `EkranLink-<version>-windows-setup.exe` from [Releases](https://github.com/meg55/EkranLink/releases),
-   or run `EkranLink.exe` from the portable Windows zip. A settings window opens and an icon appears in the
-   notification area.
-2. Install `EkranLink-<version>-android.apk` on the device (downloaded separately; the PC never installs
-   apps on the device). For USB, enable *Developer options > USB debugging*.
-3. Open EkranLink on the device; the PC finds it (USB first, then Wi-Fi). On the first Wi-Fi connection,
-   confirm the same 6-digit code on both sides.
-
-The user interface is available in English and Turkish; most documentation is currently in Turkish.
-Building: see *Derlemek* above (JDK 17+, Android SDK, MinGW-w64 GCC, CMake, Ninja). License: GPL-3.0; the
-driver in `driver/` is MS-PL / MIT.
+EkranLink is licensed under [GPL-3.0](LICENSE). The virtual display driver in [driver/](driver/) is a
+separate program, licensed under MS-PL / MIT ([driver/LICENSE](driver/LICENSE)).

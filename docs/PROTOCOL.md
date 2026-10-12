@@ -64,7 +64,7 @@ kuvvetle denenemez. İki taraf da onaylarsa yeni eşleşme anahtarı `HMAC(PRK, 
 Tablette "Reddet" bağlantıyı kapatır; PC bunu da ret sayar ve o tableti 1 dakika tekrar sormaz.
 
 **USB** (adb forward; tablette bağlantı 127.0.0.1'den gelir): kablo + adb yetkisi güvenilir kabul
-edilir; eşleştirme onaysız yapılır ve eski tabletin işlemcisini yormamak için `şifreli = 0` seçilir.
+edilir; eşleştirme onaysız yapılır ve tabletin işlemcisini yormamak için `şifreli = 0` seçilir.
 Tablet, yerel olmayan bir bağlantıdan gelen `şifreli = 0` isteğini reddeder.
 
 Eşleşmiş bir cihazın anahtarı tutmazsa `Hello` doğrulanamaz; PC kendi kaydını siler ve bir
