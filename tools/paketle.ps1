@@ -1,10 +1,12 @@
 ﻿<#
 .SYNOPSIS
-    İki ayrı indirme üretir: dist\EkranLink-<sürüm>-windows.zip ve dist\EkranLink-<sürüm>-android.apk
+    İndirmeleri üretir: dist\EkranLink-<sürüm>-windows-setup.exe (kurulum), dist\EkranLink-<sürüm>-windows.zip
+    (taşınabilir) ve dist\EkranLink-<sürüm>-android.apk
 
 .DESCRIPTION
     Windows paketi: EkranLink.exe (bildirim alanı), ekranlink-host.exe (konsol), adb\ (Android SDK platform-tools'tan),
-    BENIOKU.txt. Kurulum gerektirmez; zip'i açıp EkranLink.exe'yi çalıştırın.
+    BENIOKU.txt. Zip kurulum gerektirmez; zip'i açıp EkranLink.exe'yi çalıştırın. Kurulum programı Inno Setup 6 ile
+    derlenir (host-windows\installer\EkranLink.iss); Inno Setup yoksa atlanır (CI'da hata).
     Tablet uygulaması pakette yok: PC tablete uygulama kurmaz, APK ayrıca indirilip tablete kurulur.
 
     APK sürüm anahtarıyla imzalanır (v1+v2+v3; Android 4.x için v1 şart). Anahtar depoda değildir; yolu
@@ -120,6 +122,21 @@ $zip = Join-Path $dist "$ad.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }
 Compress-Archive -Path $hedef -DestinationPath $zip
 '{0}  ({1:N1} MB)' -f $zip, ((Get-Item $zip).Length / 1MB)
+
+# --- Kurulum programı (Inno Setup 6) ---
+$iscc = @((Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source,
+          (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe')) | Where-Object { $_ -and (Test-Path $_) } |
+        Select-Object -First 1
+if ($iscc) {
+    & $iscc /Q "/DSurum=$versionName" "/DKaynak=$hostBuild" "/DAdb=$pt" "/O$dist" (Join-Path $kok 'host-windows\installer\EkranLink.iss')
+    if ($LASTEXITCODE -ne 0) { throw 'Kurulum programı derlenemedi (ISCC)' }
+    $setup = Join-Path $dist "EkranLink-$versionName-windows-setup.exe"
+    '{0}  ({1:N1} MB)' -f $setup, ((Get-Item $setup).Length / 1MB)
+} elseif ($env:CI) {
+    throw 'Inno Setup 6 bulunamadı (ISCC.exe)'
+} else {
+    Write-Warning 'Inno Setup 6 yok: kurulum programı atlandı (winget install JRSoftware.InnoSetup)'
+}
 
 $apkHedef = Join-Path $dist "EkranLink-$versionName-android.apk"
 Copy-Item -Force $apk $apkHedef

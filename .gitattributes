@@ -5,3 +5,4 @@
 *.png binary
 *.ico binary
 *.ttf binary
+*.iss text eol=crlf

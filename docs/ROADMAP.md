@@ -165,6 +165,13 @@ MSVC + WDK ile derlenip yerel sertifikayla imzalanıyor.
 - [x] Otomatik derleme (GitHub Actions, `.github/workflows/derle.yml`): her yüklemede Android + Windows derlenir,
       şifreleme testleri çalışır, sürücü derlenir (imzasız); `v*` etiketinde paketler taslak sürüm olur (yayımlamak
       elle). Derleyici yereldekiyle aynı (WinLibs GCC 16.1.0, özetiyle doğrulanır); eylemler commit koduyla sabit
+- [x] Windows kurulum programı (Inno Setup, `host-windows/installer/EkranLink.iss`; Türkçe / İngilizce): Program
+      Files\EkranLink, Başlat menüsü, *Uygulamalar* listesinden kaldırma, isteğe bağlı Windows ile başlatma
+      (kurulumu başlatan kullanıcının kaydına). Güncellemede çalışan EkranLink düzgünce kapanır (WM_CLOSE), hizmet
+      kuruluysa durdurulup yeni sürümle yeniden kurulur; sessiz güncellemede (winget) tepsi arka planda yeniden
+      açılır. Kaldırırken hizmet kaldırılır, ayar ve eşleşmeleri silmek sorulur. Hizmet modunu kapatmak kurulu
+      programı silmez. Zip taşınabilir sürüm olarak kalır. Denendi (hizmet modu açık PC): üstüne kurulum,
+      hizmeti kapat / aç, sessiz kaldırma, yeniden kurulum; yeniden başlatma gerekmedi. Sürücü henüz pakette yok
 - [ ] Dağıtım imzası (SignPath Foundation veya EV + Microsoft) — şu an sürücü yalnızca derlendiği bilgisayarda kurulabiliyor
 
 Ölçüm (S6000, USB, ikinci ekran 1280×752): PC→tablette çizim ~27 ms, ekran sabitken PC CPU %0,3.

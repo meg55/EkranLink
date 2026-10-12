@@ -29,7 +29,9 @@ tools/          Geliştirme ve ölçüm betikleri
 
 ## Kullanım
 
-1. `dist\EkranLink-<sürüm>-windows.zip` dosyasını açın, `EkranLink.exe`'yi çalıştırın (kurulum gerekmez).
+1. [Sürümler](https://github.com/meg55/EkranLink/releases) sayfasından `EkranLink-<sürüm>-windows-setup.exe`'yi
+   indirip kurun (Program Files'a kurulur; Başlat menüsünde ve *Uygulamalar* listesinde görünür, oradan
+   kaldırılır). Kurmadan denemek için `EkranLink-<sürüm>-windows.zip`'i açıp `EkranLink.exe`'yi çalıştırın.
    Ayar penceresi açılır ve saatin yanında bir monitör simgesi belirir. Pencerenin solundaki menüyle
    sayfalar arasında geçilir: *Durum, Bağlantı, Görüntü, Dokunma ve performans, Genel*. Pencereyi
    kapatmak EkranLink'i kapatmaz; simgeye tıklayınca yeniden açılır (sağ tık: kısa menü, çıkış).
@@ -113,8 +115,9 @@ encrypted Wi-Fi: as a **second screen** (a real virtual monitor, via an IddCx dr
 (e.g. for a headless mini PC, including the Windows sign-in screen), or as a **mirror**. Touch is sent back
 as Windows multi-touch. Several devices can be connected at once, each as its own monitor.
 
-1. Run `EkranLink.exe` from the Windows zip (no install needed). A settings window opens and an icon
-   appears in the notification area.
+1. Install `EkranLink-<version>-windows-setup.exe` from [Releases](https://github.com/meg55/EkranLink/releases),
+   or run `EkranLink.exe` from the portable Windows zip. A settings window opens and an icon appears in the
+   notification area.
 2. Install `EkranLink-<version>-android.apk` on the device (downloaded separately; the PC never installs
    apps on the device). For USB, enable *Developer options > USB debugging*.
 3. Open EkranLink on the device; the PC finds it (USB first, then Wi-Fi). On the first Wi-Fi connection,

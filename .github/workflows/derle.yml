@@ -103,7 +103,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: windows
-          path: dist/EkranLink-*-windows.zip
+          path: |
+            dist/EkranLink-*-windows-setup.exe
+            dist/EkranLink-*-windows.zip
           if-no-files-found: error
 
       # Sürüm anahtarıyla imzalıysa "android", değilse yalnızca deneme için "android-gelistirme"

@@ -738,6 +738,10 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
         if (role == L"--ajan") return service::runAgent();
         if (role == L"--hizmet-kur") return service::install();
         if (role == L"--hizmet-kaldir") return service::uninstall();
+        if (role == L"--windows-ile-baslat") {  // kurulum programı, oturum açmış kullanıcı adına
+            setAutostart(true);
+            return 0;
+        }
         background = role == kBackgroundArg;
     }
 

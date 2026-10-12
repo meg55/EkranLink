@@ -573,6 +573,8 @@ int uninstall() {
     for (const wchar_t* f : {L"adbkey", L"adbkey.pub"}) DeleteFileW((keyDir + L"\\" + f).c_str());
     RemoveDirectoryW(keyDir.c_str());
     const std::wstring dir = installDir();
+    // Kurulum programıyla kurulduysa dosyalar onun: hizmet kapanınca uygulama yerinde kalır
+    if (exists(dir + L"\\unins000.exe")) return 0;
     for (const wchar_t* f : {L"adb\\adb.exe", L"adb\\AdbWinApi.dll", L"adb\\AdbWinUsbApi.dll", L"EkranLink.exe"}) {
         const std::wstring p = dir + L"\\" + f;
         if (exists(p) && !DeleteFileW(p.c_str())) MoveFileExW(p.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
