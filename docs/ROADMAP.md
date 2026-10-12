@@ -1,38 +1,40 @@
-# EkranLink yol haritası
+**English** · [Türkçe](ROADMAP.tr.md)
 
-Android tablet ve telefonları Windows bilgisayar için ekran yapan açık kaynak uygulama: yansıtma, ikinci ekran
-ve Windows'un tek ekranı olarak; USB veya Wi-Fi ile.
+# EkranLink roadmap
 
-## Kararlar
+Open-source app that turns Android tablets and phones into displays for a Windows PC: Mirror, Extend
+or Windows' only screen (Only this); over USB or Wi-Fi.
 
-| Konu | Karar | Neden |
+## Decisions
+
+| Topic | Decision | Why |
 |---|---|---|
-| Ad | EkranLink (paket `org.ekranlink.android`, Windows hizmeti `EkranLink`); 0.4.x'e kadar EKRAN | Daha genel, uluslararası bir ad; çakışan uygulama ya da marka bulunmadı (2026-10) |
-| Lisans | GPL-3.0 | Moonlight/Sunshine gibi GPL projelerden kod ve eski cihaz düzeltmeleri alabilmek; türevlerin açık kalması |
-| Windows tarafı | C++ (servis, yakalama, kodlama, sürücü) | IddCx sürücüsü zaten C++; DXGI/NVENC/AMF örneklerinin tamamı C/C++ |
-| Android istemci | Java, minSdk 16 (4.1), AndroidX yok | MediaCodec 4.1'de geldi; güncel AndroidX/NDK 4.x'i desteklemiyor |
-| iOS istemci | Swift, VideoToolbox | Yerel uygulama isteniyor; çok eski iOS sürümleri web istemcisiyle |
-| Web istemcisi | Framework'süz JavaScript | Eski tarayıcılar |
-| Hedef PC'ler | Windows 10 1809+ / 11; ekransız mini PC ve masaüstü | "Tek ekran" senaryosu birinci sınıf vatandaş |
-| Sanal ekran | Başta [Virtual Display Driver](https://github.com/VirtualDrivers/Virtual-Display-Driver) (MIT, imzalı), sonra kendi IddCx sürücümüz | Erken aşamada sürücü imzası derdi olmadan ilerlemek |
-| Şifreleme | Noise protokolü + eşleştirme kodu | Android 4.x'in TLS yığını eski; ChaCha20 donanım AES'i olmayan işlemcilerde hızlı |
+| Name | EkranLink (package `org.ekranlink.android`, Windows service `EkranLink`); EKRAN up to 0.4.x | A more general, international name; no conflicting app or trademark found (2026-10) |
+| License | GPL-3.0 | To reuse code and old-device fixes from GPL projects like Moonlight/Sunshine; derivatives stay open |
+| Windows side | C++ (service, capture, encoding, driver) | The IddCx driver is C++ anyway; all DXGI/NVENC/AMF samples are C/C++ |
+| Android client | Java, minSdk 16 (4.1), no AndroidX | MediaCodec arrived in 4.1; current AndroidX/NDK don't support 4.x |
+| iOS client | Swift, VideoToolbox | A native app is wanted; very old iOS versions via the web client |
+| Web client | Framework-free JavaScript | Old browsers |
+| Target PCs | Windows 10 1809+ / 11; headless mini PCs and desktops | The "Only this screen" scenario is a first-class citizen |
+| Virtual display | [Virtual Display Driver](https://github.com/VirtualDrivers/Virtual-Display-Driver) (MIT, signed) at first, then our own IddCx driver | Make progress early without driver-signing headaches |
+| Encryption | Ephemeral ECDH P-256 + ChaCha20-Poly1305, 6-digit pairing code on the first Wi-Fi connection ([PROTOCOL.md](PROTOCOL.md)) | Android 4.x's TLS stack is outdated; ChaCha20 is fast on CPUs without hardware AES |
 
-## Bilinen sınırlar
+## Known limitations
 
-- BIOS, açılış, Güvenli Mod ve BitLocker PIN ekranı yazılımla gösterilemez (bkz. deneysel HDMI modu).
-- Android 4.x'te `adb reverse` yok: bağlantıyı her zaman PC başlatır (`adb forward`).
-- Android 4.4 öncesinde gezinme çubuğu kalıcı gizlenemez: sanal monitör tabletin kullanılabilir alanı
-  kadar açılır (S6000'de 1280×752).
-- DRM'li içerik sanal ekranda siyah görünebilir.
+- BIOS, boot, Safe Mode and the BitLocker PIN screen cannot be shown by software (see experimental HDMI mode).
+- Android 4.x has no `adb reverse`: the PC always initiates the connection (`adb forward`).
+- Before Android 4.4 the navigation bar can't be hidden permanently: the virtual monitor is created at the
+  tablet's usable area (1280×752 on the S6000).
+- DRM-protected content may appear black on the virtual display.
 
-## Faz 0 – Duman testi ✅
+## Phase 0 – Smoke test ✅
 
-Hedef: eski tabletin donanım çözücüsünü ölçmek ve tasarımı gerçek veriye dayandırmak.
+Goal: measure the old tablet's hardware decoder and base the design on real data.
 
-Test cihazı: Lenovo IdeaTab S6000, Android 4.2.2, MediaTek MT8389, `OMX.MTK.VIDEO.DECODER.AVC`.
-PC: RTX 2060 (NVENC). Akış: 1280×752 H.264 Constrained Baseline, B-kare yok.
+Test device: Lenovo IdeaTab S6000, Android 4.2.2, MediaTek MT8389, `OMX.MTK.VIDEO.DECODER.AVC`.
+PC: RTX 2060 (NVENC). Stream: 1280×752 H.264 Constrained Baseline, no B-frames.
 
-| Bağlantı | fps | Çözücü gecikmesi (ort) | Düşen kare |
+| Connection | fps | Decoder latency (avg) | Dropped frames |
 |---|---|---|---|
 | USB (adb forward) | 30 | ~107 ms | 0 |
 | USB (adb forward) | 60 | ~58 ms | 0 |
@@ -41,218 +43,218 @@ PC: RTX 2060 (NVENC). Akış: 1280×752 H.264 Constrained Baseline, B-kare yok.
 | Wi-Fi 2.4 GHz | 60 | ~58 ms | 0 |
 | Wi-Fi 2.4 GHz | 120 | ~35 ms | 0 |
 
-Bulgular:
+Findings:
 
-1. MTK çözücü fps ne olursa olsun **içinde sabit ~3 kare tutuyor**. Gecikme kare sayısıyla ölçekleniyor,
-   çözme süresiyle değil.
-2. İşe yaramayanlar: SPS'e `max_dec_frame_buffering=1` / `max_num_reorder_frames=0` yazmak (çözücü
-   `MaxDPBNumber = 16` kullanıyor), satıcıya özel düşük gecikme anahtarları, çıkışı yüzeye çizmemek,
-   karelerin arasına boş AUD paketi koymak.
-3. İşe yarayan: **kare aralığını kısaltmak.** Tablet 1280×752'yi 120 fps'te kare düşürmeden çözüyor.
-   Değişmeyen bölgeler neredeyse sıfır baytlık "atla" bloklarıyla kodlandığı için yük düşük kalıyor.
-   → Faz 1 kodlayıcısında: ekran değişince arkasından birkaç hızlı "itici" kare, ekran sabitken hiç kare yok.
-4. Tabletin Wi-Fi'si 2.4 GHz, boşta ping ~80–115 ms (PC→modem 10 ms). Yüksek performans Wi-Fi kilidi
-   biraz iyileştiriyor. Gerçek ağ gecikmesi Faz 1 protokolündeki ping/pong ile ölçülecek; bu cihaz
-   için USB öncelikli.
-5. Tablette `f_accessory` (AOA) ve `f_rndis` (USB internet paylaşımı) çekirdek desteği var: iki USB yolu da açık.
+1. The MTK decoder **holds a constant ~3 frames internally** regardless of fps. Latency scales with the
+   number of frames, not with decode time.
+2. What didn't work: writing `max_dec_frame_buffering=1` / `max_num_reorder_frames=0` into the SPS (the decoder
+   uses `MaxDPBNumber = 16`), vendor-specific low-latency keys, not rendering the output to a surface,
+   inserting empty AUD packets between frames.
+3. What worked: **shortening the frame interval.** The tablet decodes 1280×752 at 120 fps without dropping frames.
+   The load stays low because unchanged regions are encoded as near-zero-byte "skip" blocks.
+   → In the Phase 1 encoder: a few fast "pusher" frames after each screen change, no frames at all while the screen is static.
+4. The tablet's Wi-Fi is 2.4 GHz, idle ping ~80–115 ms (PC→router 10 ms). A high-performance Wi-Fi lock
+   helps a little. Real network latency will be measured with ping/pong in the Phase 1 protocol; USB comes
+   first for this device.
+5. The tablet's kernel supports `f_accessory` (AOA) and `f_rndis` (USB tethering): both USB paths are open.
 
-Deneme: `tools/faz0.ps1` (PC'den gönderir), `tools/sayac.html` (uçtan uca gecikmeyi fotoğrafla ölçmek için).
+Tryout: `tools/faz0.ps1` (sends from the PC), `tools/sayac.html` (for measuring end-to-end latency by photo).
 
-## Faz 1 – İlk sürüm: yansıtma ✅ (0.1.0)
+## Phase 1 – First release: Mirror ✅ (0.1.0)
 
-Tasarım kuralı: **sistemi az yor.** Görüntü CPU'ya hiç inmez (DXGI → GPU video işlemci → donanım
-kodlayıcı), ekran değişmezken hiçbir şey kodlanmaz/gönderilmez, imleç tablette yerel çizilir.
-Derleme için Visual Studio gerekmez: MinGW-w64 (GCC) yeterli.
+Design rule: **keep system load low.** The image never goes down to the CPU (DXGI → GPU video processor → hardware
+encoder), nothing is encoded/sent while the screen doesn't change, the cursor is drawn locally on the tablet.
+Building doesn't need Visual Studio: MinGW-w64 (GCC) is enough.
 
-- [x] Protokol v1: uzunluk önekli kareler, el sıkışma, kare onayı, ping/pong → [PROTOCOL.md](PROTOCOL.md)
-- [x] Windows sunucu (C++, tek 350 KB exe): DXGI yakalama → GPU'da ölçek + NV12 → Media Foundation
-      donanım kodlayıcı (NVIDIA/AMD/Intel tek kod yolu), düşük gecikmeli VBR
-- [x] İtici kareler (Faz 0 bulgusu 3) + onay tabanlı akış kontrolü (gecikme birikmez)
-- [x] İmleç ayrı gönderilir, tablette çizilir (imleç hareketi kodlama gerektirmez)
-- [x] USB-ADB: adb forward, tableti uyandırma, uygulamayı başlatma; Wi-Fi: `--ip`
-- [x] Dokunma → fare (tek parmak)
-- [x] Wi-Fi'de otomatik bulma (her ağ arayüzüne UDP yayını; USB internet paylaşımı ağı da taranır — gerçek cihazda henüz denenmedi)
-- [x] Otomatik mod: önce USB, yoksa Wi-Fi; kopunca yeniden bağlanma (USB'de tablet uygulamasını da yeniden başlatır)
-- [x] Eşleştirme + şifreleme: geçici ECDH P-256; Wi-Fi'de ilk eşleştirmede iki tarafta aynı 6 haneli
-      kod onayı, USB'de onaysız; Wi-Fi verisi ChaCha20-Poly1305 (RFC 8439 test vektörleriyle doğrulandı,
-      `ekranlink-test.exe`), USB şifresiz. Ayrıntı: [PROTOCOL.md](PROTOCOL.md)
-- [x] PC'deki eşleştirme sorusu, tablet reddedince kendiliğinden kapanır
-- [x] Tablette "Eşleşmeleri unut" düğmesi (yalnızca bağlı değilken görünür)
-- [x] Bildirim alanı uygulaması `EkranLink.exe`: durum, bağlantı türü, ekran seçimi, Windows ile başlat, günlük
-- [x] Ayrı indirmeler (0.3.1): PC tablete uygulama kurmaz/sunmaz. `tools\paketle.ps1` →
-      `dist\EkranLink-<sürüm>-windows.zip` (exe'ler + adb) ve `dist\EkranLink-<sürüm>-android.apk`.
-      USB'de uygulama yoksa PC bildirimle söyler; protokol sürümü uyuşmazsa tablet `Incompatible`
-      gönderir, iki taraf da hangi uygulamanın güncelleneceğini gösterir
-- [x] Ayar penceresi (0.4.0): Direct2D, Windows'un açık/koyu temasına ve DPI'ına uyar, yalnızca açıkken
-      kaynak kullanır. Tepsi sol tık pencere, sağ tık kısa menü; ikinci kez çalıştırma pencereyi öne getirir
-- [x] Türkçe / İngilizce: PC'de `i18n.h` (Sistem / Türkçe / English), Android'de `values` / `values-tr`.
-      Hizmetin bildirimleri kodla taşınır, tepsi kendi dilinde gösterir
-- [x] Kalıcı monitör yönü: Otomatik (tabletle) ya da sabit; Windows ekran ayarlarından yapılan değişiklik de
-      kaydedilir (`Orientation`, `LastRotation`)
-- [x] Telefon düzeni: kısa kenar < 520dp'de sıkı yerleşim, gerekirse kayan karşılama ekranı, çentik payı
-- [x] Canlı ayarlar (0.4.1): ayar değişince yayın yeniden başlamaz (`Streamer::update`). Dokunma, performans,
-      otomatik bağlan, yön, çözünürlük, ikinci ekran ↔ tek ekran anında; yansıtma ↔ ikinci ekran ve yansıtılan
-      ekran yalnızca görüntü boru hattı yeniden kurularak (bağlantı ve tablet çözücüsü sürer). Tek ekrandan
-      çıkarken tabletin o anki çözünürlüğü/yönü korunur
-- [x] Çözünürlük seçimi (0.4.2): Windows'un o monitör için sunduğu modların aynısı, aynı biçimde
-      ("1600 × 940", cihazınki "(Önerilen)"); cihaz başına kaydedilir (`Cozunurluk-<cihaz>`), Windows'tan
-      yapılan değişiklik de
-- [x] Ayar penceresi sayfalı (0.4.2): sol menü (Durum, Bağlantı, Görüntü, Dokunma ve performans, Genel), kaydırma
-      yok; 1–5 / ↑↓ / Ctrl+Tab ile geçiş. Durum sayfası: bağlantı, mod, ekran, gecikme / veri / kare hızı
-      (hizmet modunda yalnızca pencere açıkken aktarılır), çözülene kadar kalan uyarılar, Windows ekran ayarları kısayolu
-- [x] Yön / çözünürlük Windows'un kaydına da yazılır (0.4.3, tek ekranda değil): monitör bir sonraki bağlanışta
-      doğrudan doğru modla açılır, fazladan mod değişimi olmaz
-- [x] Birden çok adb cihazı takılıyken: hazırlanmış olan, yoksa EkranLink'i kurulu olan cihaz seçilir; tüm adb komutları `-s` ile
-      o cihaza gider (tam çoklu cihaz yol haritasında)
-- [x] Güvenilir Wi-Fi keşfi: arayüz başına soket, 3 kez yineleme, bilinen tablet adreslerine doğrudan soru
-      (yayın güvenlik duvarıyla engellenip denendi: 1,2 sn'de bağlandı). Tablet UDP/TCP portu boşalana kadar dener
-- [x] Kalıcı APK sürüm anahtarı (depo dışında; v1+v2+v3 imza, Android 4.x için v1 şart)
-- [ ] USB yoklamasını `adb get-state` yerine Windows cihaz bildirimleriyle yapma
-- [ ] Yazılım kodlayıcı yedeği (donanım kodlayıcısı olmayan PC'ler)
+- [x] Protocol v1: length-prefixed frames, handshake, frame acknowledgement, ping/pong → [PROTOCOL.md](PROTOCOL.md)
+- [x] Windows server (C++, single 350 KB exe): DXGI capture → scale + NV12 on the GPU → Media Foundation
+      hardware encoder (one code path for NVIDIA/AMD/Intel), low-latency VBR
+- [x] Pusher frames (Phase 0 finding 3) + acknowledgement-based flow control (latency doesn't accumulate)
+- [x] Cursor sent separately, drawn on the tablet (cursor movement needs no encoding)
+- [x] USB-ADB: adb forward, waking the tablet, launching the app; Wi-Fi: `--ip`
+- [x] Touch → mouse (single finger)
+- [x] Automatic discovery on Wi-Fi (UDP broadcast on every network interface; the USB tethering network is scanned too — not yet tried on a real device)
+- [x] Automatic mode: USB first, otherwise Wi-Fi; reconnect on disconnect (on USB it also restarts the tablet app)
+- [x] Pairing + encryption: ephemeral ECDH P-256; on Wi-Fi, the first pairing requires confirming the same 6-digit
+      code on both sides, on USB no confirmation; Wi-Fi data is ChaCha20-Poly1305 (verified with RFC 8439 test vectors,
+      `ekranlink-test.exe`), USB is unencrypted. Details: [PROTOCOL.md](PROTOCOL.md)
+- [x] The pairing prompt on the PC closes by itself when the tablet rejects
+- [x] "Forget pairings" button on the tablet (visible only while not connected)
+- [x] Notification area (tray) app `EkranLink.exe`: status, connection type, display selection, Start with Windows, log
+- [x] Separate downloads (0.3.1): the PC doesn't install/offer the app to the tablet. `tools\paketle.ps1` →
+      `dist\EkranLink-<sürüm>-windows.zip` (exes + adb) and `dist\EkranLink-<sürüm>-android.apk`.
+      If the app is missing on USB, the PC says so with a notification; on a protocol version mismatch the tablet sends
+      `Incompatible`, and both sides show which app needs updating
+- [x] Settings window (0.4.0): Direct2D, follows Windows' light/dark theme and DPI, uses resources only while
+      open. Tray left click opens the window, right click a short menu; launching a second time brings the window to front
+- [x] Turkish / English: `i18n.h` on the PC (System / Türkçe / English), `values` / `values-tr` on Android.
+      The service's notifications are carried as codes; the tray shows them in its own language
+- [x] Persistent monitor orientation: Automatic (follows the tablet) or fixed; changes made in Windows display settings are
+      saved too (`Orientation`, `LastRotation`)
+- [x] Phone layout: compact layout when the short edge is < 520dp, scrolling welcome screen if needed, notch insets
+- [x] Live settings (0.4.1): changing a setting doesn't restart the stream (`Streamer::update`). Touch, performance,
+      auto-connect, orientation, resolution, Extend ↔ Only this apply instantly; Mirror ↔ Extend and the mirrored
+      display only by rebuilding the video pipeline (the connection and the tablet decoder survive). When leaving
+      Only this, the tablet's current resolution/orientation is kept
+- [x] Resolution selection (0.4.2): the same modes Windows offers for that monitor, in the same format
+      ("1600 × 940", the device's own marked "(Recommended)"); saved per device (`Cozunurluk-<cihaz>`), including
+      changes made from Windows
+- [x] Paged settings window (0.4.2): left menu (Status, Connection, Display, Touch and performance, General), no
+      scrolling; switch with 1–5 / ↑↓ / Ctrl+Tab. Status page: connection, mode, display, latency / data / frame rate
+      (in service mode transferred only while the window is open), warnings that stay until resolved, shortcut to Windows display settings
+- [x] Orientation / resolution are also written to Windows' registry (0.4.3, not in Only this): the monitor opens directly
+      in the right mode on the next connection, no extra mode change
+- [x] With multiple adb devices plugged in: the prepared one is chosen, otherwise the one with EkranLink installed; all adb commands go to
+      that device with `-s` (full multi-device support is on the roadmap)
+- [x] Reliable Wi-Fi discovery: socket per interface, 3 retries, direct query to known tablet addresses
+      (tested with broadcast blocked by the firewall: connected in 1.2 s). The tablet retries until the UDP/TCP port is free
+- [x] Persistent APK release key (outside the repo; v1+v2+v3 signing, v1 required for Android 4.x)
+- [ ] Do USB polling with Windows device notifications instead of `adb get-state`
+- [ ] Software encoder fallback (PCs without a hardware encoder)
 
-Ölçüm (S6000, USB, RTX 2060):
+Measurement (S6000, USB, RTX 2060):
 
-| Durum | PC→tablette çizim | PC CPU (tek çekirdek) |
+| Situation | PC→drawn on tablet | PC CPU (single core) |
 |---|---|---|
-| Sürekli hareket (~116 fps) | ~21 ms | ~%10 |
-| Seyrek değişim (~10/s) | ~38 ms (24 ms'si itici kareler) | ~%2 |
-| Ekran sabit | — (kare yok) | ~%0 |
-| Tablet yok, aranıyor | — | %0,000 (9,7 MB bellek) |
+| Continuous motion (~116 fps) | ~21 ms | ~10% |
+| Sparse changes (~10/s) | ~38 ms (24 ms of it pusher frames) | ~2% |
+| Static screen | — (no frames) | ~0% |
+| No tablet, searching | — | 0.000% (9.7 MB memory) |
 
-Şifreleme seçimi (S6000, Android 4.2, tek çekirdek, 16 KB'lık parçalarla):
+Encryption choice (S6000, Android 4.2, single core, 16 KB chunks):
 
-| Algoritma | Sağlayıcı | Hız |
+| Algorithm | Provider | Speed |
 |---|---|---|
-| AES-128-CTR | BouncyCastle (saf Java) | 1,4 MB/s |
-| HMAC-SHA256 | BouncyCastle (saf Java) | 1,7 MB/s |
-| ChaCha20 | EkranLink (Dalvik için elle açılmış) | 15,4 MB/s |
-| Poly1305 | EkranLink | 18,1 MB/s |
+| AES-128-CTR | BouncyCastle (pure Java) | 1.4 MB/s |
+| HMAC-SHA256 | BouncyCastle (pure Java) | 1.7 MB/s |
+| ChaCha20 | EkranLink (hand-unrolled for Dalvik) | 15.4 MB/s |
+| Poly1305 | EkranLink | 18.1 MB/s |
 
-Sürekli harekette (116 kare/s, 6,6 Mbit/s) tablet uygulamasının CPU'su: USB %33, Wi-Fi AES+HMAC %104,
-Wi-Fi ChaCha20-Poly1305 %48. Not: Dalvik JIT küçük metotları (ör. `Integer.rotateLeft`) satır içine
-almıyor; sıcak döngülerde elle açmak ~7 kat hız kazandırdı.
-- [ ] Tablet tarafında kare başına kopyaları ve onay mesajlarını azaltmak (USB'de %33'ü düşürmek)
-## Faz 2 – İkinci ekran (sürüyor)
+Tablet app CPU during continuous motion (116 frames/s, 6.6 Mbit/s): USB 33%, Wi-Fi AES+HMAC 104%,
+Wi-Fi ChaCha20-Poly1305 48%. Note: the Dalvik JIT doesn't inline small methods (e.g. `Integer.rotateLeft`);
+unrolling them by hand in hot loops gave a ~7× speedup.
+- [ ] Reduce per-frame copies and acknowledgement messages on the tablet side (bring down the 33% on USB)
+## Phase 2 – Extend (in progress)
 
-Sanal monitör için hazır sürücüler değerlendirildi: Virtual Display Driver (MIT, imzalı ama monitör
-eklemek için tüm sürücüyü yeniden yükler), Parsec VDD (kapalı kaynak, dağıtılamaz), SudoVDA (MIT, tablet
-başına ekle/çıkar API'si var ama imzalı sürümü yok), HDMI sahte takı (sürücüsüz; `--ekran N` ile bugün de
-çalışır). Seçim: **SudoVDA tabanlı kendi sürücümüz** → [driver/](../driver/README.md), bu bilgisayarda
-MSVC + WDK ile derlenip yerel sertifikayla imzalanıyor.
+Ready-made drivers for the virtual monitor were evaluated: Virtual Display Driver (MIT, signed, but reloads
+the whole driver to add a monitor), Parsec VDD (closed source, not redistributable), SudoVDA (MIT, has a per-tablet
+add/remove API but no signed release), HDMI dummy plug (driverless; works today with `--ekran N`).
+Choice: **our own driver based on SudoVDA** → [driver/](../driver/README.md), built on this PC with
+MSVC + WDK and signed with a local certificate.
 
-- [x] EkranLink sanal ekran sürücüsü (IddCx/UMDF): tablet başına tak-çıkar, sabit monitör kimliği
-      (Windows yerleşimi hatırlar), EDID'de fiziksel boyut, 3 sn bekçi köpeği (program çökse de monitör kalkar)
-- [x] Kurulum/kaldırma: `driver\kur.ps1` (özel anahtarı imzadan hemen sonra silen yerel imza), `driver\kaldir.ps1`
-- [x] PC programı: tablet bağlanınca 1280×752 monitör aç → onu yakala; ayrılınca kaldır; sürücü yoksa yansıt
-- [x] Tepsi menüsü: Görüntü → İkinci ekran / Yansıtma
-- [x] Çoklu dokunma: Windows'a gerçek dokunmatik ekran olarak (InjectTouchInput, 10 parmak; kaydırma, yakınlaştırma,
-      basılı tutunca sağ tık, dokunmatik klavye). Tepsi menüsünden "Fare" moduna geçilebilir. Basınçlı kalem kapsam dışı.
-- [x] Donanım imleci: imleç tablette yerel çizilir (Faz 1'de yapıldı)
-- [x] Döndürme: tablet dik tutulunca sanal monitör Windows'ta dikey olur (DMDO_90/270). Tabletin ekranı,
-      akış boyutu ve çözücü hiç değişmez — Windows döndürülmüş görüntüyü zaten panel yönünde verir; yalnızca
-      imleç ve dokunma çevrilir. Tabletin "otomatik döndür" kilidine uyulur; ivmeölçer yalnızca bağlıyken ve
-      en yavaş hızda (200 ms) açılır. Yön/çözünürlük/yerleşim değişiminde bağlantı artık kopmaz.
-- [x] Tablet bilgi katmanı yenilendi (karşılama ekranı, ölçüm kartı, eşleştirme onayı) ve tabletin tutuluşuna göre
-      döner; Android iletişim kutuları çevrilemediği için eşleştirme ve "eşleşmeleri unut" onayı da bu katmanda
-- [x] Yansıtmada dikey çevrilmiş PC monitörü video işlemcide düz çevrilir (desteklemeyen kartta yan kalır;
-      dokunma ve imleç her iki durumda doğru)
-- [x] Android 16+ büyük ekranlar (600dp+): targetSdk 36 ile yatay kilit yok sayılır, pencere dikey açılabilir.
-      Görüntü çözücüde çevrilir (MediaFormat KEY_ROTATION; ekran kartı yapar, ek yük yok), imleç tuvalde, dokunma
-      elle aynı açıyla; PC'ye ekran hep yatay bildirilir ve monitör yatay kilitli uygulamadaki gibi dikey olur.
-      Ölçüldü (Android 16 öykünücüsü, sw720dp): dört yönde (ters dikey dahil) dokunma ±1 px, imleç parmağın altında
-- [ ] Görüntüyü DXGI yakalama yerine doğrudan sürücüden almak (bir kopya daha az, oturum açma ekranı)
-- [x] GitHub'da açık kaynak (github.com/meg55/EkranLink): sürücü lisans metinleri, katkı ve güvenlik belgeleri
-- [x] Otomatik derleme (GitHub Actions, `.github/workflows/derle.yml`): her yüklemede Android + Windows derlenir,
-      şifreleme testleri çalışır, sürücü derlenir (imzasız); `v*` etiketinde paketler taslak sürüm olur (yayımlamak
-      elle). Derleyici yereldekiyle aynı (WinLibs GCC 16.1.0, özetiyle doğrulanır); eylemler commit koduyla sabit
-- [x] Windows kurulum programı (Inno Setup, `host-windows/installer/EkranLink.iss`; Türkçe / İngilizce): Program
-      Files\EkranLink, Başlat menüsü, *Uygulamalar* listesinden kaldırma, isteğe bağlı Windows ile başlatma
-      (kurulumu başlatan kullanıcının kaydına). Güncellemede çalışan EkranLink düzgünce kapanır (WM_CLOSE), hizmet
-      kuruluysa durdurulup yeni sürümle yeniden kurulur; sessiz güncellemede (winget) tepsi arka planda yeniden
-      açılır. Kaldırırken hizmet kaldırılır, ayar ve eşleşmeleri silmek sorulur. Hizmet modunu kapatmak kurulu
-      programı silmez. Zip taşınabilir sürüm olarak kalır. Denendi (hizmet modu açık PC): üstüne kurulum,
-      hizmeti kapat / aç, sessiz kaldırma, yeniden kurulum; yeniden başlatma gerekmedi. Sürücü henüz pakette yok
-- [ ] Dağıtım imzası (SignPath Foundation veya EV + Microsoft) — şu an sürücü yalnızca derlendiği bilgisayarda kurulabiliyor
+- [x] EkranLink virtual display driver (IddCx/UMDF): per-tablet plug/unplug, stable monitor ID
+      (Windows remembers the layout), physical size in the EDID, 3 s watchdog (the monitor is removed even if the program crashes)
+- [x] Install/uninstall: `driver\kur.ps1` (local signing that deletes the private key right after signing), `driver\kaldir.ps1`
+- [x] PC program: when a tablet connects, create a 1280×752 monitor → capture it; remove it on disconnect; mirror if there's no driver
+- [x] Tray menu: Display → Extend / Mirror
+- [x] Multi-touch: presented to Windows as a real touchscreen (InjectTouchInput, 10 fingers; scrolling, zooming,
+      press-and-hold right click, touch keyboard). "Mouse" mode can be selected from the tray menu. Pressure-sensitive pen is out of scope.
+- [x] Hardware cursor: the cursor is drawn locally on the tablet (done in Phase 1)
+- [x] Rotation: when the tablet is held upright the virtual monitor becomes portrait in Windows (DMDO_90/270). The tablet's screen,
+      stream size and decoder never change — Windows already delivers the rotated image in panel orientation; only
+      the cursor and touch are transformed. The tablet's "auto-rotate" lock is respected; the accelerometer is on only while connected and
+      at the slowest rate (200 ms). The connection no longer drops on orientation/resolution/layout changes.
+- [x] Tablet info overlay redone (welcome screen, stats card, pairing confirmation) and rotates with how the tablet
+      is held; since Android dialogs can't be rotated, the pairing and "forget pairings" confirmations live in this overlay too
+- [x] In Mirror, a PC monitor rotated to portrait is straightened in the video processor (stays sideways on GPUs that don't support it;
+      touch and cursor are correct either way)
+- [x] Android 16+ large screens (600dp+): with targetSdk 36 the landscape lock is ignored and the window can open in portrait.
+      The image is rotated in the decoder (MediaFormat KEY_ROTATION; done by the GPU, no extra load), the cursor on the canvas, touch
+      by hand at the same angle; the display is always reported to the PC as landscape and the monitor turns portrait as with a landscape-locked app.
+      Measured (Android 16 emulator, sw720dp): in all four orientations (including reverse portrait) touch ±1 px, cursor under the finger
+- [ ] Take the image directly from the driver instead of DXGI capture (one fewer copy, sign-in screen)
+- [x] Open source on GitHub (github.com/meg55/EkranLink): driver license texts, contributing and security documents
+- [x] Automated builds (GitHub Actions, `.github/workflows/derle.yml`): every push builds Android + Windows,
+      runs the encryption tests, builds the driver (unsigned); on a `v*` tag the packages become a draft release (publishing is
+      manual). The compiler matches the local one (WinLibs GCC 16.1.0, verified by hash); actions pinned to commit hashes
+- [x] Windows installer (Inno Setup, `host-windows/installer/EkranLink.iss`; Turkish / English): Program
+      Files\EkranLink, Start menu, uninstall from the *Apps* list, optional Start with Windows
+      (in the registry of the user who ran the installer). On update, a running EkranLink is closed cleanly (WM_CLOSE); if the service
+      is installed it is stopped and reinstalled with the new version; on a silent update (winget) the tray is reopened in the
+      background. Uninstalling removes the service and asks whether to delete settings and pairings. Turning off service mode doesn't remove the
+      installed program. The zip remains as the portable version. Tested (PC with service mode on): install over existing,
+      service off / on, silent uninstall, reinstall; no restart needed. The driver isn't in the package yet
+- [ ] Distribution signing (SignPath Foundation or EV + Microsoft) — for now the driver can only be installed on the PC it was built on
 
-Ölçüm (S6000, USB, ikinci ekran 1280×752): PC→tablette çizim ~27 ms, ekran sabitken PC CPU %0,3.
-### Kaynak kullanımı optimizasyonu
+Measurement (S6000, USB, Extend 1280×752): PC→drawn on tablet ~27 ms, PC CPU 0.3% with a static screen.
+### Resource usage optimization
 
-Ölçüm: S6000 + RTX 2060, USB, yansıtma, ekranda sürekli hareket (sayaç sayfası). PC RAM = Görev
-Yöneticisi'ndeki "özel çalışma kümesi"; tablet RAM = `dumpsys meminfo` PSS.
+Measurement: S6000 + RTX 2060, USB, Mirror, continuous motion on screen (counter page). PC RAM = "private working set" in
+Task Manager; tablet RAM = `dumpsys meminfo` PSS.
 
-| | Önce | Sonra (dengeli) |
+| | Before | After (balanced) |
 |---|---|---|
-| PC işlemci (tek çekirdek) | %14,4 | %4,3 |
+| PC CPU (single core) | 14.4% | 4.3% |
 | PC RAM | 25 MB | 25 MB |
-| Tablet uygulaması | %39,4 | %19,2 |
-| Tablette donanım çözücü (mediaserver) | %15,0 | %10,6 |
+| Tablet app | 39.4% | 19.2% |
+| Hardware decoder on tablet (mediaserver) | 15.0% | 10.6% |
 | Tablet RAM | 28 MB | 26 MB |
-| Hareket sırasında gecikme | ~20 ms | ~36 ms |
-| Ekran sabitken (ikinci ekran) | — | PC %0,6 · tablet %2 + %0,9 |
+| Latency during motion | ~20 ms | ~36 ms |
+| Static screen (Extend) | — | PC 0.6% · tablet 2% + 0.9% |
 
-Yapılanlar:
-- Kare hızı sınırı 60 (tabletin ekranı): PC ekranı 120/144 Hz olsa bile gösterilemeyecek kare kodlanmaz/çözülmez.
-- İtici kareler "dengeli" modda yalnızca hareket durunca; "düşük gecikme" modunda (tepsi → Performans)
-  kareler arasına da girer: ~32 ms, tablet ~1,5 kat çalışır.
-- Tablet: P-karelerinde kısa yol (tarama ve ara kopya yok), tamponlu gönderim, toplu kare onayı
-  (3 karede bir; çözücü boşalınca hemen), çözücü çıkış döngüsü boşta daha seyrek uyanır, gizli ölçüm
-  katmanı hiçbir iş yapmaz.
-- PC: D3D11 sürücü iş parçacığı optimizasyonu kapalı (iki iş parçacığı az).
-- PC'deki "özel bellek" (~93 MB) büyük ölçüde NVIDIA sürücüsünün ayırıp kullanmadığı sanal alan; gerçek
-  RAM ~25 MB (D3D11 cihazı ~60 MB sanal, Media Foundation kodlayıcı ~32 MB sanal). Tanı: `EKRAN_BELLEK=1`.
-## Faz 3 – Gerçek harici ekran
+Done:
+- Frame rate capped at 60 (the tablet's display): frames that can't be shown aren't encoded/decoded, even if the PC display is 120/144 Hz.
+- In "balanced" mode pusher frames are sent only when motion stops; in "low latency" mode (tray → Performance)
+  they're also inserted between frames: ~32 ms, the tablet works ~1.5× harder.
+- Tablet: fast path for P-frames (no scanning, no intermediate copy), buffered sending, batched frame acknowledgements
+  (every 3rd frame; immediately when the decoder drains), the decoder output loop wakes less often when idle, the hidden stats
+  overlay does no work.
+- PC: D3D11 driver threading optimization off (two fewer threads).
+- The "private bytes" on the PC (~93 MB) are largely virtual space the NVIDIA driver reserves but doesn't use; real
+  RAM ~25 MB (D3D11 device ~60 MB virtual, Media Foundation encoder ~32 MB virtual). Diagnostics: `EKRAN_BELLEK=1`.
+## Phase 3 – Real external display
 
-- [ ] AOA ile tak-çalıştır (tablette ayar yok, uygulama kendiliğinden açılır)
-- [ ] Kendi IddCx sürücümüz: cihaz başına tak-çıkar, cihaza özel EDID (Windows yerleşimi hatırlar),
-      fiziksel boyut → doğru DPI
-- [x] Windows hizmeti (tepsi → "Oturum açılmadan önce başlat"): açılışta, oturum açılmadan başlar. Hizmet
-      (Oturum 0) ekrandaki oturumda SYSTEM yetkili bir ajan başlatır; ajan giriş masaüstünü (Default ↔
-      Winlogon) izleyerek kilit ekranını, şifre ekranını ve Ctrl+Alt+Del'i yakalar, dokunmayı oraya iletir.
-      Ayarlar/durum HKLM'de (tepsi yalnızca arayüz), eşleşmeler yalnızca SYSTEM'in okuyabildiği bölümde;
-      kilitliyken yeni tablet eşleştirilmez. Kullanıcının adb anahtarı taşınır (tablet yeniden izin sormaz).
-      Ölçüldü (S6000, USB, tablet ana ekran): kilit ekranı tablette görünür, yukarı kaydırınca şifre ekranı
-      açılır, dokunma iletilir. Not: Windows kilit ekranını yalnızca **ana** monitörde çizer (ekransız mini
-      PC'de tablet zaten ana ekran; masaüstünde "Tek ekran" ya da tableti ana ekran yapmak gerekir).
-      UAC güvenli masaüstü aynı yoldan geçer ama bu PC'de UAC sormadan yükselttiği için denenemedi
-- [x] Otomatik bağlanma iki tarafta ayarlanır: PC (tepsi → Bağlantı → Otomatik bağlan / Şimdi bağlan) ve
-      tablet (karşılama ekranı → Bilgisayara takılınca otomatik aç); ikisi açıksa takınca kendiliğinden olur
-- [x] Arka plan: tablet uygulaması alta alınınca bağlantı ve Windows'taki monitör sürer (ön plan hizmeti +
-      bildirim); arkadayken PC görüntü üretmez (ajan %0 işlemci), öne gelince anahtar kareyle anında döner.
-      Bağlantıyı kesmek: bildirim ya da ölçüm kartındaki "Bağlantıyı kes"
-- [x] USB takılma bildirimi (CM_Register_Notification, ADB arabirimi): tablet takılı değilken adb hiç
-      çalıştırılmaz; kurulum denetimi aygıt başına bir kez
-- [ ] Oturum açılmadan Wi-Fi: tablet uygulaması açık ve eşleşmiş olmalı (bugün de öyle); ilk açılışta
-      tabletin bağlanması için USB önerilir
-- [x] Tek ekran modu (tepsi → Görüntü → Tek ekran, `--tek-ekran`): tablet bağlanınca diğer monitörler kapanır,
-      tablet ana ekran olur; ayrılınca eski düzen geri yüklenir. Düzen Windows'un veritabanına kaydedilmez:
-      program çökerse sürücünün bekçi köpeği monitörü kaldırır, Windows kayıtlı (tabletsiz) düzene döner
-- [x] Uyku eşitleme: Windows ekranları kapatınca (güç ayarı bildirimi, yoklama yok) tablet kararır ve kendi
-      zaman aşımıyla ekranını kapatır; bağlantı ve Wi-Fi ayakta kalır. Windows ekranı açınca tablet de yanar.
-      USB'de PC tablet ekranını adb ile hemen kapatır (geliştirici seçeneklerindeki "uyanık kal" açıkken
-      zaman aşımı hiç işlemez). Kararıkken tablete dokunmak Windows'u uyandırır.
-      Ölçüldü (S6000, USB): tablet ekranı ~3 sn'de kapanır, fare oynatınca ~4 sn'de görüntü döner, bağlantı kopmaz
-- [x] Birden çok cihaz aynı anda: her biri ayrı oturum ve ayrı sanal monitör; USB'de cihaz başına ayrı adb
-      portu; dokunmalar süreç genelinde tek tabloda (Windows'a giden her çerçeve tüm cihazların parmaklarını
-      içerir); tek ekran düzeni ortak (EkranLink monitörleri açık kalır, son çıkan geri yükler); çözünürlük ve
-      son yön cihaz başına. Pencerede cihaz başına *Bağlan* / *Bağlantıyı kes*; kesilen cihaza kullanıcı yeniden
-      bağlanana ya da cihaz çıkarılana kadar otomatik bağlanılmaz. Aynı cihaz USB'de ve Wi-Fi'de tek kayıt.
-      Ölçüldü (S6000 + Android 16 öykünücüsü, USB, hizmet modu): iki monitör, ayrı ayrı kesme / bağlama
-      (~3 sn), tümünü kes, tek ekran ↔ ikinci ekran (düzen birebir geri geldi), biri kaydırılırken diğerine
-      dokunma (±1 px)
+- [ ] Plug-and-play via AOA (no settings on the tablet, the app opens by itself)
+- [ ] Our own IddCx driver: per-device plug/unplug, device-specific EDID (Windows remembers the layout),
+      physical size → correct DPI
+- [x] Windows service (tray → "Start before sign-in"): starts at boot, before sign-in. The service
+      (Session 0) starts an agent with SYSTEM rights in the active console session; the agent follows the input desktop (Default ↔
+      Winlogon) to capture the lock screen, password screen and Ctrl+Alt+Del, and forwards touch there.
+      Settings/status live in HKLM (the tray is only a UI), pairings in a section only SYSTEM can read;
+      no new tablet can be paired while locked. The user's adb key is carried over (the tablet doesn't ask for permission again).
+      Measured (S6000, USB, tablet as primary display): the lock screen appears on the tablet, swiping up opens the password
+      screen, touch is forwarded. Note: Windows draws the lock screen only on the **primary** monitor (on a headless mini
+      PC the tablet is the primary display anyway; on a desktop you need "Only this" or to make the tablet the primary display).
+      The UAC secure desktop goes through the same path but couldn't be tested because this PC elevates without a UAC prompt
+- [x] Auto-connect is configured on both sides: PC (tray → Connection → Connect automatically / Connect now) and
+      tablet (welcome screen → Open automatically when plugged into a computer); with both on, it just happens when plugged in
+- [x] Background: when the tablet app is sent to the background, the connection and the monitor in Windows persist (foreground service +
+      notification); while in the background the PC produces no image (agent 0% CPU), and on returning to the foreground it resumes instantly with a keyframe.
+      To disconnect: "Disconnect" in the notification or the stats card
+- [x] USB plug notification (CM_Register_Notification, ADB interface): adb is never run while no tablet is
+      plugged in; installation check once per device
+- [ ] Wi-Fi before sign-in: the tablet app must be open and paired (as today); for the first boot
+      USB is recommended for connecting the tablet
+- [x] Only this mode (tray → Display → Only this, `--tek-ekran`): when the tablet connects the other monitors are turned off and
+      the tablet becomes the primary display; on disconnect the previous layout is restored. The layout isn't saved to Windows' database:
+      if the program crashes the driver's watchdog removes the monitor and Windows returns to the saved (tablet-less) layout
+- [x] Sleep sync: when Windows turns off the displays (power setting notification, no polling) the tablet goes dark and turns off
+      its screen with its own timeout; the connection and Wi-Fi stay up. When Windows turns the display on, the tablet lights up too.
+      On USB the PC turns off the tablet's screen immediately via adb (with "stay awake" on in developer options the
+      timeout never fires). Touching the tablet while dark wakes Windows.
+      Measured (S6000, USB): the tablet screen turns off in ~3 s, moving the mouse brings the image back in ~4 s, the connection doesn't drop
+- [x] Multiple devices at once: each with its own session and its own virtual monitor; a separate adb
+      port per device on USB; touches in one process-wide table (every frame sent to Windows contains all devices'
+      fingers); the Only this layout is shared (EkranLink monitors stay on, the last one to leave restores it); resolution and
+      last orientation per device. *Connect* / *Disconnect* per device in the window; a disconnected device isn't auto-connected
+      until the user reconnects it or the device is unplugged. The same device on USB and Wi-Fi is a single entry.
+      Measured (S6000 + Android 16 emulator, USB, service mode): two monitors, disconnecting / connecting each separately
+      (~3 s), disconnect all, Only this ↔ Extend (layout restored exactly), touching one while scrolling
+      the other (±1 px)
 
-## Faz 4 – Her cihaz
+## Phase 4 – Every device
 
-- [ ] iOS uygulaması (Swift, VideoToolbox)
-- [ ] Web istemcisi (JPEG modu eski tarayıcılar, H.264 modu yeni tarayıcılar)
-- [ ] Hafif mod: sadece değişen bölgeler JPEG olarak
-- [ ] Ses aktarımı
-- [ ] E-mürekkep (e-ink) modu
+- [ ] iOS app (Swift, VideoToolbox)
+- [ ] Web client (JPEG mode for old browsers, H.264 mode for new browsers)
+- [ ] Lightweight mode: only changed regions, as JPEG
+- [ ] Audio forwarding
+- [ ] E-ink mode
 
-## Faz 5 – Ekstralar
+## Phase 5 – Extras
 
-- [ ] Sistem paneli (CPU/GPU sıcaklığı, saat, medya) – video akışı olmadan, yerel çizim
-- [ ] Kısayol paneli (Stream Deck benzeri)
-- [ ] Pil güvenliği: sürekli şarjda sıcaklık/şarj izleme ve uyarı
-- [ ] Video duvarı, pano paylaşımı, touchpad modu
-- [ ] Deneysel HDMI modu: USB HDMI yakalama çubuğu + OTG → BIOS dahil gerçek monitör
-- [ ] Linux / macOS sunucu
+- [ ] System panel (CPU/GPU temperature, clock, media) – without a video stream, drawn locally
+- [ ] Shortcut panel (Stream Deck-like)
+- [ ] Battery safety: temperature/charge monitoring and warnings during constant charging
+- [ ] Video wall, clipboard sharing, touchpad mode
+- [ ] Experimental HDMI mode: USB HDMI capture stick + OTG → a real monitor, BIOS included
+- [ ] Linux / macOS server

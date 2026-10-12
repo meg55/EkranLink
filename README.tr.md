@@ -50,7 +50,7 @@ bağlantısı ve reklam yok; çoğu durumda ayar da gerekmez.
   kodlama); ekran değişmiyorsa hiçbir şey gönderilmez; fare imleci cihazda çizilir. Boştayken işlemci
   kullanımı neredeyse sıfırdır.
 - **Düşük gecikme:** USB'de bilgisayardan ekrana yaklaşık 20–40 ms; 2013 model bir tablette ölçüldü
-  ([ölçümler](docs/ROADMAP.md)).
+  ([ölçümler](docs/ROADMAP.tr.md)).
 - **İki dil:** Türkçe ve İngilizce arayüz.
 
 ## Durum
@@ -59,11 +59,11 @@ bağlantısı ve reklam yok; çoğu durumda ayar da gerekmez.
 |---|---|
 | Yansıtma, ikinci ekran, tek ekran, USB, Wi-Fi, dokunma, birden çok cihaz, hizmet modu | Çalışıyor |
 | Windows kurulum programı ve taşınabilir zip | Çalışıyor; ilk herkese açık sürüm hazırlanıyor |
-| Sanal ekran sürücüsü (*İkinci ekran* ve *Tek ekran* için gerekli) | Çalışıyor, ama dağıtım için **henüz imzalı değil**: şimdilik yalnızca kendiniz derleyerek kurulabiliyor ([driver/](driver/README.md)). Sürücü yoksa EkranLink yansıtır. |
+| Sanal ekran sürücüsü (*İkinci ekran* ve *Tek ekran* için gerekli) | Çalışıyor, ama dağıtım için **henüz imzalı değil**: şimdilik yalnızca kendiniz derleyerek kurulabiliyor ([driver/](driver/README.tr.md)). Sürücü yoksa EkranLink yansıtır. |
 | Google Play'de Android uygulaması | Planlandı; o zamana kadar APK ayrı indirilir |
 | macOS, Linux, iPad | Henüz yok |
 
-Plan ve ölçümler: [docs/ROADMAP.md](docs/ROADMAP.md) · Test edilen cihazlar: [docs/DEVICES.md](docs/DEVICES.md)
+Plan ve ölçümler: [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md) · Test edilen cihazlar: [docs/DEVICES.md](docs/DEVICES.md)
 
 ## Başlarken
 
@@ -125,7 +125,7 @@ sürümde geldi. Orada çalışmaya devam etsin diye uygulama AndroidX kullanmad
 
 **Wi-Fi güvenli mi?** Her Wi-Fi bağlantısı yeni ECDH anahtarları ve doğrulamalı şifreleme kullanır; yeni
 bir bilgisayar cihazda 6 haneli kodla onaylanmalıdır. USB bağlantıları yereldir ve şifrelenmez. Bkz.
-[docs/PROTOCOL.md](docs/PROTOCOL.md) ve [SECURITY.md](SECURITY.md).
+[docs/PROTOCOL.tr.md](docs/PROTOCOL.tr.md) ve [SECURITY.md](SECURITY.md).
 
 **iPad ya da Mac ile kullanabilir miyim?** Henüz değil. Şimdilik Windows bilgisayar ve Android cihaz gerekir.
 
@@ -150,14 +150,14 @@ flowchart LR
 ```
 
 Bağlantıyı her zaman bilgisayar açar (USB'de `adb forward` üzerinden, Wi-Fi'de doğrudan cihaza); böylece
-`adb reverse` olmayan Android 4.x'te de aynı yol çalışır. Ayrıntılar: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-ve iletişim protokolü [docs/PROTOCOL.md](docs/PROTOCOL.md).
+`adb reverse` olmayan Android 4.x'te de aynı yol çalışır. Ayrıntılar: [docs/ARCHITECTURE.tr.md](docs/ARCHITECTURE.tr.md)
+ve iletişim protokolü [docs/PROTOCOL.tr.md](docs/PROTOCOL.tr.md).
 
 ## Kaynaktan derlemek
 
 Gerekenler: JDK 17+ ve Android SDK (Android Studio ile gelir), MinGW-w64 GCC + CMake + Ninja
 (`winget install BrechtSanders.WinLibs.POSIX.MSVCRT`), kurulum programı için Inno Setup 6. Sürücü dışında
-Visual Studio gerekmez (sürücü: MSVC + WDK, bkz. [driver/README.md](driver/README.md)).
+Visual Studio gerekmez (sürücü: MSVC + WDK, bkz. [driver/README.tr.md](driver/README.tr.md)).
 
 ```powershell
 .\tools\paketle.ps1                         # her şeyi derler, testleri çalıştırır, dist\'e yazar (kurulum, zip, apk)
@@ -180,8 +180,8 @@ tools/          Paketleme, simge üretimi ve ölçüm betikleri
 art/            Logo, mağaza görselleri, ekran görüntüleri
 ```
 
-Kaynak koddaki yorumlar, günlük satırları ve belgelerin çoğu Türkçe; kullanıcıya görünen metinler Türkçe ve
-İngilizce.
+Her belgenin Türkçesi ve İngilizcesi var (`X.tr.md` / `X.md`). Kaynak koddaki yorumlar ve günlük satırları
+Türkçe; kullanıcıya görünen metinler Türkçe ve İngilizce.
 
 ## Katkı
 

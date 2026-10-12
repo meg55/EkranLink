@@ -1,8 +1,10 @@
+**English** · [Türkçe](ARCHITECTURE.tr.md)
+
 # EkranLink architecture
 
 This document explains how EkranLink is put together: the programs, how a frame travels from the PC to the
 device, how devices are found and connected, and why the design looks the way it does. The wire format is
-specified in [PROTOCOL.md](PROTOCOL.md) (Turkish); plans and measurements are in [ROADMAP.md](ROADMAP.md).
+specified in [PROTOCOL.md](PROTOCOL.md); plans and measurements are in [ROADMAP.md](ROADMAP.md).
 Turkish names that appear in code are explained in the glossary in [../AGENTS.md](../AGENTS.md).
 
 ## Programs

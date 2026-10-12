@@ -1,5 +1,10 @@
 # AGENTS.md
 
+> **Türkçe:** Bu dosya yapay zekâ kodlama asistanları içindir (Codex, Copilot, Cursor, Claude vb. depoda bu adı
+> arar), bu yüzden İngilizcedir. Proje belgelerinin Türkçeleri: [README.tr.md](README.tr.md),
+> [docs/ARCHITECTURE.tr.md](docs/ARCHITECTURE.tr.md), [docs/PROTOCOL.tr.md](docs/PROTOCOL.tr.md),
+> [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md), [driver/README.tr.md](driver/README.tr.md).
+
 Guidance for AI coding agents, and a quick orientation for human contributors. Read this before changing
 code. For what the project is, see [README.md](README.md); for how it works, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -83,8 +88,11 @@ compiles is not a change that works: say what you verified and what you could no
   Turkish (see glossary). Match the style of the surrounding code.
 - Text files are UTF-8. `.ps1`, `.bat` and `.iss` use CRLF (`.gitattributes`); PowerShell scripts and the
   `.iss` file start with a BOM so Windows PowerShell 5 and Inno Setup read Turkish characters correctly.
-- Docs in `docs/` are Turkish except `ARCHITECTURE.md`; keep `README.md` (English) and `README.tr.md`
-  (Turkish) in sync.
+- **Every document exists in English and Turkish.** Long documents come in pairs, `X.md` (English) and
+  `X.tr.md` (Turkish): `README`, `docs/ARCHITECTURE`, `docs/PROTOCOL`, `docs/ROADMAP`, `driver/README`. Files
+  GitHub looks up by name (`CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`) and `docs/DEVICES.md` hold
+  both languages in one file, English first. When you change a document, change both languages in the same
+  commit; links in Turkish documents point to `.tr.md` versions. This file is the exception (English only).
 
 ## Glossary (Turkish names in code, files and docs)
 
@@ -127,10 +135,13 @@ compiles is not a change that works: say what you verified and what you could no
 
 ## Documents
 
-- [README.md](README.md) / [README.tr.md](README.tr.md): what it is, how to use it
+Each has a Turkish twin (`.tr.md`) except where noted.
+
+- [README.md](README.md): what it is, how to use it
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): programs, frame path, connections, service mode
-- [docs/PROTOCOL.md](docs/PROTOCOL.md): wire protocol, handshake, encryption (Turkish)
-- [docs/ROADMAP.md](docs/ROADMAP.md): plan, decisions and measurements (Turkish)
-- [docs/DEVICES.md](docs/DEVICES.md): tested devices
+- [docs/PROTOCOL.md](docs/PROTOCOL.md): wire protocol, handshake, encryption
+- [docs/ROADMAP.md](docs/ROADMAP.md): plan, decisions and measurements
+- [docs/DEVICES.md](docs/DEVICES.md): tested devices (both languages in one file)
 - [driver/README.md](driver/README.md): virtual display driver, signing, install
-- [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md)
+- [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+  (both languages in one file)

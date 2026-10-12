@@ -1,137 +1,140 @@
-# EkranLink protokolü v2
+**English** · [Türkçe](PROTOCOL.tr.md)
 
-Tek TCP bağlantısı, varsayılan port **27183**. Bağlantıyı her zaman PC açar (Android 4.x'te
-`adb reverse` yok): USB'de `adb forward tcp:27183 tcp:27183`, Wi-Fi'de tabletin IP'si.
+# EkranLink protocol v2
 
-Tüm sayılar aksi belirtilmedikçe **big-endian**. `str` = `u16 uzunluk` + UTF-8 bayt.
+A single TCP connection, default port **27183**. The connection is always opened by the PC (Android 4.x has no
+`adb reverse`): over USB via `adb forward tcp:27183 tcp:27183`, over Wi-Fi to the tablet's IP.
 
-## Bulunma (UDP, port 27183)
+Unless stated otherwise, all numbers are **big-endian**. `str` = `u16 length` + UTF-8 bytes.
+Direction markers: `P` = PC, `T` = tablet/phone (the Android device); `P→T` = PC→device, `T→P` = device→PC.
 
-PC, her ağ arayüzünün yayın adresine (ör. 192.168.1.255, USB internet paylaşımında 192.168.42.255) sorar:
+## Discovery (UDP, port 27183)
 
-- Soru (P→T): `"EKRN?"` + `u16 sürüm`
-- Cevap (T→P, soranın adresine): `"EKRN!"` + `u16 sürüm, u16 tcpPort, str ad, str kimlik`
+The PC asks on the broadcast address of every network interface (e.g. 192.168.1.255, or 192.168.42.255 with USB tethering):
 
-Tablet boştayken hiçbir paket göndermez; yalnızca soru gelince cevap verir.
+- Query (P→T): `"EKRN?"` + `u16 version`
+- Reply (T→P, to the sender's address): `"EKRN!"` + `u16 version, u16 tcpPort, str name, str id`
 
-Soru her arayüzden, o arayüzün adresine bağlı ayrı bir soketle gönderilir: aynı ağa iki kartla
-(Ethernet + Wi-Fi) bağlı PC'de bağlanmamış soketin yayını yalnızca yönlendirmenin seçtiği karttan çıkar.
-Wi-Fi yayını onaysız gider ve güç tasarrufundaki tablet kaçırabilir; bu yüzden soru 1 sn içinde 3 kez
-yinelenir ve daha önce Wi-Fi ile bağlanılan tabletlerin adreslerine (en çok 4, eşleşme deposunda
-`Tabletler`) doğrudan da sorulur. Doğrudan paketi erişim noktası onaylı ve yeniden göndererek iletir.
+While idle, the tablet sends no packets at all; it only replies when a query arrives.
 
-## Çerçeve
+The query is sent from every interface through a separate socket bound to that interface's address: on a PC
+connected to the same network with two adapters (Ethernet + Wi-Fi), a broadcast from an unbound socket leaves only through the adapter chosen by routing.
+Wi-Fi broadcasts are sent unacknowledged and a tablet in power-saving mode may miss them; therefore the query is repeated 3 times
+within 1 s, and the addresses of tablets previously connected over Wi-Fi (at most 4, `Tabletler` in the pairing
+store) are also queried directly. A direct packet is delivered by the access point with acknowledgement and retransmission.
 
-```
-u32 gövdeUzunluğu
-gövde = u8 tür + yük
-[16 bayt etiket]      yalnızca şifreli bağlantıda
-```
-
-Şifreli bağlantıda gövde **ChaCha20-Poly1305** (RFC 8439, ek veri boş) ile yerinde şifrelenir.
-Nonce = `00 00 00 00` + `sıra no (u64, little-endian)`; her yönün kendi anahtarı ve 0'dan başlayan
-sıra numarası vardır, sıra no her çerçevede artar (tekrar gönderme / sıra değiştirme işe yaramaz).
-Etiket tutmazsa bağlantı hemen kesilir.
-
-## Açılış ve güvenlik
+## Frame
 
 ```
-P→T  "EKRN" + u16 sürüm (2)                                              ham
-P→T  PcHello   u8 bayrak, 16 pcKimlik, 65 ecdhP, 16 nonceP, str pcAdı    şifresiz çerçeve
-T→P  TabletKey 65 ecdhT, 16 nonceT, str cihazKimliği, str cihazAdı, u8 buPC'yiTanıyorum
-P→T  Mode      u8 eşleşmiş, u8 şifreli
-     ── bu noktadan sonra (şifreliyse) tüm çerçeveler şifreli ──
-     (eşleşmemişse) P→T ve T→P PairResult u8 onay
+u32 bodyLength
+body = u8 type + payload
+[16-byte tag]      only on an encrypted connection
+```
+
+On an encrypted connection the body is encrypted in place with **ChaCha20-Poly1305** (RFC 8439, empty associated data).
+Nonce = `00 00 00 00` + `sequence number (u64, little-endian)`; each direction has its own key and its own sequence
+number starting from 0, and the sequence number is incremented on every frame (replaying / reordering is useless).
+If the tag does not verify, the connection is dropped immediately.
+
+## Handshake and security
+
+```
+P→T  "EKRN" + u16 version (2)                                            raw
+P→T  PcHello   u8 flags, 16 pcId, 65 ecdhP, 16 nonceP, str pcName       unencrypted frame
+T→P  TabletKey 65 ecdhT, 16 nonceT, str deviceId, str deviceName, u8 knowsThisPc
+P→T  Mode      u8 paired, u8 encrypted
+     ── from this point on (if encrypted) all frames are encrypted ──
+     (if not paired) P→T and T→P PairResult u8 accept
 T→P  Hello ...
 ```
 
-Tablet PC'nin sürümünü desteklemiyorsa `TabletKey` yerine `Incompatible` (24) gönderir:
-`u16 tabletinSürümü, str uygulamaSürümü` (şifresiz çerçeve) ve bağlantıyı kapatır. İki taraf da
-kullanıcıya hangi uygulamanın güncelleneceğini söyler (PC tablete uygulama kurmaz; ikisi ayrı indirilir).
+If the tablet does not support the PC's version, it sends `Incompatible` (24) instead of `TabletKey`:
+`u16 tabletVersion, str appVersion` (unencrypted frame) and closes the connection. Both sides
+tell the user which app needs to be updated (the PC does not install the app on the tablet; the two are downloaded separately).
 
-- `ecdh*`: geçici ECDH P-256 açık anahtarı (`04 || X || Y`), her bağlantıda yenisi üretilir.
-  Tablet gelen noktanın eğri üzerinde olduğunu doğrular; Windows CNG içe aktarırken doğrular.
-- `Z` = ECDH ortak sırrı (X koordinatı, 32 bayt, big-endian).
-- `H` = SHA-256(ecdhP ‖ ecdhT ‖ nonceP ‖ nonceT ‖ pcKimlik ‖ cihazKimliği)
-- `K` = eşleşme anahtarı (eşleşmişse), değilse 32 sıfır bayt
-- `PRK` = HMAC-SHA256(anahtar = H, veri = Z ‖ K)
-- Oturum anahtarları: `HMAC(PRK, "ekran p2t key")` (PC→tablet), `HMAC(PRK, "ekran t2p key")` (tablet→PC)
+- `ecdh*`: ephemeral ECDH P-256 public key (`04 || X || Y`), a new one is generated for every connection.
+  The tablet verifies that the received point lies on the curve; Windows CNG verifies it on import.
+- `Z` = ECDH shared secret (X coordinate, 32 bytes, big-endian).
+- `H` = SHA-256(ecdhP ‖ ecdhT ‖ nonceP ‖ nonceT ‖ pcId ‖ deviceId)
+- `K` = pairing key (if paired), otherwise 32 zero bytes
+- `PRK` = HMAC-SHA256(key = H, data = Z ‖ K)
+- Session keys: `HMAC(PRK, "ekran p2t key")` (PC→tablet), `HMAC(PRK, "ekran t2p key")` (tablet→PC)
 
-**Eşleştirme** (`eşleşmiş = 0`): iki taraf da `HMAC(PRK, "ekran sas")`'ın ilk 4 baytından
-(big-endian, mod 1 000 000) 6 haneli kodu gösterir. Araya giren biri iki tarafla ayrı anahtar
-değişimi yaparsa kodlar farklı çıkar ve kullanıcı fark eder. Kod oturuma bağlı olduğundan kaba
-kuvvetle denenemez. İki taraf da onaylarsa yeni eşleşme anahtarı `HMAC(PRK, "ekran pair")` saklanır.
-Tablette "Reddet" bağlantıyı kapatır; PC bunu da ret sayar ve o tableti 1 dakika tekrar sormaz.
+**Pairing** (`paired = 0`): both sides display a 6-digit code derived from the first 4 bytes of `HMAC(PRK, "ekran sas")`
+(big-endian, mod 1 000 000). If a man-in-the-middle performs separate key
+exchanges with each side, the codes come out different and the user notices. Because the code is bound to the session, it cannot be
+brute-forced. If both sides accept, the new pairing key `HMAC(PRK, "ekran pair")` is stored.
+"Reject" on the tablet closes the connection; the PC also counts this as a rejection and does not ask that tablet again for 1 minute.
 
-**USB** (adb forward; tablette bağlantı 127.0.0.1'den gelir): kablo + adb yetkisi güvenilir kabul
-edilir; eşleştirme onaysız yapılır ve tabletin işlemcisini yormamak için `şifreli = 0` seçilir.
-Tablet, yerel olmayan bir bağlantıdan gelen `şifreli = 0` isteğini reddeder.
+**USB** (adb forward; on the tablet the connection arrives from 127.0.0.1): cable + adb authorization are considered
+trusted; pairing is done without confirmation and `encrypted = 0` is chosen so as not to burden the tablet's CPU.
+The tablet rejects an `encrypted = 0` request coming from a non-local connection.
 
-Eşleşmiş bir cihazın anahtarı tutmazsa `Hello` doğrulanamaz; PC kendi kaydını siler ve bir
-sonraki bağlantıda yeniden eşleştirme ister.
+If the key of a paired device does not match, `Hello` cannot be verified; the PC deletes its own record and
+requests re-pairing on the next connection.
 
-## Mesajlar
+## Messages
 
-| Tür | Ad | Yön | Yük |
+| Type | Name | Direction | Payload |
 |---|---|---|---|
-| 1 | Hello | T→P | `u16 sürüm, u16 yüzeyGen, u16 yüzeyYük, u16 ekranGen, u16 ekranYük, u16 dpi, u16 sdk, str model, str çözücü` |
-| 2 | Config | P→T | `u16 akışGen, u16 akışYük, u8 codec(1=H.264), u16 kaynakGen, u16 kaynakYük, u16 içerikX, u16 içerikY, u16 içerikGen, u16 içerikYük` |
-| 3 | Video | P→T | `u64 pts(µs, PC saati), u8 bayrak(bit0 anahtar kare, bit1 itici kare), ... tek karenin Annex-B verisi` |
-| 4 | Ping | P→T | `u64 zaman` |
-| 5 | Pong | T→P | `u64 zaman` (Ping'deki değer aynen) |
-| 6 | FrameAck | T→P | `u64 pts, u32 çözmeSüresi(µs), u16 adet` — son çizilen kare; `adet` bu onayın kapsadığı kare sayısı (hareket sürerken 3'te bir, çözücü boşalınca hemen gönderilir; yoksa 1) |
-| 7 | CursorShape | P→T | `u16 gen, u16 yük, u16 sıcakX, u16 sıcakY, gen×yük adet u32 ARGB` |
-| 8 | CursorPos | P→T | `s16 x, s16 y, u8 görünür` — imlecin sol üstü, kaynak görüntü pikseli |
-| 10 | Touch | T→P | `u8 eylem(0 bas,1 kaydır,2 bırak,3 iptal), u8 parmak, u16 x, u16 y, u16 basınç(0–1024)` — akış pikseli; her parmak ayrı `parmak` kimliğiyle, `iptal` tüm parmakları iptal eder |
-| 11 | Orientation | T→P | `u16 derece` (0, 90, 270) — tabletin tutuluş yönü, yatay ekrana göre saat yönünde. Yalnızca tabletin otomatik döndürmesi açıkken, bağlanınca ve yön değişince gönderilir |
-| 12 | DisplayPower | P→T | `u8 açık` — Windows ekranları kapattı (0) / açtı (1). Tablet kararır ve ekranının kendi zaman aşımıyla kapanmasına izin verir; bağlantı sürer. Açılınca tablet ekranını yakar |
-| 13 | KeyRequest | T→P | (boş) — tablet çözücüsünü yeniden kurdu (yüzeyi yok olup geri geldi); PC anahtar kare gönderir ve onay sayacını sıfırlar |
-| 14 | VideoVisible | T→P | `u8 önde` — tablet uygulaması arka plana alındı (0) / öne geldi (1). Arkadayken PC yakalama ve kodlamayı durdurur, bağlantı sürer; öne gelince tablet `KeyRequest` gönderir. Arkadayken PC tablet ekranını kapatmaz |
-| 20–24 | PcHello, TabletKey, Mode, PairResult, Incompatible | | yukarıda |
+| 1 | Hello | T→P | `u16 version, u16 surfaceWidth, u16 surfaceHeight, u16 screenWidth, u16 screenHeight, u16 dpi, u16 sdk, str model, str decoder` |
+| 2 | Config | P→T | `u16 streamWidth, u16 streamHeight, u8 codec(1=H.264), u16 sourceWidth, u16 sourceHeight, u16 contentX, u16 contentY, u16 contentWidth, u16 contentHeight` |
+| 3 | Video | P→T | `u64 pts(µs, PC clock), u8 flags(bit0 key frame, bit1 pusher frame), ... Annex-B data of a single frame` |
+| 4 | Ping | P→T | `u64 time` |
+| 5 | Pong | T→P | `u64 time` (the value from the Ping, unchanged) |
+| 6 | FrameAck | T→P | `u64 pts, u32 decodeTime(µs), u16 count` — the last rendered frame; `count` is the number of frames this acknowledgement covers (every 3rd frame while motion continues, sent immediately when the decoder drains; otherwise 1) |
+| 7 | CursorShape | P→T | `u16 width, u16 height, u16 hotspotX, u16 hotspotY, width×height × u32 ARGB` |
+| 8 | CursorPos | P→T | `s16 x, s16 y, u8 visible` — top-left of the cursor, in source image pixels |
+| 10 | Touch | T→P | `u8 action(0 down,1 move,2 up,3 cancel), u8 finger, u16 x, u16 y, u16 pressure(0–1024)` — stream pixels; each finger with its own `finger` id, `cancel` cancels all fingers |
+| 11 | Orientation | T→P | `u16 degrees` (0, 90, 270) — how the tablet is held, clockwise relative to the landscape screen. Sent only while the tablet's auto-rotate is on, on connect and when the orientation changes |
+| 12 | DisplayPower | P→T | `u8 on` — Windows turned the displays off (0) / on (1). The tablet dims and lets its screen turn off via its own timeout; the connection stays up. When turned on, the tablet lights its screen |
+| 13 | KeyRequest | T→P | (empty) — the tablet re-created its decoder (its surface was destroyed and came back); the PC sends a key frame and resets the acknowledgement counter |
+| 14 | VideoVisible | T→P | `u8 foreground` — the tablet app was sent to the background (0) / came to the foreground (1). While in the background the PC stops capturing and encoding, the connection stays up; on returning to the foreground the tablet sends `KeyRequest`. While in the background the PC does not turn off the tablet's screen |
+| 20–24 | PcHello, TabletKey, Mode, PairResult, Incompatible | | above |
 
-Tablet ilk 4 bayt `"EKRN"` değilse akışı ham H.264 Annex-B kabul eder (tanı modu, `tools/faz0.ps1`).
+If the first 4 bytes are not `"EKRN"`, the tablet treats the stream as raw H.264 Annex-B (diagnostic mode, `tools/faz0.ps1`).
 
-### İçerik dikdörtgeni
+### Content rectangle
 
-Kaynak ekran (ör. 1920×1080) oranı korunarak akışa (ör. 1280×752) yerleştirilir; kalan kısım siyah.
-`içerik*` bu yerleşimi akış pikseli cinsinden verir. Tablet imleci buna göre konumlar/ölçekler,
-PC dokunmayı bunun tersine göre masaüstüne çevirir.
+The source screen (e.g. 1920×1080) is fitted into the stream (e.g. 1280×752) preserving its aspect ratio; the remainder is black.
+`content*` gives this placement in stream pixels. The tablet positions/scales the cursor according to it,
+and the PC maps touches back to the desktop using its inverse.
 
-### USB'de otomatik açılma
+### Auto-start over USB
 
-PC, adb ile tablete sorar: `am broadcast -f 32 -n org.ekranlink.android/.AutoStartReceiver`. Sonuç kodu
-tabletin kararıdır: **1** izin var (PC uygulamayı `am start` ile başlatır; Android 10+ arka plandan ekran
-açmaya izin vermediği için başlatan PC'dir), **2** reddedildi ("bilgisayara takılınca otomatik aç" kapalı ya
-da kullanıcı bağlantıyı tabletten kesti — kablo 30 sn çıkarılana ya da uygulama elle açılana kadar),
-**3** uygulama zaten açık (PC bağlanır). PC'de de "otomatik bağlan" ayarı vardır: ikisi de açıksa tablet
-takılınca kendiliğinden ekran olur.
+The PC asks the tablet via adb: `am broadcast -f 32 -n org.ekranlink.android/.AutoStartReceiver`. The result code
+is the tablet's decision: **1** allowed (the PC launches the app with `am start`; since Android 10+ does not allow turning on the screen
+from the background, it is the PC that launches it), **2** refused ("open automatically when plugged into the computer" is off, or
+the user disconnected from the tablet — until the cable has been unplugged for 30 s or the app is opened manually),
+**3** the app is already open (the PC connects). The PC also has an "auto-connect" setting: if both are on, the tablet
+automatically becomes a display when plugged in.
 
-Sonuç verisi `kimlik|ad` (ör. `9774d56d682e549c|LENOVO Vodafone Smart Tab III 10`): kimlik, el sıkışmada ve
-Wi-Fi keşfinde gönderilenin aynısıdır. PC cihaz bulurken uygulamayı açmadan da sorar (`--ez kimlik true`; bu
-soru "bağlantı kesildi" bekletmesini uzatmaz): birden çok cihazı ayırt eder, aynı cihazı USB'de ve Wi-Fi'de
-iki kez listelemez (ikisinde de varsa USB, biri bağlıysa o).
+The result data is `kimlik|ad` (i.e. `id|name`, e.g. `9774d56d682e549c|LENOVO Vodafone Smart Tab III 10`): the id is the same one sent in the handshake and
+in Wi-Fi discovery. While looking for devices the PC also asks without opening the app (`--ez kimlik true`; this
+query does not extend the "disconnected" hold-off): it distinguishes multiple devices and does not list the same device twice over USB and Wi-Fi
+(if it is present on both, USB; if one of them is connected, that one).
 
-### Birden çok cihaz
+### Multiple devices
 
-Her cihaz ayrı bir oturumdur (ayrı TCP bağlantısı, kodlayıcı ve ikinci ekranda ayrı sanal monitör). USB'de
-her cihaz için PC'de ayrı bir yerel port açılır (`adb -s SERİ forward tcp:0 tcp:27183`; adb boş bir port
-seçer). Tek ekran modunda EkranLink'in tüm monitörleri açık kalır, yalnızca diğerleri kapanır.
+Each device is a separate session (separate TCP connection, encoder and, in extended-display mode, separate virtual monitor). Over USB
+a separate local port is opened on the PC for each device (`adb -s SERIAL forward tcp:0 tcp:27183`; adb picks a free
+port). In single-display mode all of EkranLink's monitors stay on; only the others are turned off.
 
-### Döndürme
+### Rotation
 
-Tablet uygulaması hep yatay kalır. Tablet dik tutulunca `Orientation` gönderir; PC ikinci ekran modunda sanal
-monitörü döndürür (90 → DMDO_90, 270 → DMDO_270). Windows döndürülmüş ekranın görüntüsünü panelin kendi
-yönünde verdiğinden akış, `Config` ve çözücü değişmez: `kaynakGen×kaynakYük` her zaman bu görüntünün
-boyutudur. PC imleç resmini ve konumunu bu görüntünün yönüne çevirerek gönderir, gelen dokunmayı da tersine
-çevirerek masaüstüne uygular. Yansıtma modunda PC'nin gerçek monitörü döndürülmez.
+The tablet app always stays in landscape. When the tablet is held upright it sends `Orientation`; in extended-display mode the PC rotates the virtual
+monitor (90 → DMDO_90, 270 → DMDO_270). Because Windows delivers the image of a rotated display in the panel's own
+orientation, the stream, `Config` and the decoder do not change: `sourceWidth×sourceHeight` is always the size of this
+image. The PC sends the cursor image and position converted to this image's orientation, and applies incoming touches to the desktop
+after converting them back. In mirror mode the PC's real monitor is not rotated.
 
-### İtici kareler ve akış kontrolü
+### Pusher frames and flow control
 
-Bazı donanım çözücüler (ör. MediaTek) içinde sabit ~3 kare tutar; yeni kare gelmezse son görüntü
-ekrana hiç çıkmaz. Bu yüzden PC, ekran değiştikten sonra kısa aralıklarla birkaç **itici kare**
-(değişmemiş görüntü, neredeyse sıfır bayt) gönderir. Ekran sabitken hiçbir kare gönderilmez.
-Gerçek karelerin pts'i çift, itici karelerinki tek sayıdır.
+Some hardware decoders (e.g. MediaTek) hold a fixed ~3 frames internally; if no new frame arrives, the last image
+never reaches the screen. Therefore, after the screen changes, the PC sends a few **pusher frames**
+(unchanged image, almost zero bytes) at short intervals. While the screen is static no frames are sent.
+Real frames have even pts values, pusher frames have odd ones.
 
-PC, gönderdiği ama `FrameAck` almadığı kare sayısını sınırlar. Sınıra ulaşınca yeni kare kodlamaz,
-yalnızca "ekran değişti" bilgisini tutar; onay gelince en güncel görüntüyü kodlar. Böylece yavaş
-bağlantıda gecikme birikmez.
+The PC limits the number of frames it has sent but not yet received a `FrameAck` for. When the limit is reached it does not encode new frames,
+it only remembers that "the screen changed"; when an acknowledgement arrives it encodes the most recent image. This way, on a slow
+connection, latency does not accumulate.

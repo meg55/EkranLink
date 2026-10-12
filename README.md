@@ -179,8 +179,8 @@ tools/          Packaging, icon generation and measurement scripts
 art/            Logo, store graphics, screenshots
 ```
 
-Source comments, log lines and most docs are in Turkish; user-facing text is in English and Turkish. A
-glossary of the Turkish names used in code is in [AGENTS.md](AGENTS.md).
+Every document is available in English and Turkish (`X.md` / `X.tr.md`). Source comments and log lines are
+in Turkish; a glossary of the Turkish names used in code is in [AGENTS.md](AGENTS.md).
 
 ## Contributing
 
