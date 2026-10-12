@@ -5,12 +5,16 @@ kaldıran IddCx (Indirect Display) sürücüsü. Kullanıcı modunda (UMDF 2) ç
 
 ## Kaynak ve lisans
 
-Bu klasör **EkranLink'in geri kalanından ayrı lisanslıdır.**
+Bu klasör **EkranLink'in geri kalanından (GPL-3.0) ayrı lisanslıdır**; lisans metinlerinin tamamı
+[LICENSE](LICENSE) dosyasındadır. Sürücü ayrı bir programdır; EkranLink onunla yalnızca aygıt komutlarıyla
+(IOCTL) konuşur. Microsoft örneğinden gelen kısımlar nedeniyle bu klasörün kaynağı bir bütün olarak
+**MS-PL** koşullarıyla dağıtılır.
 
-- [SudoVDA](https://github.com/SudoMaker/SudoVDA) (SudoMaker) tabanlıdır — lisansı: *"MIT and CC0 or
-  Public Domain … choose the least restrictive option"*.
-- SudoVDA, Microsoft'un [Indirect Display Driver örneğine](https://github.com/microsoft/Windows-driver-samples/tree/main/video/IndirectDisplay)
-  dayanır — lisansı: MS-PL.
+- Microsoft'un [Indirect Display Driver örneği](https://github.com/microsoft/Windows-driver-samples/tree/main/video/IndirectDisplay) — MS-PL.
+- Onun üzerine [Virtual-Display-Driver](https://github.com/VirtualDrivers/Virtual-Display-Driver)
+  (IddSampleDriver) — MIT.
+- Onun üzerine [SudoVDA](https://github.com/SudoMaker/SudoVDA) (SudoMaker) — *"MIT and CC0 or Public
+  Domain … choose the least restrictive option"*.
 - EkranLink değişiklikleri (MIT): EkranLink'e özel donanım kimliği / arayüz GUID'i / kayıt defteri yolu
   (SudoVDA veya Apollo kurulu makinelerde çakışmasın), dış girdiler için sınır denetimleri ve
   sonlandırılmış dizgiler (EDID'e kopyalanan 14 baytlık alanlar), tabletin fiziksel boyutunun EDID'e

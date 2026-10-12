@@ -1,0 +1,51 @@
+name: Hata bildirimi / Bug report
+description: Bir şey beklendiği gibi çalışmıyor / Something doesn't work as expected
+labels: [hata]
+body:
+  - type: textarea
+    id: ne
+    attributes:
+      label: Ne oldu? / What happened?
+      description: Ne bekliyordunuz, ne oldu? Adım adım nasıl tekrarlanır? / What did you expect, what happened, how to reproduce?
+    validations:
+      required: true
+  - type: input
+    id: cihaz
+    attributes:
+      label: Cihaz ve Android sürümü / Device and Android version
+      placeholder: "Lenovo Tab M10, Android 11"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows sürümü / Windows version
+      placeholder: "Windows 11 24H2"
+    validations:
+      required: true
+  - type: input
+    id: surum
+    attributes:
+      label: EkranLink sürümü / EkranLink version
+      description: Pencerenin sol altında / Bottom left of the window
+      placeholder: "0.4.3"
+    validations:
+      required: true
+  - type: dropdown
+    id: baglanti
+    attributes:
+      label: Bağlantı / Connection
+      options: [USB, Wi-Fi]
+  - type: dropdown
+    id: mod
+    attributes:
+      label: Görüntü modu / Display mode
+      options: [İkinci ekran / Second screen, Tek ekran / Only screen, Yansıtma / Mirror]
+  - type: textarea
+    id: gunluk
+    attributes:
+      label: Günlük / Log
+      description: >
+        Pencerede Genel > Günlüğü aç; ilgili son satırlar. Paylaşmadan önce göz atın (cihaz adları, yerel IP adresleri).
+        / General > Open log; the relevant last lines. Review before sharing (device names, local IP addresses).
+      render: text

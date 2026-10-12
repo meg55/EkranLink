@@ -3,3 +3,5 @@
 *.ps1 text eol=crlf
 *.jar binary
 *.png binary
+*.ico binary
+*.ttf binary

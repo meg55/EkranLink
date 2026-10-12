@@ -92,6 +92,32 @@ Gerekenler: JDK 17+ ve Android SDK (Android Studio ile gelir), MinGW-w64 GCC + C
 ```
 
 Tanı için ham akış testi: `.\tools\faz0.ps1` (ffmpeg gerekir).
+
+## Katkı ve güvenlik
+
+Hata bildirimi ve katkı: [CONTRIBUTING.md](CONTRIBUTING.md). Güvenlik açıklarını herkese açık issue yerine
+gizli bildirin: [SECURITY.md](SECURITY.md).
+
 ## Lisans
 
-[GPL-3.0](LICENSE)
+EkranLink [GPL-3.0](LICENSE) ile lisanslıdır. Sanal ekran sürücüsü ([driver/](driver/)) ayrı bir programdır;
+Microsoft örneğine dayandığı için MS-PL, EkranLink değişiklikleri MIT ile lisanslıdır
+([driver/LICENSE](driver/LICENSE)).
+
+## English
+
+EkranLink turns old Android tablets and phones (Android 4.1+) into displays for a Windows PC, over USB or
+encrypted Wi-Fi: as a **second screen** (a real virtual monitor, via an IddCx driver), as the **only screen**
+(e.g. for a headless mini PC, including the Windows sign-in screen), or as a **mirror**. Touch is sent back
+as Windows multi-touch. Several devices can be connected at once, each as its own monitor.
+
+1. Run `EkranLink.exe` from the Windows zip (no install needed). A settings window opens and an icon
+   appears in the notification area.
+2. Install `EkranLink-<version>-android.apk` on the device (downloaded separately; the PC never installs
+   apps on the device). For USB, enable *Developer options > USB debugging*.
+3. Open EkranLink on the device; the PC finds it (USB first, then Wi-Fi). On the first Wi-Fi connection,
+   confirm the same 6-digit code on both sides.
+
+The user interface is available in English and Turkish; most documentation is currently in Turkish.
+Building: see *Derlemek* above (JDK 17+, Android SDK, MinGW-w64 GCC, CMake, Ninja). License: GPL-3.0; the
+driver in `driver/` is MS-PL / MIT.
