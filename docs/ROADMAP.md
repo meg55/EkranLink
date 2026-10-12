@@ -106,7 +106,7 @@ Derleme için Visual Studio gerekmez: MinGW-w64 (GCC) yeterli.
       o cihaza gider (tam çoklu cihaz yol haritasında)
 - [x] Güvenilir Wi-Fi keşfi: arayüz başına soket, 3 kez yineleme, bilinen tablet adreslerine doğrudan soru
       (yayın güvenlik duvarıyla engellenip denendi: 1,2 sn'de bağlandı). Tablet UDP/TCP portu boşalana kadar dener
-- [ ] Kalıcı APK sürüm anahtarı (GitHub sürümleri için; şu an hata ayıklama anahtarı)
+- [x] Kalıcı APK sürüm anahtarı (depo dışında; v1+v2+v3 imza, Android 4.x için v1 şart)
 - [ ] USB yoklamasını `adb get-state` yerine Windows cihaz bildirimleriyle yapma
 - [ ] Yazılım kodlayıcı yedeği (donanım kodlayıcısı olmayan PC'ler)
 
@@ -161,6 +161,10 @@ MSVC + WDK ile derlenip yerel sertifikayla imzalanıyor.
       elle aynı açıyla; PC'ye ekran hep yatay bildirilir ve monitör yatay kilitli uygulamadaki gibi dikey olur.
       Ölçüldü (Android 16 öykünücüsü, sw720dp): dört yönde (ters dikey dahil) dokunma ±1 px, imleç parmağın altında
 - [ ] Görüntüyü DXGI yakalama yerine doğrudan sürücüden almak (bir kopya daha az, oturum açma ekranı)
+- [x] GitHub'da açık kaynak (github.com/meg55/EkranLink): sürücü lisans metinleri, katkı ve güvenlik belgeleri
+- [x] Otomatik derleme (GitHub Actions, `.github/workflows/derle.yml`): her yüklemede Android + Windows derlenir,
+      şifreleme testleri çalışır, sürücü derlenir (imzasız); `v*` etiketinde paketler taslak sürüm olur (yayımlamak
+      elle). Derleyici yereldekiyle aynı (WinLibs GCC 16.1.0, özetiyle doğrulanır); eylemler commit koduyla sabit
 - [ ] Dağıtım imzası (SignPath Foundation veya EV + Microsoft) — şu an sürücü yalnızca derlendiği bilgisayarda kurulabiliyor
 
 Ölçüm (S6000, USB, ikinci ekran 1280×752): PC→tablette çizim ~27 ms, ekran sabitken PC CPU %0,3.

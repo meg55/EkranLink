@@ -1,0 +1,176 @@
+# Her yüklemede derler ve testleri çalıştırır; "v0.4.3" gibi bir sürüm etiketi atılınca indirme
+# paketlerini taslak sürüm (draft release) olarak hazırlar. Taslağı yayımlamak elle yapılır.
+#
+# APK imzası (isteğe bağlı): depo ayarlarında Secrets > Actions altında ANDROID_KEYSTORE_BASE64,
+# ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD tanımlıysa etiket derlemesinde APK
+# sürüm anahtarıyla imzalanır. Tanımlı değilse taslağa APK eklenmez (geliştirme imzalı APK yayımlanmaz);
+# yerelde tools\paketle.ps1 ile imzalanan APK taslağa elle eklenir.
+#
+# Eylemler sürüm etiketiyle değil, değişmez commit koduyla sabitlenir (tedarik zinciri güvenliği).
+
+name: Derleme
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: derleme-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Yereldeki derleyicinin aynısı (host-windows\build.ps1: WinLibs GCC, MSVCRT, POSIX iş parçacıkları)
+  WINLIBS_URL: https://github.com/brechtsanders/winlibs_mingw/releases/download/16.1.0posix-14.0.0-msvcrt-r2/winlibs-x86_64-posix-seh-gcc-16.1.0-mingw-w64msvcrt-14.0.0-r2.zip
+  WINLIBS_SHA256: 08f3bbc1db7edf6ce1520a64e639d14b70104faa86d9ef632a1513734f69553a
+
+jobs:
+  uygulama:
+    name: Uygulama (Android + Windows)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6  # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: MinGW önbelleği
+        id: mingw
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ runner.temp }}\mingw64
+          key: winlibs-${{ env.WINLIBS_SHA256 }}
+
+      - name: MinGW indir (WinLibs GCC 16.1.0)
+        if: steps.mingw.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'winlibs.zip'
+          Invoke-WebRequest $env:WINLIBS_URL -OutFile $zip
+          $h = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          if ($h -ne $env:WINLIBS_SHA256) { throw "WinLibs özeti uyuşmuyor: $h" }
+          7z x $zip "-o$env:RUNNER_TEMP" -y | Out-Null
+
+      - name: MinGW yolu
+        shell: pwsh
+        run: |
+          Join-Path $env:RUNNER_TEMP 'mingw64\bin' | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+
+      - name: APK imza anahtarı (yalnızca sürüm etiketinde, tanımlıysa)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if (-not $env:KEYSTORE_BASE64) { Write-Host 'İmza anahtarı tanımlı değil; APK taslağa eklenmeyecek.'; exit 0 }
+          $ks = Join-Path $env:RUNNER_TEMP 'release.jks'
+          [IO.File]::WriteAllBytes($ks, [Convert]::FromBase64String($env:KEYSTORE_BASE64))
+          $props = Join-Path $env:RUNNER_TEMP 'keystore.properties'
+          @(
+            "storeFile=$($ks -replace '\\', '/')"
+            "storePassword=$env:KEYSTORE_PASSWORD"
+            "keyAlias=$env:KEY_ALIAS"
+            "keyPassword=$env:KEY_PASSWORD"
+          ) | Set-Content -Encoding ascii $props
+          "RELEASE_KEYSTORE_PROPERTIES=$props" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - name: Derle, test et, paketle
+        shell: pwsh
+        run: |
+          g++ --version | Select-Object -First 1
+          .\tools\paketle.ps1
+
+      - name: Etiket ve sürüm aynı mı
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist\EkranLink-*-windows.zip | Select-Object -First 1
+          $surum = $zip.Name -replace '^EkranLink-(.+)-windows\.zip$', '$1'
+          if ("v$surum" -ne $env:GITHUB_REF_NAME) { throw "Etiket $env:GITHUB_REF_NAME, kaynak sürümü $surum" }
+
+      - name: Kaydet (Windows paketi)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: windows
+          path: dist/EkranLink-*-windows.zip
+          if-no-files-found: error
+
+      # Sürüm anahtarıyla imzalıysa "android", değilse yalnızca deneme için "android-gelistirme"
+      - name: APK imzalı mı
+        id: apk
+        shell: pwsh
+        run: |
+          $imzali = Test-Path android\app\build\outputs\apk\release\app-release.apk
+          "imzali=$($imzali.ToString().ToLower())" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+
+      - name: Kaydet (APK, sürüm imzalı)
+        if: steps.apk.outputs.imzali == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: android
+          path: dist/EkranLink-*-android.apk
+          if-no-files-found: error
+
+      - name: Kaydet (APK, geliştirme imzalı)
+        if: steps.apk.outputs.imzali != 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: android-gelistirme
+          path: dist/EkranLink-*-android.apk
+          if-no-files-found: error
+
+  surucu:
+    name: Sanal ekran sürücüsü
+    runs-on: windows-2022   # WDK 10.0.26100 bu imajda kurulu
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Derle
+        shell: pwsh
+        run: .\driver\build.ps1
+
+      # İmzasız: yalnızca derlemenin sağlamlığı için; dağıtım için imza gerekir (driver/README.md)
+      - name: Kaydet
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: surucu-imzasiz
+          path: driver/out/
+          if-no-files-found: error
+
+  taslak:
+    name: Taslak sürüm
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [uygulama, surucu]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          pattern: '{windows,android}'
+          path: paket
+          merge-multiple: true
+
+      - name: Taslak oluştur
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls -l paket
+          (cd paket && sha256sum * > SHA256SUMS.txt)
+          gh release create "$GITHUB_REF_NAME" paket/* --draft --verify-tag \
+            --title "EkranLink ${GITHUB_REF_NAME#v}" --generate-notes
+          if ! ls paket/*.apk >/dev/null 2>&1; then
+            echo "::warning::APK taslakta yok (imza anahtarı tanımlı değil). Yerelde imzalanan APK'yı taslağa ekleyin."
+          fi

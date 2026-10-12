@@ -1,5 +1,7 @@
 # <img src="art/ekranlink.svg" width="48" align="top" alt=""> EkranLink
 
+[![Derleme](https://github.com/meg55/EkranLink/actions/workflows/derle.yml/badge.svg)](https://github.com/meg55/EkranLink/actions/workflows/derle.yml)
+
 Eski tablet ve telefonlarınızı bilgisayarınız için ekran yapın: **yansıtma**, **ikinci ekran** veya
 **Windows'un tek ekranı** olarak, **USB** ya da **Wi-Fi** ile. Android 4.1'e kadar eski cihazları destekler.
 
