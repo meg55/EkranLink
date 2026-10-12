@@ -70,6 +70,8 @@ bool parse(int argc, char** argv, Options& o) {
 }  // namespace
 
 int main(int argc, char** argv) {
+    // DLL yalnızca System32'den ve exe'nin klasöründen (geçerli klasör ve PATH'teki DLL'ler yüklenmesin)
+    SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
     SetConsoleOutputCP(CP_UTF8);
     Options opt;
     if (!parse(argc, argv, opt)) {

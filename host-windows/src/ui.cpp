@@ -657,13 +657,16 @@ void Window::statusPage() {
     if (m.notice != Notice(0)) {
         card(
             [&] {
-                const bool missing = m.notice == Notice::AppMissing, tabletOld = m.notice == Notice::TabletOutdated;
+                const bool missing = m.notice == Notice::AppMissing, tabletOld = m.notice == Notice::TabletOutdated,
+                           repair = m.notice == Notice::Repair;
                 y_ += drawText(W(missing     ? i18n::NoticeAppMissingTitle
                                  : tabletOld ? i18n::NoticeTabletOldTitle
+                                 : repair    ? i18n::NoticeRepairTitle
                                              : i18n::NoticePcOldTitle),
                                fSection_.get(), x_, y_, w_, t.warn) + 4;
                 const std::wstring body = missing     ? W(i18n::NoticeAppMissing)
                                           : tabletOld ? W(i18n::NoticeTabletOld)
+                                          : repair    ? i18n::F(i18n::NoticeRepair, m.noticeArg.c_str())
                                                       : i18n::F(i18n::NoticePcOld, m.noticeArg.c_str());
                 y_ += drawText(body, fBody_.get(), x_, y_, w_, t.text) + kRowGap;
             },

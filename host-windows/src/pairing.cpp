@@ -36,7 +36,7 @@ void writeBinary(const std::wstring& key, const wchar_t* name, const void* data,
 std::array<uint8_t, 16> pcId() {
     std::array<uint8_t, 16> id{};
     if (!readBinary(config::secretPath(), L"PcId", id.data(), 16)) {
-        crypto::random(id.data(), 16);
+        if (!crypto::random(id.data(), 16)) return {};  // sıfır kimlik: el sıkışma reddeder
         writeBinary(config::secretPath(), L"PcId", id.data(), 16);
     }
     return id;
@@ -54,6 +54,13 @@ std::string pcName() {
 
 bool load(const std::string& deviceId, crypto::Bytes32& key) {
     return readBinary(config::pairsPath(), widen(deviceId).c_str(), key.data(), 32);
+}
+
+bool known(const std::string& deviceId) {
+    crypto::Bytes32 key;
+    const bool ok = !deviceId.empty() && load(deviceId, key);
+    SecureZeroMemory(key.data(), key.size());
+    return ok;
 }
 
 void save(const std::string& deviceId, const crypto::Bytes32& key) {

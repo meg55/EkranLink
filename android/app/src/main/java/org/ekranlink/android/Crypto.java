@@ -1,5 +1,8 @@
 package org.ekranlink.android;
 
+import android.os.Build;
+import android.util.Log;
+
 import java.math.BigInteger;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
@@ -24,7 +27,13 @@ import javax.crypto.spec.SecretKeySpec;
  * Hepsi Android 3.0+ standart sağlayıcılarında var; dış kütüphane gerekmez.
  */
 final class Crypto {
-    static final SecureRandom RANDOM = new SecureRandom();
+    private static final String TAG = "EkranCrypto";
+
+    /**
+     * Tek örnek: nonce'lar ve ECDH anahtarı buradan. Android 4.1–4.3'te SecureRandom'un tohumlaması hatalı
+     * (Ağustos 2013 uyarısı): orada doğrudan /dev/urandom okunur.
+     */
+    static final SecureRandom RANDOM = Build.VERSION.SDK_INT <= 18 ? new UrandomRandom() : new SecureRandom();
 
     private Crypto() {
     }
@@ -68,12 +77,32 @@ final class Crypto {
     static final class Ecdh {
         private final KeyPair pair;
         private final ECParameterSpec params;
+        private final String provider; // null: varsayılan sağlayıcı
 
         Ecdh() throws GeneralSecurityException {
-            KeyPairGenerator g = KeyPairGenerator.getInstance("EC");
-            g.initialize(new ECGenParameterSpec("secp256r1"), RANDOM);
-            pair = g.generateKeyPair();
+            // Android 4.1–4.3: AndroidOpenSSL'in EC üreticisi (sürümde varsa) verilen SecureRandom'u yok sayıp
+            // OpenSSL'in kendi (aynı tohumlama sorunlu) üretecini kullanır. BouncyCastle RANDOM'u kullanır: onu seç.
+            KeyPair kp = null;
+            String prov = null;
+            if (Build.VERSION.SDK_INT <= 18) {
+                try {
+                    kp = generate(KeyPairGenerator.getInstance("EC", "BC"));
+                    prov = "BC";
+                } catch (GeneralSecurityException | RuntimeException e) {
+                    Log.w(TAG, "BC ile EC anahtarı üretilemedi, varsayılan sağlayıcı kullanılıyor", e);
+                }
+            }
+            if (kp == null) {
+                kp = generate(KeyPairGenerator.getInstance("EC"));
+            }
+            pair = kp;
             params = ((ECPublicKey) pair.getPublic()).getParams();
+            provider = prov;
+        }
+
+        private static KeyPair generate(KeyPairGenerator g) throws GeneralSecurityException {
+            g.initialize(new ECGenParameterSpec("secp256r1"), RANDOM);
+            return g.generateKeyPair();
         }
 
         /** 0x04 || X || Y (65 bayt) */
@@ -99,8 +128,10 @@ final class Crypto {
                     || !y.multiply(y).mod(p).equals(x.pow(3).add(a.multiply(x)).add(b).mod(p))) {
                 throw new GeneralSecurityException("Anahtar noktası eğri üzerinde değil");
             }
-            PublicKey peer = KeyFactory.getInstance("EC").generatePublic(new ECPublicKeySpec(new ECPoint(x, y), params));
-            KeyAgreement ka = KeyAgreement.getInstance("ECDH");
+            // Anahtar BC'de üretildiyse anlaşma da BC'de: sağlayıcılar arası anahtar dönüştürmeye güvenmeyelim
+            KeyFactory kf = provider != null ? KeyFactory.getInstance("EC", provider) : KeyFactory.getInstance("EC");
+            PublicKey peer = kf.generatePublic(new ECPublicKeySpec(new ECPoint(x, y), params));
+            KeyAgreement ka = provider != null ? KeyAgreement.getInstance("ECDH", provider) : KeyAgreement.getInstance("ECDH");
             ka.init(pair.getPrivate());
             ka.doPhase(peer, true);
             byte[] z = ka.generateSecret();

@@ -44,7 +44,7 @@ struct Options {
 enum class DisplayMode { Extend = 0, Only = 1, Mirror = 2 };
 
 // Kullanıcının bir şey yapması gereken durumlar (metni arayüz kendi dilinde yazar, i18n.h)
-enum class Notice { AppMissing = 1, TabletOutdated = 2, PcOutdated = 3 };
+enum class Notice { AppMissing = 1, TabletOutdated = 2, PcOutdated = 3, Repair = 4 /* arg: cihaz adı */ };
 
 enum class DeviceState {
     Found = 0,       // bağlanılabilir
@@ -140,6 +140,7 @@ private:
     std::map<std::string, unsigned> usbPorts_;      // USB seri → PC'deki yerel port (adb forward)
     std::vector<DeviceInfo> published_;
     int64_t nextUsbPollUs_ = 0, usbBurstUntilUs_ = 0, nextWifiUs_ = 0;
+    int64_t pairQuietUntilUs_ = 0;  // ret sonrası: kendiliğinden eşleştirme sorusu açılmaz
 
     std::mutex publishMutex_;  // yayın sırası (m_'den önce alınır)
     std::mutex noticeMutex_;

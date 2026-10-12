@@ -191,6 +191,9 @@ void showNotice(Notice code, const std::string& arg) {
         case Notice::PcOutdated:
             notify(W(i18n::NoticePcOldTitle), i18n::F(i18n::NoticePcOld, widen(arg).c_str()), NIIF_WARNING);
             break;
+        case Notice::Repair:
+            notify(W(i18n::NoticeRepairTitle), i18n::F(i18n::NoticeRepair, widen(arg).c_str()), NIIF_WARNING);
+            break;
     }
 }
 
@@ -727,6 +730,9 @@ LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
+    // DLL yalnızca System32'den ve exe'nin klasöründen: bu exe hizmet / ajan olarak SYSTEM'le de çalışır
+    // (geçerli klasör ve PATH'e kullanıcılar DLL koyabilir)
+    SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
     // Aynı exe'nin diğer rolleri (service.h)
     bool background = false;
     {

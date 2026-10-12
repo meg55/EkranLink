@@ -80,6 +80,9 @@ final class SpsRewriter {
             w.se(r.se());
             w.se(r.se());
             int cycle = r.ue();
+            if (cycle > 255) { // standart sınırı; Bits zaten verinin sonunda durur
+                throw new IllegalStateException("Geçersiz POC döngü uzunluğu");
+            }
             w.ue(cycle);
             for (int i = 0; i < cycle; i++) {
                 w.se(r.se());
@@ -202,7 +205,10 @@ final class SpsRewriter {
     }
 
     private static void copyHrd(Bits r, BitWriter w) {
-        int cpbCnt = r.ue();
+        int cpbCnt = r.ue(); // cpb_cnt_minus1: standart en çok 31
+        if (cpbCnt > 31) {
+            throw new IllegalStateException("Geçersiz cpb_cnt");
+        }
         w.ue(cpbCnt);
         w.u(4, r.u(4));
         w.u(4, r.u(4));

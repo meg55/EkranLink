@@ -70,7 +70,8 @@ flowchart LR
 4. **Kodlama.** Media Foundation donanımsal H.264 (NVIDIA, AMD ya da Intel, tek bir kod yolu üzerinden), düşük
    gecikme ayarları, B-kare yok.
 5. **Gönderme.** Her cihaz için bir TCP bağlantısı, port 27183. Karelerin başına uzunlukları eklenir; Wi-Fi'de
-   her kare şifrelenir ve doğrulanır (ChaCha20-Poly1305). USB yereldir ve şifrelenmez.
+   her kare şifrelenir ve doğrulanır (ChaCha20-Poly1305). USB'de cihaza giden görüntü şifrelenmez (kablodan
+   çıkmaz); dokunma gibi cihazdan PC'ye giden mesajlar her zaman şifrelidir.
 6. **Çözme.** `MediaCodec` donanım çözücüsü doğrudan yüzeye (surface) çizer. `SpsRewriter` SPS'i yamalar
    (`max_num_reorder_frames = 0`), çünkü birçok çözücü (ör. MediaTek) aksi hâlde birkaç kareyi geride tutar.
 7. **Onay.** Cihaz, gösterdiği kareler için `FrameAck` gönderir. Bilgisayar, yolda olan kare sayısını bu
@@ -101,8 +102,10 @@ kullanılır. Tarama yapar, her cihaz için bir `Dev` kaydı tutar ve bağlı he
 - **Hem USB'de hem Wi-Fi'de görünen aynı cihaz** bir kez gösterilir (cihaz kimliğiyle eşleştirilir); USB
   öncelik kazanır.
 - **El sıkışma:** geçici (ephemeral) ECDH P-256 anahtar değişimi, ardından HMAC-SHA256 ile anahtar türetme.
-  Yeni bir bilgisayar, oturumdan türetilen 6 haneli bir kodla iki ekranda da onaylanmalıdır; bu, ortadaki adam
-  saldırısını boşa çıkarır. Sonrasında iki tarafta da bir eşleştirme anahtarı saklanır. Bkz. PROTOCOL.tr.md.
+  Yeni bir cihaz, oturumdan türetilen 6 haneli bir kodla iki ekranda bir kez onaylanmalıdır (USB'de de); PC
+  rastgele değerini önceden taahhüt ettiği için araya giren biri kodları denk getiremez. Sonrasında iki
+  tarafta da bir eşleştirme anahtarı saklanır ve her bağlantıda iki tarafı da kanıtlar. Ağda bulunan
+  eşleşmemiş bir cihaz soru açtıramaz; kullanıcı onu *Bağlan* ile bağlar. Bkz. PROTOCOL.tr.md.
 - **Kullanıcının isteği:** kullanıcının bağlantısını kestiği bir cihaz "bekletilir"; kullanıcı onu yeniden
   bağlayana ya da cihaz çıkarılana kadar otomatik olarak yeniden bağlanmaz. Elle yapılan bir *Bağlan* işlemi
   kısa bir süre hatırlanır.

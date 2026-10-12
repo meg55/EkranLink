@@ -6,14 +6,19 @@
 
 namespace ekran::adb {
 
-// ANDROID_HOME, ANDROID_SDK_ROOT, %LOCALAPPDATA%\Android\Sdk, PATH sırasıyla aranır.
+// Exe'nin yanındaki (paketle gelen) adb, sonra ANDROID_HOME, ANDROID_SDK_ROOT, %LOCALAPPDATA%\Android\Sdk, PATH
+// sırasıyla aranır. Hizmet / ajanda (makine deposu) yalnızca exe'nin yanındaki.
 std::wstring find();
+
+// Kablosuz hata ayıklama ile bağlı cihaz mı ("192.168.1.5:5555", "adb-...._adb-tls-connect._tcp").
+// "emulator-5554" değildir.
+bool isNetworkSerial(const std::string& serial);
 
 // Komutu pencere açmadan çalıştırır; çıktıyı döndürür. Başarısızsa false.
 bool run(const std::wstring& adbPath, const std::wstring& args, std::string* output = nullptr, int timeoutMs = 10000);
 
 // USB'de hata ayıklaması açık (yetkili) cihazların seri numaraları (sessiz; tek adb çağrısı).
-// Sonraki komutlar seri numarasıyla o cihaza gider.
+// Sonraki komutlar seri numarasıyla o cihaza gider; [A-Za-z0-9._:-] dışında karakter içerenler atlanır.
 std::vector<std::string> devices(const std::wstring& adbPath);
 
 // Cihazda EkranLink uygulaması kurulu mu. PC uygulama kurmaz: APK ayrıca indirilip cihaza kurulur.

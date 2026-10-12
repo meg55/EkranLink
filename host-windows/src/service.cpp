@@ -2,6 +2,7 @@
 
 #include <winsock2.h>
 #include <windows.h>
+#include <aclapi.h>
 #include <mfapi.h>
 #include <sddl.h>
 #include <shellapi.h>
@@ -221,14 +222,78 @@ bool createKey(const wchar_t* path, const wchar_t* sddl) {
     return r == ERROR_SUCCESS;
 }
 
-bool createDir(const std::wstring& path, const wchar_t* sddl) {
+// Yöneticinin izinlere takılmadan okuma / yazma ve sahiplik alma ayrıcalıkları (başkasının klasörü için)
+void setPrivileges(bool on) {
+    HANDLE tok;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &tok)) return;
+    for (const wchar_t* name : {SE_BACKUP_NAME, SE_RESTORE_NAME, SE_TAKE_OWNERSHIP_NAME}) {
+        TOKEN_PRIVILEGES tp{};
+        tp.PrivilegeCount = 1;
+        tp.Privileges[0].Attributes = on ? SE_PRIVILEGE_ENABLED : 0;
+        if (LookupPrivilegeValueW(nullptr, name, &tp.Privileges[0].Luid))
+            AdjustTokenPrivileges(tok, FALSE, &tp, 0, nullptr, nullptr);
+    }
+    CloseHandle(tok);
+}
+
+// Klasörü oluşturur ya da var olanı devralır: sahibi Yöneticiler, izinleri sddl. ProgramData'da her kullanıcı
+// klasör açabilir; önceden açılmış klasörün sahibi o kullanıcı kalsaydı izinleri geri açabilir, SYSTEM'in yazdığı
+// dosyalara bağ kurabilirdi. Bağlantı noktası / sembolik bağ ya da dosyaysa silinip klasör yeniden açılır.
+// Başkasınınsa *taken = true (içindeki dosyalar silinmeli).
+bool createDir(const std::wstring& path, const wchar_t* sddl, bool* taken = nullptr) {
     PSECURITY_DESCRIPTOR sd = nullptr;
-    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, SDDL_REVISION_1, &sd, nullptr)) return false;
+    const std::wstring full = std::wstring(L"O:BA") + sddl;
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(full.c_str(), SDDL_REVISION_1, &sd, nullptr)) return false;
     SECURITY_ATTRIBUTES sa{sizeof sa, sd, FALSE};
-    bool ok = CreateDirectoryW(path.c_str(), &sa) || GetLastError() == ERROR_ALREADY_EXISTS;
-    if (ok) SetFileSecurityW(path.c_str(), DACL_SECURITY_INFORMATION, sd);
+    setPrivileges(true);
+    bool ok = false;
+    for (int attempt = 0; attempt < 3 && !ok; attempt++) {
+        CreateDirectoryW(path.c_str(), &sa);
+        // Bağ izlenmeden açılır; tanıtıcı açıkken (silme paylaşılmaz) klasör silinip yerine bağ konamaz
+        HANDLE h = CreateFileW(path.c_str(), FILE_LIST_DIRECTORY | READ_CONTROL | WRITE_DAC | WRITE_OWNER | DELETE,
+                               FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+                               FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+        if (h == INVALID_HANDLE_VALUE) break;
+        BY_HANDLE_FILE_INFORMATION fi{};
+        if (!GetFileInformationByHandle(h, &fi)) {
+            CloseHandle(h);
+            break;
+        }
+        if ((fi.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) || !(fi.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+            FILE_DISPOSITION_INFO del{TRUE};  // bağın kendisi silinir, gösterdiği yer değil
+            SetFileInformationByHandle(h, FileDispositionInfo, &del, sizeof del);
+            CloseHandle(h);
+            if (taken) *taken = true;
+            continue;
+        }
+        PSID owner = nullptr;
+        PSECURITY_DESCRIPTOR cur = nullptr;
+        if (GetSecurityInfo(h, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &owner, nullptr, nullptr, nullptr, &cur) !=
+                ERROR_SUCCESS ||
+            !(IsWellKnownSid(owner, WinLocalSystemSid) || IsWellKnownSid(owner, WinBuiltinAdministratorsSid))) {
+            if (taken) *taken = true;
+        }
+        if (cur) LocalFree(cur);
+        // SetKernelObjectSecurity içeriye yaymaz (Set*SecurityInfo yayardı; içeriye konmuş bağlar izlenebilirdi)
+        ok = SetKernelObjectSecurity(h, OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION, sd);
+        CloseHandle(h);
+    }
+    setPrivileges(false);
     LocalFree(sd);
     return ok;
+}
+
+// Başkasının klasöründe önceden konmuş dosya ve bağları siler (bizim yazacaklarımız yerine)
+void deleteMatching(const std::wstring& dir, const wchar_t* pattern) {
+    WIN32_FIND_DATAW fd;
+    HANDLE f = FindFirstFileW((dir + L"\\" + pattern).c_str(), &fd);
+    if (f == INVALID_HANDLE_VALUE) return;
+    do {
+        const std::wstring p = dir + L"\\" + fd.cFileName;
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) DeleteFileW(p.c_str());
+        else if (fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) RemoveDirectoryW(p.c_str());
+    } while (FindNextFileW(f, &fd));
+    FindClose(f);
 }
 
 // Çalışan bir exe'nin üstüne de yazabilmek için: kilitliyse eskisini kenara al (yeniden başlatınca silinir)
@@ -245,26 +310,32 @@ bool copyFile(const std::wstring& from, const std::wstring& to) {
     return false;
 }
 
-// Bir anahtarın tüm değerlerini diğerine kopyalar (üzerine yazar)
-void copyValues(HKEY fromRoot, const std::wstring& from, HKEY toRoot, const std::wstring& to, bool overwrite) {
+// Bir anahtarın tüm değerlerini diğerine kopyalar (üzerine yazar). Kaynak yoksa da true; bir değer
+// kopyalanamadıysa false.
+bool copyValues(HKEY fromRoot, const std::wstring& from, HKEY toRoot, const std::wstring& to, bool overwrite) {
     HKEY src, dst;
-    if (RegOpenKeyExW(fromRoot, from.c_str(), 0, KEY_READ, &src) != 0) return;
+    if (RegOpenKeyExW(fromRoot, from.c_str(), 0, KEY_READ, &src) != 0) return true;
     if (RegCreateKeyExW(toRoot, to.c_str(), 0, nullptr, 0, KEY_READ | KEY_WRITE, nullptr, &dst, nullptr) != 0) {
         RegCloseKey(src);
-        return;
+        return false;
     }
+    bool ok = true;
     for (DWORD i = 0;; i++) {
         wchar_t name[256];
         BYTE data[512];
         DWORD nameLen = ARRAYSIZE(name), dataLen = sizeof data, type = 0;
         const LONG r = RegEnumValueW(src, i, name, &nameLen, nullptr, &type, data, &dataLen);
         if (r == ERROR_NO_MORE_ITEMS) break;
-        if (r != ERROR_SUCCESS) continue;
+        if (r != ERROR_SUCCESS) {
+            ok = false;
+            continue;
+        }
         if (!overwrite && RegQueryValueExW(dst, name, nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS) continue;
-        RegSetValueExW(dst, name, 0, type, data, dataLen);
+        if (RegSetValueExW(dst, name, 0, type, data, dataLen) != ERROR_SUCCESS) ok = false;
     }
     RegCloseKey(dst);
     RegCloseKey(src);
+    return ok;
 }
 
 void deleteValue(HKEY root, const std::wstring& path, const wchar_t* name) {
@@ -463,10 +534,14 @@ std::wstring installedVersion() {
 
 int install() {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    CreateDirectoryW(config::programDataDir().c_str(), nullptr);
-    createDir(config::programDataDir(), kDirPublic);
-    logToFile(config::programDataDir() + L"\\hizmet.log");
+    // Klasör kurulumdan önce başkasınca açılmışsa önceden konmuş günlükler (bağlar) silinir
+    const std::wstring dataDir = config::programDataDir();
+    bool taken = false;
+    if (!createDir(dataDir, kDirPublic, &taken)) return 3;
+    if (taken) deleteMatching(dataDir, L"*.log");
+    logToFile(dataDir + L"\\hizmet.log");
     logf("Hizmet kuruluyor (%ls)", config::kVersion);
+    if (taken) logf("%ls başkasına aitti: sahipliği alındı, içi temizlendi", dataDir.c_str());
 
     SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
     if (!scm) return int(GetLastError());
@@ -494,8 +569,9 @@ int install() {
     copyValues(HKEY_CURRENT_USER, config::kUserKey, HKEY_LOCAL_MACHINE, config::kSettingsKey, false);
     deleteValue(HKEY_LOCAL_MACHINE, config::kSettingsKey, L"PcId");  // ayar değil, gizli bölüme
     copyValues(HKEY_CURRENT_USER, config::kUserKey, HKEY_LOCAL_MACHINE, config::kSecretKey, false);
-    copyValues(HKEY_CURRENT_USER, std::wstring(config::kUserKey) + L"\\Pairs", HKEY_LOCAL_MACHINE,
-               std::wstring(config::kSecretKey) + L"\\Pairs", false);
+    const std::wstring userPairs = std::wstring(config::kUserKey) + L"\\Pairs";
+    const bool pairsMoved = copyValues(HKEY_CURRENT_USER, userPairs, HKEY_LOCAL_MACHINE,
+                                       std::wstring(config::kSecretKey) + L"\\Pairs", false);
     {
         HKEY k;
         if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, config::kMachineKey, 0, KEY_SET_VALUE, &k) == 0) {
@@ -507,11 +583,19 @@ int install() {
     }
 
     // 3) Kullanıcının adb anahtarı (tablet buna "her zaman izin ver" demişti); yalnızca SYSTEM okuyabilir
-    const std::wstring keyDir = config::programDataDir() + L"\\anahtar";
-    createDir(keyDir, kDirPrivate);
-    for (const wchar_t* f : {L"adbkey", L"adbkey.pub"}) {
-        const std::wstring from = userProfile() + L"\\.android\\" + f;
-        if (exists(from)) copyFile(from, keyDir + L"\\" + f);
+    const std::wstring keyDir = dataDir + L"\\anahtar";
+    bool keyTaken = taken;
+    if (createDir(keyDir, kDirPrivate, &keyTaken)) {
+        if (keyTaken) deleteMatching(keyDir, L"*");
+        for (const wchar_t* f : {L"adbkey", L"adbkey.pub"}) {
+            const std::wstring from = userProfile() + L"\\.android\\" + f, to = keyDir + L"\\" + f;
+            if (!exists(from)) continue;
+            // Yeni dosya açılsın: yerinde duran bir bağın (ya da açık tutulan dosyanın) üstüne yazılmasın
+            DeleteFileW(to.c_str());
+            if (!CopyFileW(from.c_str(), to.c_str(), TRUE)) logf("Kopyalanamadı: %ls (hata %lu)", to.c_str(), GetLastError());
+        }
+    } else {
+        logf("Anahtar klasörü hazırlanamadı: adb anahtarı kopyalanmadı");
     }
 
     // 4) Hizmet: açılışta, oturum açılmadan başlar
@@ -530,6 +614,11 @@ int install() {
         ChangeServiceConfigW(svc, SERVICE_NO_CHANGE, SERVICE_AUTO_START, SERVICE_NO_CHANGE, bin.c_str(), nullptr,
                              nullptr, nullptr, nullptr, nullptr, nullptr);
     }
+    // Eşleşmeler artık gizli bölümde: kullanıcının okuyabildiği kopyalar (anahtarlar, PC kimliği) kalmasın.
+    // Hizmet kurulduktan sonra: kurulum yarıda kalsaydı tepsi eşleşmeleri HKCU'da arardı.
+    if (pairsMoved) RegDeleteTreeW(HKEY_CURRENT_USER, userPairs.c_str());
+    if (RegGetValueW(HKEY_LOCAL_MACHINE, config::kSecretKey, L"PcId", RRF_RT_ANY, nullptr, nullptr, nullptr) == 0)
+        deleteValue(HKEY_CURRENT_USER, config::kUserKey, L"PcId");
     SERVICE_DESCRIPTIONW desc{const_cast<wchar_t*>(
         L"Android tablet ve telefonları bu bilgisayarın ekranı yapar; oturum açma ekranı ve UAC dahil.")};
     ChangeServiceConfig2W(svc, SERVICE_CONFIG_DESCRIPTION, &desc);
@@ -560,7 +649,13 @@ int uninstall() {
     }
     CloseServiceHandle(scm);
 
-    // Eşleşmeleri ve ayarları kullanıcıya geri taşı: tepsi uygulaması kaldığı yerden sürsün
+    // Eşleşmeleri ve ayarları kullanıcıya geri taşı: tepsi uygulaması kaldığı yerden sürsün. Kullanıcıdaki
+    // eski eşleşmeler önce silinir: hizmetteyken unutulanlar geri gelmesin (hizmet hiç kurulmadıysa dokunulmaz)
+    HKEY secret;
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, config::kSecretKey, 0, KEY_READ, &secret) == 0) {
+        RegCloseKey(secret);
+        RegDeleteTreeW(HKEY_CURRENT_USER, (std::wstring(config::kUserKey) + L"\\Pairs").c_str());
+    }
     copyValues(HKEY_LOCAL_MACHINE, config::kSecretKey, HKEY_CURRENT_USER, config::kUserKey, true);
     copyValues(HKEY_LOCAL_MACHINE, std::wstring(config::kSecretKey) + L"\\Pairs", HKEY_CURRENT_USER,
                std::wstring(config::kUserKey) + L"\\Pairs", true);

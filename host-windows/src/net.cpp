@@ -3,6 +3,7 @@
 #include <ws2tcpip.h>
 
 #include <cstdio>
+#include <array>
 #include <atomic>
 #include <cstring>
 #include <thread>
@@ -53,7 +54,7 @@ bool Connection::connect(const std::string& host, uint16_t port, int timeoutMs) 
     return true;
 }
 
-bool Connection::handshake(bool trustedLink, const PairingHooks& hooks, proto::Hello& hello) {
+bool Connection::handshake(bool localLink, const PairingHooks& hooks, proto::Hello& hello) {
     // adb forward bağlantıyı tablet dinlemese de kabul eder; cevap gelmezse boşuna beklemeyelim.
     DWORD timeout = 3000;
     setsockopt(sock_, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof timeout);
@@ -64,19 +65,25 @@ bool Connection::handshake(bool trustedLink, const PairingHooks& hooks, proto::H
     WSABUF b{ULONG(magic.buf.size()), reinterpret_cast<char*>(magic.buf.data())};
     if (!sendAll(&b, 1)) return false;
 
-    // 1) PC → tablet: kimlik + geçici ECDH anahtarı
+    // 1) PC → tablet: kimlik + geçici ECDH anahtarı + rastgele değerimizin taahhüdü (değer Mode'da açıklanır).
+    //    Taahhüt olmasa araya giren biri kendi değerini bizimkini gördükten sonra seçip iki ekranda aynı kodu
+    //    tutturana kadar deneyebilirdi (~10⁶ deneme, birkaç saniye).
     crypto::Ecdh ecdh;
     if (!ecdh.generate()) return false;
     const auto pcId = pairing::pcId();
     uint8_t pcNonce[16];
-    crypto::random(pcNonce, 16);
+    if (pcId == std::array<uint8_t, 16>{} || !crypto::random(pcNonce, 16)) {
+        logf("Güvenlik: rastgele sayı üretilemedi");
+        return false;
+    }
+    const crypto::Bytes32 commit = crypto::sha256(pcNonce, 16);
     const auto pcPub = ecdh.publicKey();
     {
         proto::Writer w;
-        w.u8(trustedLink ? proto::kWantPlain : 0);
+        w.u8(localLink ? proto::kWantPlain : 0);
         w.bytes(pcId.data(), 16);
         w.bytes(pcPub.data(), 65);
-        w.bytes(pcNonce, 16);
+        w.bytes(commit.data(), 32);
         const std::string name = pairing::pcName();
         w.u16(uint16_t(name.size()));
         w.bytes(name.data(), name.size());
@@ -90,7 +97,7 @@ bool Connection::handshake(bool trustedLink, const PairingHooks& hooks, proto::H
     proto::Reader r(payload.data(), payload.size());
     if (type == proto::kIncompatible) {
         peerVersion_ = r.u16();
-        peerAppVersion_ = r.str();
+        peerAppVersion_ = proto::cleanName(r.str());
         if (!r.ok()) peerVersion_ = 0;
         return false;
     }
@@ -99,9 +106,9 @@ bool Connection::handshake(bool trustedLink, const PairingHooks& hooks, proto::H
     for (auto& x : tPub) x = r.u8();
     for (auto& x : tNonce) x = r.u8();
     deviceId_ = r.str();
-    const std::string deviceName = r.str();
+    const std::string deviceName = proto::cleanName(r.str());
     const bool tabletKnowsUs = r.u8() != 0;
-    if (!r.ok() || deviceId_.empty()) return false;
+    if (!r.ok() || !proto::validId(deviceId_)) return false;
 
     // 3) Ortak sır ve oturum anahtarları
     crypto::Bytes32 z{};
@@ -119,64 +126,77 @@ bool Connection::handshake(bool trustedLink, const PairingHooks& hooks, proto::H
     const crypto::Bytes32 h = crypto::sha256(transcript.data(), transcript.size());
 
     crypto::Bytes32 pairKey{};
-    const bool paired = tabletKnowsUs && pairing::load(deviceId_, pairKey);
+    const bool haveKey = !hooks.ignoreKey && pairing::load(deviceId_, pairKey);
+    const bool paired = tabletKnowsUs && haveKey;
+    if (!paired && !hooks.mayPair) {
+        // Kendiliğinden bulunan eşleşmemiş cihaz için soru açılmaz (ağdaki biri soru yağdıramasın)
+        needsPairing_ = true;
+        logf(haveKey ? "%s bu bilgisayarla eşleşmeyi unutmuş; yeniden eşleştirmek için pencereden Bağlan'a basın"
+                     : "%s eşleşmemiş; eşleştirmek için pencereden Bağlan'a basın",
+             deviceName.c_str());
+        return false;
+    }
+    if (!paired) pairKey = {};
     uint8_t ikm[64];
     std::memcpy(ikm, z.data(), 32);
     std::memcpy(ikm + 32, pairKey.data(), 32);  // eşleşmemişse sıfırlar
     const crypto::Bytes32 prk = crypto::hmac(h.data(), 32, ikm, 64);
     SecureZeroMemory(ikm, sizeof ikm);
+    SecureZeroMemory(pairKey.data(), pairKey.size());
 
-    const bool encrypt = !trustedLink;
     {
         proto::Writer w;
         w.u8(paired ? 1 : 0);
-        w.u8(encrypt ? 1 : 0);
+        w.u8(localLink ? 1 : 0);  // görüntü şifresiz (yalnızca USB)
+        w.bytes(pcNonce, 16);     // taahhüdün açıklaması
         if (!send(proto::kMode, w.buf)) return false;
     }
-    if (encrypt) {
-        tx_ = std::make_unique<crypto::DirectionKey>();
-        rx_ = std::make_unique<crypto::DirectionKey>();
-        if (!tx_->init(crypto::derive(prk, "ekran p2t key")) || !rx_->init(crypto::derive(prk, "ekran t2p key")))
-            return false;
-    }
+    // Bu noktadan sonra iki yön de şifreli; USB'de PC→cihaz görüntüsü Hello'dan sonra şifresizleşir
+    tx_ = std::make_unique<crypto::DirectionKey>();
+    rx_ = std::make_unique<crypto::DirectionKey>();
+    if (!tx_->init(crypto::derive(prk, "ekran p2t key")) || !rx_->init(crypto::derive(prk, "ekran t2p key")))
+        return false;
 
-    // 4) İlk eşleştirme: USB'de otomatik; Wi-Fi'de iki tarafta da aynı kod onaylanır.
-    if (!paired) {
+    if (paired) {
+        // Anahtar onayı: tablet bunu çözebiliyorsa eşleşme anahtarını bildiğimiz kanıtlanır
+        proto::Writer w;
+        w.u8(1);
+        if (!send(proto::kPairResult, w.buf)) return false;
+    } else {
+        // 4) İlk eşleştirme (USB'de de): iki ekranda aynı kod görünür, iki tarafta da onaylanır
         const crypto::Bytes32 sas = crypto::derive(prk, "ekran sas");
         const uint32_t n = ((uint32_t(sas[0]) << 24) | (uint32_t(sas[1]) << 16) | (uint32_t(sas[2]) << 8) | sas[3]) % 1000000;
         char code[8];
         std::snprintf(code, sizeof code, "%03u %03u", n / 1000, n % 1000);
 
-        bool accepted = trustedLink;
-        if (!trustedLink) {
-            timeout = 0;  // kullanıcıyı bekliyoruz
-            setsockopt(sock_, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof timeout);
-            logf("Eşleştirme isteği: %s, kod %s", deviceName.c_str(), code);
-            // Soru açıkken bağlantıyı izle: tablet "Reddet" derse bağlantıyı kapatır → soru kapanır.
-            HANDLE cancel = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-            std::atomic<bool> asking{true};
-            std::thread watcher([&] {
-                while (asking) {
-                    fd_set rs;
-                    FD_ZERO(&rs);
-                    FD_SET(sock_, &rs);
-                    timeval tv{0, 200000};
-                    if (select(0, &rs, nullptr, nullptr, &tv) > 0) {  // veri ya da kapanma
-                        char c;
-                        if (recv(sock_, &c, 1, MSG_PEEK) <= 0) {
-                            SetEvent(cancel);
-                            return;
-                        }
-                        Sleep(200);
+        timeout = 0;  // kullanıcıyı bekliyoruz
+        setsockopt(sock_, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof timeout);
+        logf("Eşleştirme isteği: %s, kod %s", deviceName.c_str(), code);
+        // Soru açıkken bağlantıyı izle: tablet "Reddet" derse bağlantıyı kapatır → soru kapanır.
+        HANDLE cancel = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        std::atomic<bool> asking{true};
+        std::thread watcher([&] {
+            while (asking) {
+                fd_set rs;
+                FD_ZERO(&rs);
+                FD_SET(sock_, &rs);
+                timeval tv{0, 200000};
+                if (select(0, &rs, nullptr, nullptr, &tv) > 0) {  // veri ya da kapanma
+                    char c;
+                    if (recv(sock_, &c, 1, MSG_PEEK) <= 0) {
+                        SetEvent(cancel);
+                        return;
                     }
+                    Sleep(200);
                 }
-            });
-            accepted = hooks.confirm && hooks.confirm(deviceName, code, cancel) &&
-                       WaitForSingleObject(cancel, 0) != WAIT_OBJECT_0;
-            asking = false;
-            watcher.join();
-            CloseHandle(cancel);
-        }
+            }
+        });
+        const bool accepted = hooks.confirm && hooks.confirm(deviceName, code, cancel) &&
+                              WaitForSingleObject(cancel, 0) != WAIT_OBJECT_0;
+        asking = false;
+        watcher.join();
+        CloseHandle(cancel);
+
         proto::Writer w;
         w.u8(accepted ? 1 : 0);
         // Tablette "Reddet" bağlantıyı kapatır: gönderim/okuma hatası da ret sayılır.
@@ -191,17 +211,18 @@ bool Connection::handshake(bool trustedLink, const PairingHooks& hooks, proto::H
         logf("Eşleştirildi: %s", deviceName.c_str());
     }
 
-    // 5) Tabletin Hello mesajı (Wi-Fi'de şifreli; anahtar uyuşmazsa doğrulama burada düşer)
+    // 5) Tabletin Hello mesajı (şifreli; anahtar uyuşmazsa doğrulama burada düşer)
     timeout = 5000;
     setsockopt(sock_, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof timeout);
     const bool ok = readMessage(type, payload) && type == proto::kHello;
     timeout = 0;
     setsockopt(sock_, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof timeout);
     if (!ok) {
-        if (paired && encrypt) {
-            // Tablet eşleşmeyi unutmuş/değiştirmiş olabilir: bizim kaydı sil, bir dahaki sefere yeniden eşleş.
-            logf("Güvenlik: %s doğrulanamadı; eşleşme silindi, yeniden eşleştirilecek", deviceName.c_str());
-            pairing::forget(deviceId_);
+        // Eşleşme kaydı silinmez: doğrulanmamış bir karşı taraf eşleşmeyi sildiremesin. Cihaz eşleşmeyi
+        // gerçekten unuttuysa bir dahaki bağlantıda "tanımıyorum" der, kullanıcı yeniden eşleştirir.
+        if (paired) {
+            logf("Güvenlik: %s doğrulanamadı (eşleşme anahtarı tutmuyor ya da bağlantı koptu)", deviceName.c_str());
+            authFailed_ = true;
         }
         return false;
     }
@@ -214,9 +235,15 @@ bool Connection::handshake(bool trustedLink, const PairingHooks& hooks, proto::H
     hello.screenH = hr.u16();
     hello.dpi = hr.u16();
     hello.sdk = hr.u16();
-    hello.model = hr.str();
-    hello.decoder = hr.str();
-    return hr.ok();
+    hello.model = proto::cleanName(hr.str());
+    hello.decoder = proto::cleanName(hr.str());
+    if (!hr.ok()) return false;
+    if (localLink) {
+        // USB: görüntü bundan sonra şifresiz (eski tabletleri yormasın); cihaz→PC şifreli ve doğrulanmış kalır
+        std::lock_guard<std::mutex> lock(sendMutex_);
+        tx_.reset();
+    }
+    return true;
 }
 
 bool Connection::send(uint8_t type, const std::vector<uint8_t>& payload) {
@@ -257,7 +284,8 @@ bool Connection::readMessage(uint8_t& type, std::vector<uint8_t>& payload) {
     uint8_t len[4];
     if (!recvAll(len, 4)) return false;
     const uint32_t bodyLen = (uint32_t(len[0]) << 24) | (uint32_t(len[1]) << 16) | (uint32_t(len[2]) << 8) | len[3];
-    if (bodyLen < 1 || bodyLen > (1u << 24)) {  // bozuk akışa karşı
+    // Bozuk akışa karşı; anahtarlar kurulmadan (kimlik doğrulanmadan) yalnızca küçük el sıkışma çerçeveleri
+    if (bodyLen < 1 || bodyLen > (rx_ ? (1u << 24) : proto::kMaxHandshakeFrame)) {
         broken_ = true;
         return false;
     }

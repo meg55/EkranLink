@@ -1,6 +1,6 @@
 **English** · [Türkçe](PROTOCOL.tr.md)
 
-# EkranLink protocol v2
+# EkranLink protocol v3
 
 A single TCP connection, default port **27183**. The connection is always opened by the PC (Android 4.x has no
 `adb reverse`): over USB via `adb forward tcp:27183 tcp:27183`, over Wi-Fi to the tablet's IP.
@@ -39,13 +39,15 @@ If the tag does not verify, the connection is dropped immediately.
 ## Handshake and security
 
 ```
-P→T  "EKRN" + u16 version (2)                                            raw
-P→T  PcHello   u8 flags, 16 pcId, 65 ecdhP, 16 nonceP, str pcName       unencrypted frame
+P→T  "EKRN" + u16 version (3)                                                raw
+P→T  PcHello   u8 flags, 16 pcId, 65 ecdhP, 32 commit, str pcName           unencrypted frame
 T→P  TabletKey 65 ecdhT, 16 nonceT, str deviceId, str deviceName, u8 knowsThisPc
-P→T  Mode      u8 paired, u8 encrypted
-     ── from this point on (if encrypted) all frames are encrypted ──
-     (if not paired) P→T and T→P PairResult u8 accept
+P→T  Mode      u8 paired, u8 plainVideo, 16 nonceP
+     ── from this point on both directions are encrypted ──
+     if paired:      P→T PairResult 1 (key confirmation)
+     if not paired:  P→T PairResult u8 accept, T→P PairResult u8 accept
 T→P  Hello ...
+     ── if plainVideo = 1, PC→tablet is unencrypted from here on; tablet→PC always stays encrypted ──
 ```
 
 If the tablet does not support the PC's version, it sends `Incompatible` (24) instead of `TabletKey`:
@@ -54,24 +56,40 @@ tell the user which app needs to be updated (the PC does not install the app on 
 
 - `ecdh*`: ephemeral ECDH P-256 public key (`04 || X || Y`), a new one is generated for every connection.
   The tablet verifies that the received point lies on the curve; Windows CNG verifies it on import.
+- `commit` = SHA-256(nonceP). The PC commits to its random value first and reveals it in `Mode`; the tablet
+  closes the connection if it does not match. A man in the middle therefore cannot pick its own values after
+  seeing the PC's and make both screens show the same code (without the commitment, ~10⁶ tries — a few
+  seconds — would find a match).
 - `Z` = ECDH shared secret (X coordinate, 32 bytes, big-endian).
 - `H` = SHA-256(ecdhP ‖ ecdhT ‖ nonceP ‖ nonceT ‖ pcId ‖ deviceId)
 - `K` = pairing key (if paired), otherwise 32 zero bytes
 - `PRK` = HMAC-SHA256(key = H, data = Z ‖ K)
 - Session keys: `HMAC(PRK, "ekran p2t key")` (PC→tablet), `HMAC(PRK, "ekran t2p key")` (tablet→PC)
 
-**Pairing** (`paired = 0`): both sides display a 6-digit code derived from the first 4 bytes of `HMAC(PRK, "ekran sas")`
-(big-endian, mod 1 000 000). If a man-in-the-middle performs separate key
-exchanges with each side, the codes come out different and the user notices. Because the code is bound to the session, it cannot be
-brute-forced. If both sides accept, the new pairing key `HMAC(PRK, "ekran pair")` is stored.
-"Reject" on the tablet closes the connection; the PC also counts this as a rejection and does not ask that tablet again for 1 minute.
+Before authentication (until the keys are set up) both sides accept frames of at most 4096 bytes.
 
-**USB** (adb forward; on the tablet the connection arrives from 127.0.0.1): cable + adb authorization are considered
-trusted; pairing is done without confirmation and `encrypted = 0` is chosen so as not to burden the tablet's CPU.
-The tablet rejects an `encrypted = 0` request coming from a non-local connection.
+**Paired device:** right after `Mode` the PC sends an encrypted `PairResult 1`; if the tablet can decrypt it,
+the PC has proven it knows the pairing key. The tablet proves the same with its encrypted `Hello`. If the key
+does not match, the connection is closed; **records are not deleted** (an unauthenticated peer must not be
+able to erase a pairing). If the device really forgot the pairing, it says `knowsThisPc = 0` and pairing is
+needed again.
 
-If the key of a paired device does not match, `Hello` cannot be verified; the PC deletes its own record and
-requests re-pairing on the next connection.
+**Pairing** (`paired = 0`), the same over USB and Wi-Fi: both sides display a 6-digit code derived from the
+first 4 bytes of `HMAC(PRK, "ekran sas")` (big-endian, mod 1 000 000); if both accept, the new pairing key
+`HMAC(PRK, "ekran pair")` is stored. Each device is paired once. "Reject" on the tablet closes the
+connection; the PC also counts this as a rejection and opens no new prompt on its own for 1 minute. On the
+PC the default button is "No" and only one prompt is shown at a time.
+
+The PC only opens the prompt for an unpaired device if the user clicked *Connect* in the window or the device
+was plugged in with a USB cable. An unpaired device found on the network appears in the list but cannot open
+a prompt.
+
+**USB** (adb forward; on the tablet the connection arrives from 127.0.0.1): authentication is the same as
+over Wi-Fi (another app on the same device can also connect to 127.0.0.1, and on the PC the adb server is
+open to every local program). Only to spare old tablets' CPUs, `plainVideo = 1` is chosen: after `Hello`,
+PC→tablet frames are sent unencrypted; tablet→PC (including touch) stays encrypted and authenticated. The
+tablet rejects `plainVideo = 1` from a non-local connection. adb over the network (`adb connect`, wireless
+debugging) does not count as local, and video is encrypted there too.
 
 ## Messages
 

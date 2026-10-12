@@ -67,7 +67,8 @@ flowchart LR
 4. **Encode.** Media Foundation hardware H.264 (NVIDIA, AMD or Intel through one code path), low-latency
    settings, no B-frames.
 5. **Send.** One TCP connection per device, port 27183. Frames are length-prefixed; on Wi-Fi each frame is
-   encrypted and authenticated (ChaCha20-Poly1305). USB is local and unencrypted.
+   encrypted and authenticated (ChaCha20-Poly1305). Over USB the video to the device is not encrypted (it
+   stays on the cable); device→PC messages such as touch are always encrypted.
 6. **Decode.** `MediaCodec` hardware decoder renders straight to the surface. `SpsRewriter` patches the SPS
    (`max_num_reorder_frames = 0`) because many decoders (e.g. MediaTek) otherwise hold several frames back.
 7. **Acknowledge.** The device sends `FrameAck` for frames it has shown. The PC limits frames in flight by
@@ -94,9 +95,11 @@ tool. It scans, keeps one `Dev` record per device and runs one session thread pe
 - **Wi-Fi:** UDP query `EKRN?` to the broadcast address of every network interface, repeated a few times,
   plus direct queries to known device addresses. The app answers only when asked (`DiscoveryResponder`).
 - **Same device on USB and Wi-Fi** is shown once (matched by device ID); USB wins.
-- **Handshake:** ephemeral ECDH P-256 key exchange, then keys derived with HMAC-SHA256. A new PC must be
-  approved on both screens with a 6-digit code derived from the session, which defeats a man in the middle.
-  Afterwards a pairing key is stored on both sides. See PROTOCOL.md.
+- **Handshake:** ephemeral ECDH P-256 key exchange, then keys derived with HMAC-SHA256. A new device must be
+  approved once on both screens with a 6-digit code derived from the session (over USB too); the PC commits
+  to its random value first, so a man in the middle cannot make the codes match. Afterwards a pairing key is
+  stored on both sides and proves each side on every connection. An unpaired device found on the network
+  cannot open a prompt; the user connects it with *Connect*. See PROTOCOL.md.
 - **User intent:** a device the user disconnects is "held" and not reconnected automatically until the user
   connects it again or it is unplugged; a manual *Connect* is remembered for a short while.
 

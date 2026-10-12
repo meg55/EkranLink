@@ -1,6 +1,6 @@
 [English](PROTOCOL.md) · **Türkçe**
 
-# EkranLink protokolü v2
+# EkranLink protokolü v3
 
 Tek TCP bağlantısı, varsayılan port **27183**. Bağlantıyı her zaman PC açar (Android 4.x'te
 `adb reverse` yok): USB'de `adb forward tcp:27183 tcp:27183`, Wi-Fi'de tabletin IP'si.
@@ -38,13 +38,15 @@ Etiket tutmazsa bağlantı hemen kesilir.
 ## Açılış ve güvenlik
 
 ```
-P→T  "EKRN" + u16 sürüm (2)                                              ham
-P→T  PcHello   u8 bayrak, 16 pcKimlik, 65 ecdhP, 16 nonceP, str pcAdı    şifresiz çerçeve
+P→T  "EKRN" + u16 sürüm (3)                                                  ham
+P→T  PcHello   u8 bayrak, 16 pcKimlik, 65 ecdhP, 32 taahhüt, str pcAdı       şifresiz çerçeve
 T→P  TabletKey 65 ecdhT, 16 nonceT, str cihazKimliği, str cihazAdı, u8 buPC'yiTanıyorum
-P→T  Mode      u8 eşleşmiş, u8 şifreli
-     ── bu noktadan sonra (şifreliyse) tüm çerçeveler şifreli ──
-     (eşleşmemişse) P→T ve T→P PairResult u8 onay
+P→T  Mode      u8 eşleşmiş, u8 şifresizGörüntü, 16 nonceP
+     ── bu noktadan sonra iki yön de şifreli ──
+     eşleşmişse:    P→T PairResult 1 (anahtar onayı)
+     eşleşmemişse:  P→T PairResult u8 onay, T→P PairResult u8 onay
 T→P  Hello ...
+     ── şifresizGörüntü = 1 ise PC→tablet bundan sonra şifresiz; tablet→PC hep şifreli ──
 ```
 
 Tablet PC'nin sürümünü desteklemiyorsa `TabletKey` yerine `Incompatible` (24) gönderir:
@@ -53,24 +55,37 @@ kullanıcıya hangi uygulamanın güncelleneceğini söyler (PC tablete uygulama
 
 - `ecdh*`: geçici ECDH P-256 açık anahtarı (`04 || X || Y`), her bağlantıda yenisi üretilir.
   Tablet gelen noktanın eğri üzerinde olduğunu doğrular; Windows CNG içe aktarırken doğrular.
+- `taahhüt` = SHA-256(nonceP). PC rastgele değerini önce taahhüt eder, `Mode`'da açıklar; tablet tutmazsa
+  bağlantıyı keser. Böylece araya giren biri kendi değerlerini PC'ninkini gördükten sonra seçip iki ekranda
+  aynı kodu tutturamaz (taahhüt olmasa ~10⁶ denemeyle birkaç saniyede bulunurdu).
 - `Z` = ECDH ortak sırrı (X koordinatı, 32 bayt, big-endian).
 - `H` = SHA-256(ecdhP ‖ ecdhT ‖ nonceP ‖ nonceT ‖ pcKimlik ‖ cihazKimliği)
 - `K` = eşleşme anahtarı (eşleşmişse), değilse 32 sıfır bayt
 - `PRK` = HMAC-SHA256(anahtar = H, veri = Z ‖ K)
 - Oturum anahtarları: `HMAC(PRK, "ekran p2t key")` (PC→tablet), `HMAC(PRK, "ekran t2p key")` (tablet→PC)
 
-**Eşleştirme** (`eşleşmiş = 0`): iki taraf da `HMAC(PRK, "ekran sas")`'ın ilk 4 baytından
-(big-endian, mod 1 000 000) 6 haneli kodu gösterir. Araya giren biri iki tarafla ayrı anahtar
-değişimi yaparsa kodlar farklı çıkar ve kullanıcı fark eder. Kod oturuma bağlı olduğundan kaba
-kuvvetle denenemez. İki taraf da onaylarsa yeni eşleşme anahtarı `HMAC(PRK, "ekran pair")` saklanır.
-Tablette "Reddet" bağlantıyı kapatır; PC bunu da ret sayar ve o tableti 1 dakika tekrar sormaz.
+Kimlik doğrulanmadan önce (anahtarlar kurulana kadar) iki taraf da en çok 4096 baytlık çerçeve kabul eder.
 
-**USB** (adb forward; tablette bağlantı 127.0.0.1'den gelir): kablo + adb yetkisi güvenilir kabul
-edilir; eşleştirme onaysız yapılır ve tabletin işlemcisini yormamak için `şifreli = 0` seçilir.
-Tablet, yerel olmayan bir bağlantıdan gelen `şifreli = 0` isteğini reddeder.
+**Eşleşmiş cihaz:** PC `Mode`'dan hemen sonra şifreli `PairResult 1` gönderir; tablet bunu çözebiliyorsa
+PC'nin eşleşme anahtarını bildiği kanıtlanır. Tablet de şifreli `Hello` ile aynısını kanıtlar. Anahtar
+tutmazsa bağlantı kesilir; **kayıtlar silinmez** (doğrulanmamış bir karşı taraf eşleşmeyi sildiremesin).
+Cihaz eşleşmeyi gerçekten unuttuysa `buPC'yiTanıyorum = 0` der ve yeniden eşleştirme gerekir.
 
-Eşleşmiş bir cihazın anahtarı tutmazsa `Hello` doğrulanamaz; PC kendi kaydını siler ve bir
-sonraki bağlantıda yeniden eşleştirme ister.
+**Eşleştirme** (`eşleşmiş = 0`), USB ve Wi-Fi'de aynı: iki taraf da `HMAC(PRK, "ekran sas")`'ın ilk 4
+baytından (big-endian, mod 1 000 000) 6 haneli kodu gösterir; ikisinde de onaylanırsa yeni eşleşme anahtarı
+`HMAC(PRK, "ekran pair")` saklanır. Her cihaz bir kez eşleştirilir. Tablette "Reddet" bağlantıyı kapatır; PC
+bunu da ret sayar ve 1 dakika boyunca kendiliğinden yeni soru açmaz. PC'de varsayılan düğme "Hayır"dır ve
+aynı anda tek soru açılır.
+
+PC eşleşmemiş bir cihaz için soruyu yalnızca kullanıcı pencerede *Bağlan*'a bastıysa ya da cihaz USB
+kablosuyla takıldıysa açar. Ağda kendiliğinden bulunan eşleşmemiş cihaz listede görünür ama soru açtıramaz.
+
+**USB** (adb forward; tablette bağlantı 127.0.0.1'den gelir): kimlik doğrulaması Wi-Fi'dekiyle aynıdır
+(127.0.0.1'e aynı cihazdaki başka bir uygulama da bağlanabilir; PC tarafında da adb sunucusu her yerel
+programa açıktır). Yalnızca eski tabletlerin işlemcisini yormamak için `şifresizGörüntü = 1` seçilir:
+`Hello`'dan sonra PC→tablet çerçeveleri şifresiz gider; tablet→PC (dokunma dahil) şifreli ve doğrulanmış
+kalır. Tablet, yerel olmayan bir bağlantıdan gelen `şifresizGörüntü = 1` isteğini reddeder. Ağ üzerinden adb
+(`adb connect`, kablosuz hata ayıklama) yerel sayılmaz, görüntü de şifreli gider.
 
 ## Mesajlar
 

@@ -134,11 +134,12 @@ namespace ekran::i18n {
     X(PairTitle, L"EkranLink — eşleştirme", L"EkranLink — pairing")                                                         \
     X(PairText,                                                                                                     \
       L"\"%ls\" bu bilgisayarla eşleşmek istiyor.\n\nCihazda görünen kod:\n\n        %ls\n\nKodlar aynıysa "      \
-      L"Evet'e basın ve cihazda da onaylayın.\nFarklıysa Hayır'a basın: ağda başka biri araya girmeye "           \
-      L"çalışıyor olabilir.",                                                                                       \
+      L"Evet'e basın ve cihazda da onaylayın.\nFarklıysa ya da bu cihazı siz bağlamadıysanız Hayır'a basın: "      \
+      L"başka bir cihaz ya da program araya girmeye çalışıyor olabilir.\n\nBu soru her cihaz için bir kez sorulur.", \
       L"\"%ls\" wants to pair with this computer.\n\nCode shown on the device:\n\n        %ls\n\nIf the codes "    \
-      L"match, press Yes and confirm on the device too.\nIf they differ, press No: someone on the network may "    \
-      L"be trying to intercept the connection.")                                                                    \
+      L"match, press Yes and confirm on the device too.\nIf they differ, or you did not connect this device, "    \
+      L"press No: another device or program may be trying to intercept the connection.\n\nYou are asked only "    \
+      L"once per device.")                                                                                          \
     X(NoticeAppMissingTitle, L"Cihazda EkranLink uygulaması yok", L"EkranLink app not found on the device")                \
     X(NoticeAppMissing,                                                                                             \
       L"EkranLink'in Android uygulamasını (APK) cihaza indirip kurun. Kurulunca bağlantı kendiliğinden kurulur.",     \
@@ -148,7 +149,13 @@ namespace ekran::i18n {
       L"Install the new version of the EkranLink Android app (APK) on the device.")                                     \
     X(NoticePcOldTitle, L"Bu bilgisayardaki EkranLink eski", L"EkranLink on this computer is outdated")                     \
     X(NoticePcOld, L"Bilgisayara EkranLink'in yeni sürümünü kurun (cihazda %ls var).",                                 \
-      L"Install the new version of EkranLink on this computer (the device has %ls).")
+      L"Install the new version of EkranLink on this computer (the device has %ls).")                                 \
+    X(NoticeRepairTitle, L"Cihaz yeniden eşleştirilmeli", L"The device needs to be paired again")                        \
+    X(NoticeRepair,                                                                                                 \
+      L"%ls doğrulanamadı: iki taraftaki eşleştirme bilgileri uyuşmuyor. Cihazı USB'ye takın ya da pencerede "    \
+      L"Bağlan'a basın, sonra iki ekranda aynı kodu onaylayın.",                                                     \
+      L"%ls could not be verified: the pairing details on the two sides do not match. Plug the device in over "    \
+      L"USB or click Connect in the window, then confirm the same code on both screens.")
 
 enum Str : int {
 #define EKRAN_ENUM(name, tr, en) name,

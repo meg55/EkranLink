@@ -174,6 +174,28 @@ MSVC + WDK and signed with a local certificate.
       background. Uninstalling removes the service and asks whether to delete settings and pairings. Turning off service mode doesn't remove the
       installed program. The zip remains as the portable version. Tested (PC with service mode on): install over existing,
       service off / on, silent uninstall, reinstall; no restart needed. The driver isn't in the package yet
+- [x] Security review and protocol v3 (0.5.0). Previously USB was trusted without confirmation: an unprivileged
+      program on the PC (the adb server is open to everyone) or an app on the phone could pose as a USB device
+      and, in service mode, touch the lock / UAC screen. Now:
+      - A new device is confirmed once with the same code on both screens, over USB too. A paired device proves
+        its key on every connection (the PC's key confirmation + encrypted Hello).
+      - The pairing code is protected by a commitment to the PC's random value: a man in the middle cannot make
+        the codes match (previously ~10⁶ tries, a few seconds, could find a match).
+      - Device→PC (including touch) is always encrypted; PC→device video is unencrypted only over USB (old
+        tablets). adb over the network does not count as local.
+      - An unpaired device found on the network cannot open a prompt (the user clicks *Connect*); the PC prompt
+        defaults to "No", one prompt at a time, no automatic prompt for 1 minute after a rejection. A connection
+        that fails authentication does not delete the pairing.
+      - Before authentication, a 4 KB frame limit and a timeout; device names and IDs are sanitized; at most 16
+        devices on Wi-Fi.
+      - Android: on 4.1–4.3 random numbers come from /dev/urandom (old SecureRandom seeding bug), keys via BC;
+        AutoStartReceiver only open to adb (DUMP permission); raw H.264 only on a local connection; NAL, SPS and
+        cursor-shape limits; excluded from backup and device transfer.
+      - Windows: a pre-created ProgramData\EkranLink folder cannot be hijacked (ownership is taken), the log
+        written by SYSTEM does not follow links / hard links; the service only runs its own adb; adb serial
+        numbers are validated; DLLs only from System32 and the app folder; pairing keys are removed from the
+        user's registry once moved to the service.
+      Known limitations: SECURITY.md
 - [ ] Distribution signing (SignPath Foundation or EV + Microsoft) — for now the driver can only be installed on the PC it was built on
 
 Measurement (S6000, USB, Extend 1280×752): PC→drawn on tablet ~27 ms, PC CPU 0.3% with a static screen.

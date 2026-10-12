@@ -13,13 +13,16 @@ import java.security.GeneralSecurityException;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
- * Protokol v2 oturumu (docs/PROTOCOL.md).
+ * Protokol v3 oturumu (docs/PROTOCOL.md).
  *
- * Çerçeve: u32 gövdeUzunluğu, gövde = u8 tür + yük; şifreli bağlantıda gövde ChaCha20-Poly1305 ile
- * şifrelenir ve 16 bayt etiket eklenir. USB (yerel bağlantı) şifresizdir.
+ * Çerçeve: u32 gövdeUzunluğu, gövde = u8 tür + yük; şifreli yönde gövde ChaCha20-Poly1305 ile şifrelenir ve
+ * 16 bayt etiket eklenir. Cihaz→PC her zaman şifreli; PC→cihaz görüntüsü yalnızca USB'de (yerel bağlantı)
+ * şifresiz. Yeni bir PC her bağlantı türünde iki ekranda aynı kodla bir kez onaylanır.
  */
 final class Session implements H264Decoder.FrameListener {
-    static final int VERSION = 2;
+    static final int VERSION = 3;
+    /** Kimlik doğrulanmadan önce kabul edilen en büyük çerçeve (bellek tüketme saldırısına karşı). */
+    private static final int MAX_HANDSHAKE_FRAME = 4096;
 
     static final int MSG_HELLO = 1;
     static final int MSG_CONFIG = 2;
@@ -88,6 +91,9 @@ final class Session implements H264Decoder.FrameListener {
     private int pendingAcks; // onayı henüz gönderilmemiş çizilen kare sayısı
     private volatile boolean helloSent;
     private volatile boolean videoVisible = true; // uygulama önde: PC görüntü üretsin
+    private boolean authenticated; // el sıkışma bitti: büyük çerçeveler kabul edilir
+    private boolean plainVideo; // USB: PC→cihaz görüntüsü şifresiz
+    private java.net.Socket socket; // el sıkışmada okuma zaman aşımı için (StreamServer verir)
     private byte[] buf = new byte[256 * 1024];
 
     Session(DataInputStream in, OutputStream out, boolean localLink, Surface surface, Stats stats, Host host) {
@@ -97,6 +103,20 @@ final class Session implements H264Decoder.FrameListener {
         this.localLink = localLink;
         this.host = host;
         this.decoder = new H264Decoder(surface, stats, this);
+    }
+
+    /** Okuma zaman aşımını el sıkışma boyunca yönetmek için bağlantının soketi. */
+    void setSocket(java.net.Socket s) {
+        socket = s;
+    }
+
+    private void setReadTimeout(int ms) {
+        if (socket != null) {
+            try {
+                socket.setSoTimeout(ms);
+            } catch (IOException ignored) {
+            }
+        }
     }
 
     /** Karşı taraf "EKRN" gönderdi; oturum bağlantı kopana kadar sürer. */
@@ -119,7 +139,7 @@ final class Session implements H264Decoder.FrameListener {
         }, "ekran-send");
         sender.start();
         sendHello();
-        host.onSessionActive(true, tx != null);
+        host.onSessionActive(true, !plainVideo);
 
         try {
             while (!closed) {
@@ -169,7 +189,7 @@ final class Session implements H264Decoder.FrameListener {
 
     private void handshake() throws IOException, GeneralSecurityException {
         int len = readFrame();
-        if ((buf[0] & 0xFF) != MSG_PC_HELLO || len < 1 + 1 + 16 + 65 + 16 + 2) {
+        if ((buf[0] & 0xFF) != MSG_PC_HELLO || len < 1 + 1 + 16 + 65 + 32 + 2) {
             throw new IOException("PcHello bekleniyordu");
         }
         int o = 1;
@@ -178,10 +198,12 @@ final class Session implements H264Decoder.FrameListener {
         o += 16;
         byte[] pcPub = slice(o, 65);
         o += 65;
-        byte[] pcNonce = slice(o, 16);
-        o += 16;
+        // PC'nin rastgele değerinin taahhüdü: değer Mode'da açıklanır. Araya giren biri kodu tutturmak için
+        // değerleri sonradan seçemez.
+        byte[] pcCommit = slice(o, 32);
+        o += 32;
         int nameLen = readU16(buf, o);
-        String pcName = new String(buf, o + 2, Math.min(nameLen, len - o - 2), "UTF-8");
+        String pcName = cleanName(new String(buf, o + 2, Math.max(0, Math.min(nameLen, len - o - 2)), "UTF-8"));
 
         PairStore store = host.pairStore();
         byte[] pairKey = store.load(pcId);
@@ -204,12 +226,16 @@ final class Session implements H264Decoder.FrameListener {
         }
 
         len = readFrame();
-        if ((buf[0] & 0xFF) != MSG_MODE || len != 3) {
+        if ((buf[0] & 0xFF) != MSG_MODE || len != 1 + 1 + 1 + 16) {
             throw new IOException("Mode bekleniyordu");
         }
         boolean paired = buf[1] != 0;
-        boolean encrypt = buf[2] != 0;
-        if (!encrypt && !localLink) {
+        boolean plainVideo = buf[2] != 0;
+        byte[] pcNonce = slice(3, 16);
+        if (!java.security.MessageDigest.isEqual(Crypto.sha256(pcNonce), pcCommit)) {
+            throw new GeneralSecurityException("PC'nin taahhüdü tutmuyor");
+        }
+        if (plainVideo && !localLink) {
             throw new GeneralSecurityException("ağdan gelen şifresiz bağlantı reddedildi");
         }
         if (paired && pairKey == null) {
@@ -222,19 +248,25 @@ final class Session implements H264Decoder.FrameListener {
         byte[] z = ecdh.agree(pcPub);
         byte[] h = Crypto.sha256(pcPub, tPub, pcNonce, tNonce, pcId, deviceId.getBytes("UTF-8"));
         byte[] prk = Crypto.hmac(h, z, paired ? pairKey : new byte[32]);
-        if (encrypt) {
-            tx = new Crypto.DirectionKey(Crypto.derive(prk, "ekran t2p key"));
-            rx = new Crypto.DirectionKey(Crypto.derive(prk, "ekran p2t key"));
-        }
+        // Bu noktadan sonra iki yön de şifreli
+        tx = new Crypto.DirectionKey(Crypto.derive(prk, "ekran t2p key"));
+        rx = new Crypto.DirectionKey(Crypto.derive(prk, "ekran p2t key"));
 
-        if (!paired) {
+        if (paired) {
+            // PC'nin anahtar onayı: çözülebiliyorsa PC eşleşme anahtarını biliyor
+            len = readFrame();
+            if ((buf[0] & 0xFF) != MSG_PAIR_RESULT || len != 2 || buf[1] != 1) {
+                throw new GeneralSecurityException("PC anahtarı doğrulanamadı");
+            }
+        } else {
             byte[] sas = Crypto.derive(prk, "ekran sas");
             long n = (((sas[0] & 0xFFL) << 24) | ((sas[1] & 0xFF) << 16) | ((sas[2] & 0xFF) << 8) | (sas[3] & 0xFF))
                     % 1000000L;
             String code = String.format(java.util.Locale.US, "%03d %03d", n / 1000, n % 1000);
+            // İlk eşleştirme USB'de de sorulur: aynı cihazdaki başka bir uygulama da 127.0.0.1'den bağlanabilir.
             // Pencere açıkken PC'nin kararını oku; PC reddederse pencere hemen kapanır.
             // Tablette reddedilirse bağlantı kapatılır, PC de hemen öğrenir.
-            PairPrompt prompt = localLink ? null : host.showPairing(pcName, code, new Runnable() {
+            PairPrompt prompt = host.showPairing(pcName, code, new Runnable() {
                 @Override
                 public void run() {
                     close();
@@ -244,6 +276,7 @@ final class Session implements H264Decoder.FrameListener {
                     }
                 }
             });
+            setReadTimeout(120000); // kullanıcı iki ekranda da karar verirken
             boolean pcAccepted;
             try {
                 len = readFrame();
@@ -257,8 +290,8 @@ final class Session implements H264Decoder.FrameListener {
             if (!pcAccepted && prompt != null) {
                 prompt.dismiss();
             }
-            // USB'de soru yok (kablo güvenilir); Wi-Fi'de soru gösterilemediyse (arayüz yok) reddedilir
-            boolean accepted = pcAccepted && (localLink || (prompt != null && prompt.await()));
+            // Soru gösterilemediyse (arayüz yok) reddedilir
+            boolean accepted = pcAccepted && prompt != null && prompt.await();
             writeFrameNow(new byte[]{(byte) MSG_PAIR_RESULT, (byte) (accepted ? 1 : 0)});
             out.flush();
             if (!accepted) {
@@ -267,7 +300,28 @@ final class Session implements H264Decoder.FrameListener {
             store.save(pcId, Crypto.derive(prk, "ekran pair"), pcName);
             Log.i(TAG, "Eşleştirildi: " + pcName);
         }
-        Log.i(TAG, "Oturum: " + pcName + (encrypt ? " (şifreli)" : " (USB, şifresiz)"));
+        java.util.Arrays.fill(prk, (byte) 0);
+        if (plainVideo) {
+            // USB: PC Hello'yu aldıktan sonra görüntüyü şifresiz gönderir (eski tabletleri yormasın). PC Hello'yu
+            // okuyana kadar başka bir şey göndermediği için okuma anahtarını şimdi bırakmak güvenli.
+            rx = null;
+        }
+        this.plainVideo = plainVideo;
+        authenticated = true;
+        setReadTimeout(0);
+        Log.i(TAG, "Oturum: " + pcName + (plainVideo ? " (USB, görüntü şifresiz)" : " (şifreli)"));
+    }
+
+    /** Karşı taraftan gelen ad: denetim karakterleri atılır, en çok 64 karakter. */
+    static String cleanName(String s) {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < s.length() && b.length() < 64; i++) {
+            char c = s.charAt(i);
+            if (c >= 0x20 && c != 0x7F && !(c >= 0x80 && c < 0xA0)) {
+                b.append(c);
+            }
+        }
+        return b.toString();
     }
 
     private byte[] slice(int off, int n) {
@@ -281,12 +335,12 @@ final class Session implements H264Decoder.FrameListener {
     /** Bir çerçeve okur; gövde (tür + yük) buf[0..len) içinde. */
     private int readFrame() throws IOException {
         int len = in.readInt();
-        if (len < 1 || len > (1 << 24)) {
+        if (len < 1 || len > (authenticated ? (1 << 24) : MAX_HANDSHAKE_FRAME)) {
             throw new IOException("Geçersiz çerçeve uzunluğu " + len);
         }
         int total = len + (rx != null ? 16 : 0);
         if (total > buf.length) {
-            buf = new byte[Math.max(total, buf.length * 2)];
+            buf = new byte[Math.min(Math.max(total, buf.length * 2), (1 << 24) + 16)]; // en büyük çerçeve + etiket
         }
         in.readFully(buf, 0, total);
         if (rx != null && !rx.decrypt(rxSeq++, buf, 0, len, buf, len)) {
@@ -364,10 +418,11 @@ final class Session implements H264Decoder.FrameListener {
             }
             case MSG_CURSOR_SHAPE: {
                 int w = readU16(b, o), h = readU16(b, o + 2), hx = readU16(b, o + 4), hy = readU16(b, o + 6);
-                int n = w * h;
-                if (8 + n * 4 > len) {
+                // Windows imleçleri en çok 256 piksel; büyük değer taşma / bellek tüketme olmasın
+                if (w == 0 || h == 0 || w > 512 || h > 512 || 8L + 4L * w * h > len) {
                     break;
                 }
+                int n = w * h;
                 int[] argb = new int[n];
                 for (int i = 0, p = o + 8; i < n; i++, p += 4) {
                     argb[i] = ((b[p] & 0xFF) << 24) | ((b[p + 1] & 0xFF) << 16) | ((b[p + 2] & 0xFF) << 8)

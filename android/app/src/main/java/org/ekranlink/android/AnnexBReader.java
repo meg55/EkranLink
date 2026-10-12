@@ -10,6 +10,9 @@ import java.io.InputStream;
  * en fazla bir karelik gecikme vardır. Faz 1 protokolünde kareler uzunluk önekli gelecek.
  */
 final class AnnexBReader {
+    /** Tek NAL için üst sınır: bozuk ya da kötü niyetli akış belleği sınırsız büyütmesin. */
+    static final int MAX_NAL = 8 * 1024 * 1024;
+
     private final InputStream in;
     private byte[] buf = new byte[512 * 1024];
     private int end;        // buf[0..end) geçerli veri
@@ -86,7 +89,11 @@ final class AnnexBReader {
             }
         }
         if (end == buf.length) {
-            byte[] bigger = new byte[buf.length * 2];
+            // Tampon yalnızca tek bir NAL'le doluysa büyür (nalStart = 0); sınıra ulaştıysa bağlantı kapanır.
+            if (buf.length >= MAX_NAL) {
+                throw new IOException("NAL birimi " + MAX_NAL + " bayttan büyük");
+            }
+            byte[] bigger = new byte[Math.min(buf.length * 2, MAX_NAL)];
             System.arraycopy(buf, 0, bigger, 0, end);
             buf = bigger;
         }

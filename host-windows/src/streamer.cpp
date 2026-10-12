@@ -23,6 +23,7 @@
 #include "encoder.h"
 #include "input.h"
 #include "net.h"
+#include "pairing.h"
 #include "protocol.h"
 #include "scaler.h"
 #include "usb_watch.h"
@@ -103,6 +104,7 @@ struct Streamer::Dev {
     int64_t probeAtUs = 0;  // USB: uygulama yoksa yeniden sorma zamanı
     bool probed = false;
     int fails = 0;
+    bool authFailed = false;  // kayıtlı anahtar doğrulanamadı: kullanıcı onayıyla yeniden eşleştirilir
     std::atomic<bool> busy{false};  // oturum iş parçacığı çalışıyor
     bool cancel = false;            // kullanıcı kesti: oturum kurulurken vazgeç
     std::thread worker;
@@ -283,8 +285,8 @@ void Streamer::scanUsb(const std::wstring& adbPath, bool usbWatchOk) {
         bool missingNow = false, wanted = false;
         {
             std::lock_guard<std::mutex> lock(m_);
-            if (!name.empty()) d->info.name = name;
-            if (!id.empty()) d->info.deviceId = id;
+            if (!proto::cleanName(name).empty()) d->info.name = proto::cleanName(name);
+            if (proto::validId(id)) d->info.deviceId = id;
             if (app == adb::App::Installed) {
                 d->probed = true;
                 if (d->info.state == DeviceState::AppMissing) d->info.state = DeviceState::Found;
@@ -316,17 +318,26 @@ void Streamer::scanWifi() {
     bool anyConnected = false;
     {
         std::lock_guard<std::mutex> lock(m_);
+        size_t wifiCount = 0;
+        for (const auto& [k, d] : devs_) wifiCount += !d->usb;
         for (const auto& f : found) {
-            const std::string key = "wifi:" + (f.id.empty() ? f.ip : f.id);
+            if (!proto::validId(f.id)) continue;  // kimliksiz / bozuk cevap
+            const std::string key = "wifi:" + f.id;
             auto& slot = devs_[key];
             if (!slot) {
+                if (wifiCount >= 16) {  // ağdan sahte cevap yağmuruna karşı
+                    devs_.erase(key);
+                    continue;
+                }
+                wifiCount++;
                 slot = std::make_unique<Dev>();
                 slot->info.key = key;
             }
             slot->ip = f.ip;
             if (!slot->busy) slot->info.link = "Wi-Fi " + f.ip;
-            if (!f.name.empty()) slot->info.name = f.name;
-            if (!f.id.empty()) slot->info.deviceId = f.id;
+            const std::string name = proto::cleanName(f.name);
+            if (!name.empty()) slot->info.name = name;
+            slot->info.deviceId = f.id;
             slot->present = true;
             slot->lastSeenUs = after;
         }
@@ -371,6 +382,8 @@ void Streamer::startSessions(const std::wstring& adbPath) {
         if (!linkAllowed(d) || suppressedLocked(d)) continue;
         if (d.usb && adbPath.empty()) continue;
         if (!((autoC && !held_.count(k)) || wanted_.count(k))) continue;
+        // Ağdaki eşleşmemiş cihaza kendiliğinden bağlanılmaz: listede görünür, kullanıcı "Bağlan" der
+        if (!d.usb && !wanted_.count(k) && !pairing::known(d.info.deviceId)) continue;
         if (d.worker.joinable()) continue;  // önceki iş parçacığı henüz toplanmadı (prune)
         d.busy = true;
         d.cancel = false;
@@ -536,20 +549,49 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
     PairingHooks hooks;
     hooks.confirm = ev_.onPairRequest;
     std::string link, serial;
+    const bool usb = d.usb;
+    // USB kablosu (adb forward): görüntü şifresiz gidebilir. Ağ üzerinden adb (adb connect, kablosuz hata
+    // ayıklama) yerel bağlantı sayılmaz.
+    const bool localLink = usb && !adb::isNetworkSerial(d.serial);
     {
         std::lock_guard<std::mutex> lock(m_);
         link = d.info.link;
         serial = d.serial;
+        // Eşleşmemiş cihaz için soru: kullanıcı "Bağlan" dediyse ya da cihaz USB'ye takıldıysa (son retten
+        // sonraki 1 dk hariç). Ağdan kendiliğinden bulunan cihaz soru açtıramaz.
+        hooks.mayPair = wanted_.count(d.info.key) || (localLink && nowUs() >= pairQuietUntilUs_);
+        hooks.ignoreKey = d.authFailed;
     }
-    const bool usb = d.usb;  // adb forward: kablo + adb yetkisi = güvenilir bağlantı
     if (!conn.connect(host, uint16_t(port), 2000)) return Result::Failed;
-    if (!conn.handshake(usb, hooks, hello)) {
+    bool shaken;
+    try {
+        shaken = conn.handshake(localLink, hooks, hello);
+    } catch (const std::bad_alloc&) {
+        logf("Bellek yetmedi: el sıkışma iptal");
+        shaken = false;
+    }
+    if (!shaken) {
         {
             std::lock_guard<std::mutex> lock(m_);
             if (conn.pairingRejected()) {
                 d.retryAtUs = nowUs() + 60 * kSecond;  // 1 dk sorma
+                pairQuietUntilUs_ = nowUs() + 60 * kSecond;
             }
+            if (conn.needsPairing()) d.retryAtUs = nowUs() + 60 * kSecond;  // "Bağlan" beklenir
             if (conn.peerVersion()) d.retryAtUs = nowUs() + 30 * kSecond;
+        }
+        if (conn.authFailed()) {
+            // Anahtarlar uyuşmuyor: kayıt silinmez; bir sonraki denemede (USB takılıysa ya da kullanıcı "Bağlan"
+            // derse) iki ekranda kod onayıyla yeniden eşleştirilir
+            bool first;
+            std::string name;
+            {
+                std::lock_guard<std::mutex> lock(m_);
+                first = !d.authFailed;
+                d.authFailed = true;
+                name = d.info.name;
+            }
+            if (first) notice(Notice::Repair, name, "Cihaz doğrulanamadı; yeniden eşleştirme gerekiyor");
         }
         if (conn.peerVersion()) {
             // Cihaz protokol sürümümüzü desteklemiyor: hangi tarafın güncelleneceğini söyle; güncellenene kadar
@@ -567,6 +609,7 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
         std::lock_guard<std::mutex> lock(m_);
         if (d.cancel || stop_) return Result::Failed;
         d.conn = &conn;
+        d.authFailed = false;
         d.info.deviceId = conn.deviceId();
         d.info.name = hello.model;
     }

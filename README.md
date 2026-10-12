@@ -37,8 +37,8 @@ internet connection, no ads, nothing to configure on most setups.
 
 - **Three display modes:** *Extend* (a separate monitor), *Only this* (the device becomes the PC's only
   screen and the other monitors turn off while it is connected, handy for a headless mini PC) and *Mirror*.
-- **USB or Wi-Fi.** Devices are found automatically. Wi-Fi traffic is encrypted (ECDH P-256 +
-  ChaCha20-Poly1305); the first Wi-Fi connection is confirmed with the same 6-digit code on both screens.
+- **USB or Wi-Fi.** Devices are found automatically. Connections are encrypted (ECDH P-256 +
+  ChaCha20-Poly1305); a new device is confirmed once with the same 6-digit code on both screens.
 - **Touch:** real Windows multi-touch (up to 10 fingers: scroll, pinch to zoom, press and hold for right
   click, touch keyboard) or a simple mouse mode.
 - **Several devices at once,** each as its own monitor. Connect or disconnect each one from the window or
@@ -75,8 +75,8 @@ The plan and measurements are in [docs/ROADMAP.md](docs/ROADMAP.md); tested devi
    device, or copy it over USB and open it with a file manager). The PC never installs apps on the device.
    For USB, turn on *Developer options > USB debugging* on the device.
 3. **Connect:** open EkranLink on the device. Plug in the USB cable, or join the same Wi-Fi network as the PC.
-   The PC finds the device by itself (USB first). On the first Wi-Fi connection, confirm the 6-digit code
-   on both screens.
+   The PC finds the device by itself (USB first). The first time, confirm the 6-digit code on both
+   screens; a new device on Wi-Fi is connected with *Connect* in the window.
 
 Three-finger tap on the device shows or hides the performance overlay.
 
@@ -124,8 +124,9 @@ Wi-Fi both must be on the same local network.
 **Why Android 4.1?** That is when Android got the hardware video decoder API (MediaCodec) that EkranLink
 uses. The app is written without AndroidX so it keeps working there.
 
-**Is Wi-Fi safe?** Each Wi-Fi connection uses fresh ECDH keys and authenticated encryption, and a new PC
-must be approved on the device with a 6-digit code. USB connections are local and not encrypted. See
+**Is it safe?** Every connection uses fresh ECDH keys and authenticated encryption, and a new device is
+approved once on both screens with a 6-digit code, over USB too. Over USB the picture to the device is not
+encrypted (it stays on the cable, and old tablets would slow down); touch from the device always is. See
 [docs/PROTOCOL.md](docs/PROTOCOL.md) and [SECURITY.md](SECURITY.md).
 
 **Can I use an iPad or a Mac?** Not yet. A Windows PC and an Android device are required for now.
@@ -215,8 +216,8 @@ bağlantısı ve reklam yok; çoğu durumda ayar da gerekmez.
 
 - **Üç görüntü modu:** *İkinci ekran* (ayrı bir monitör), *Tek ekran* (cihaz bağlıyken diğer monitörler
   kapanır, cihaz bilgisayarın tek ekranı olur; ekransız mini PC'ler için) ve *Yansıtma*.
-- **USB ya da Wi-Fi.** Cihazlar kendiliğinden bulunur. Wi-Fi trafiği şifrelidir (ECDH P-256 +
-  ChaCha20-Poly1305); ilk Wi-Fi bağlantısı iki ekranda görünen aynı 6 haneli kodla onaylanır.
+- **USB ya da Wi-Fi.** Cihazlar kendiliğinden bulunur. Bağlantılar şifrelidir (ECDH P-256 +
+  ChaCha20-Poly1305); yeni bir cihaz iki ekranda görünen aynı 6 haneli kodla bir kez onaylanır.
 - **Dokunma:** gerçek Windows çoklu dokunması (10 parmağa kadar: kaydırma, iki parmakla yakınlaştırma,
   basılı tutunca sağ tık, dokunmatik klavye) ya da basit fare modu.
 - **Birden çok cihaz aynı anda,** her biri ayrı bir monitör. Her birini pencereden ya da simge menüsünden
@@ -254,8 +255,8 @@ Plan ve ölçümler: [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md) · Test edilen cih
    ya da USB ile kopyalayıp dosya yöneticisinden açın). Bilgisayar cihaza uygulama kurmaz. USB için
    cihazda *Geliştirici seçenekleri > USB hata ayıklama* açık olmalı.
 3. **Bağlanın:** cihazda EkranLink'i açın. USB kablosunu takın ya da bilgisayarla aynı Wi-Fi ağına bağlanın.
-   Bilgisayar cihazı kendiliğinden bulur (önce USB). İlk Wi-Fi bağlantısında iki ekranda görünen 6 haneli
-   kodu onaylayın.
+   Bilgisayar cihazı kendiliğinden bulur (önce USB). İlk seferde iki ekranda görünen 6 haneli kodu
+   onaylayın; Wi-Fi'deki yeni bir cihaza pencereden *Bağlan* ile bağlanılır.
 
 Cihazda üç parmakla dokunmak ölçüm kartını gösterir ya da gizler.
 
@@ -302,8 +303,9 @@ ikisi aynı yerel ağda olmalı.
 **Neden Android 4.1?** EkranLink'in kullandığı donanım video çözücü arayüzü (MediaCodec) Android'e o
 sürümde geldi. Orada çalışmaya devam etsin diye uygulama AndroidX kullanmadan yazıldı.
 
-**Wi-Fi güvenli mi?** Her Wi-Fi bağlantısı yeni ECDH anahtarları ve doğrulamalı şifreleme kullanır; yeni
-bir bilgisayar cihazda 6 haneli kodla onaylanmalıdır. USB bağlantıları yereldir ve şifrelenmez. Bkz.
+**Güvenli mi?** Her bağlantı yeni ECDH anahtarları ve doğrulamalı şifreleme kullanır; yeni bir cihaz, USB'de
+de, iki ekranda 6 haneli kodla bir kez onaylanır. USB'de cihaza giden görüntü şifrelenmez (kablodan çıkmaz,
+eski tabletler de yavaşlardı); cihazdan gelen dokunma her zaman şifrelidir. Bkz.
 [docs/PROTOCOL.tr.md](docs/PROTOCOL.tr.md) ve [SECURITY.md](SECURITY.md).
 
 **iPad ya da Mac ile kullanabilir miyim?** Henüz değil. Şimdilik Windows bilgisayar ve Android cihaz gerekir.

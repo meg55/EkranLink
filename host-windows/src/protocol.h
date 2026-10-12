@@ -1,4 +1,4 @@
-// EkranLink protokol v1 sabitleri. Ayrıntı: docs/PROTOCOL.md
+// EkranLink protokol v3 sabitleri. Ayrıntı: docs/PROTOCOL.md
 #pragma once
 
 #include <cstdint>
@@ -8,8 +8,10 @@
 namespace ekran::proto {
 
 constexpr uint16_t kPort = 27183;
-constexpr uint16_t kVersion = 2;
+constexpr uint16_t kVersion = 3;
 constexpr char kMagic[4] = {'E', 'K', 'R', 'N'};
+// Kimlik doğrulanmadan önce kabul edilen en büyük çerçeve (bellek tüketme saldırısına karşı)
+constexpr uint32_t kMaxHandshakeFrame = 4096;
 
 enum Msg : uint8_t {
     kHello = 1,
@@ -25,19 +27,42 @@ enum Msg : uint8_t {
     kDisplayPower = 12, // P→T: Windows ekranları açık mı (u8)
     kKeyRequest = 13,   // T→P: çözücü yeniden kuruldu, anahtar kare gönder
     kVideoVisible = 14, // T→P: tablet uygulaması önde mi (u8); arka plandayken görüntü üretilmez
-    // Anahtar değişimi / eşleştirme (şifresiz çerçeveler, kPairResult hariç)
+    // Anahtar değişimi / eşleştirme (Mode'a kadar şifresiz, sonrası şifreli)
     kPcHello = 20,
     kTabletKey = 21,
     kMode = 22,
-    kPairResult = 23,  // şifreli
+    kPairResult = 23,  // şifreli; eşleşmişte PC'nin anahtar onayı, ilk eşleştirmede kullanıcının kararı
     // T→P, kPcHello yerine: tablet PC'nin protokol sürümünü desteklemiyor (u16 tablet sürümü, str uygulama sürümü).
     // Ardından tablet bağlantıyı kapatır; PC kullanıcıya hangi tarafın güncelleneceğini söyler.
     kIncompatible = 24,
 };
 
 enum PcHelloFlags : uint8_t {
-    kWantPlain = 1,  // USB: şifreleme istemiyorum (tablet yalnızca yerel bağlantıda kabul eder)
+    kWantPlain = 1,  // USB: PC→cihaz görüntüsü şifresiz olsun (cihaz yalnızca yerel bağlantıda kabul eder)
 };
+
+// Cihazdan gelen ad: denetim karakterleri (sekme, satır sonu, NUL) atılır, en çok 64 bayt (UTF-8 harfi bölmeden).
+// Ad soruda, günlükte ve kayıt defterindeki cihaz listesinde (sekmeyle ayrılmış) görünür.
+inline std::string cleanName(const std::string& s) {
+    std::string out;
+    for (unsigned char c : s)
+        if (c >= 0x20 && c != 0x7F) out += char(c);
+    if (out.size() > 64) {
+        size_t n = 64;
+        while (n > 0 && (static_cast<unsigned char>(out[n]) & 0xC0) == 0x80) n--;
+        out.resize(n);
+    }
+    return out;
+}
+
+// Cihaz kimliği: Android kimliği ya da seri no; yalnızca harf, rakam, '-' ve '_' (kayıt defteri adı olur)
+inline bool validId(const std::string& s) {
+    if (s.empty() || s.size() > 64) return false;
+    for (unsigned char c : s)
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-' || c == '_'))
+            return false;
+    return true;
+}
 
 enum VideoFlags : uint8_t {
     kKeyFrame = 1,

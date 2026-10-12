@@ -1,5 +1,7 @@
 #include "pair_prompt.h"
 
+#include <atomic>
+
 #include "i18n.h"
 #include "log.h"
 
@@ -22,10 +24,13 @@ struct PairAsk {
 
 DWORD WINAPI pairAskThread(void* p) {
     auto* a = static_cast<PairAsk*>(p);
+    // Varsayılan düğme "Hayır": başka bir şey yazarken basılan Enter/boşluk eşleştirmeyi onaylamasın
     a->result = MessageBoxW(nullptr, a->text.c_str(), i18n::W(i18n::PairTitle),
-                            MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND);
+                            MB_YESNO | MB_DEFBUTTON2 | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND);
     return 0;
 }
+
+std::atomic<bool> g_asking{false};
 
 BOOL CALLBACK closeDialog(HWND w, LPARAM) {
     wchar_t cls[16];
@@ -36,6 +41,14 @@ BOOL CALLBACK closeDialog(HWND w, LPARAM) {
 }  // namespace
 
 bool askPairing(const std::wstring& device, const std::wstring& code, HANDLE cancel) {
+    // Aynı anda tek soru: üst üste açılan sorular karıştırılıp yanlışlıkla onaylanmasın
+    if (g_asking.exchange(true)) {
+        logf("Başka bir eşleştirme sorusu açık; bu istek reddedildi");
+        return false;
+    }
+    struct Done {
+        ~Done() { g_asking = false; }
+    } done;
     PairAsk a;
     a.text = i18n::F(i18n::PairText, device.c_str(), code.c_str());
     DWORD tid = 0;

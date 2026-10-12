@@ -174,6 +174,27 @@ MSVC + WDK ile derlenip yerel sertifikayla imzalanıyor.
       açılır. Kaldırırken hizmet kaldırılır, ayar ve eşleşmeleri silmek sorulur. Hizmet modunu kapatmak kurulu
       programı silmez. Zip taşınabilir sürüm olarak kalır. Denendi (hizmet modu açık PC): üstüne kurulum,
       hizmeti kapat / aç, sessiz kaldırma, yeniden kurulum; yeniden başlatma gerekmedi. Sürücü henüz pakette yok
+- [x] Güvenlik incelemesi ve protokol v3 (0.5.0). Önceden USB onaysız güveniliyordu: bilgisayardaki yetkisiz
+      bir program (adb sunucusu herkese açık) ya da telefondaki bir uygulama kendini USB cihazı gibi gösterip
+      hizmet modunda kilit / UAC ekranına dokunabilirdi. Şimdi:
+      - Yeni cihaz USB'de de ilk bağlantıda iki ekranda aynı kodla bir kez onaylanır. Eşleşmiş cihaz anahtarını
+        her bağlantıda kanıtlar (PC'nin anahtar onayı + şifreli Hello).
+      - Eşleştirme kodu PC'nin rastgele değerinin taahhüdüyle korunur: araya giren biri kodları denk getiremez
+        (önceden ~10⁶ denemeyle birkaç saniyede bulunabilirdi).
+      - Cihaz→PC (dokunma dahil) her zaman şifreli; PC→cihaz görüntüsü yalnızca USB'de şifresiz (eski tabletler).
+        Ağ üzerinden adb yerel sayılmaz.
+      - Ağda bulunan eşleşmemiş cihaz soru açtıramaz (kullanıcı *Bağlan* der); PC sorusunda varsayılan "Hayır",
+        aynı anda tek soru, ret sonrası 1 dk kendiliğinden soru yok. Doğrulanamayan bağlantı eşleşmeyi silmez.
+      - Kimlik doğrulanmadan önce 4 KB çerçeve sınırı ve zaman aşımı; cihaz adları ve kimlikleri temizlenir;
+        Wi-Fi'de en çok 16 cihaz.
+      - Android: 4.1–4.3'te rastgele sayılar /dev/urandom'dan (eski SecureRandom tohumlama hatası), anahtar BC
+        ile; AutoStartReceiver yalnızca adb'ye açık (DUMP izni); ham H.264 yalnızca yerel bağlantıda; NAL, SPS
+        ve imleç şekli sınırları; yedekleme ve cihaz taşımadan dışlama.
+      - Windows: önceden açılmış ProgramData\EkranLink klasörü ele geçirilemez (sahiplik alınır), SYSTEM'in
+        yazdığı günlük bağlantı / sabit bağlantı izlemez; hizmet yalnızca kendi adb'sini çalıştırır; adb seri
+        numarası denetlenir; DLL yalnızca System32 ve uygulama klasöründen; eşleşme anahtarları hizmete geçince
+        kullanıcı kaydından silinir.
+      Bilinen sınırlar: SECURITY.md
 - [ ] Dağıtım imzası (SignPath Foundation veya EV + Microsoft) — şu an sürücü yalnızca derlendiği bilgisayarda kurulabiliyor
 
 Ölçüm (S6000, USB, ikinci ekran 1280×752): PC→tablette çizim ~27 ms, ekran sabitken PC CPU %0,3.

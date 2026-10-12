@@ -1,8 +1,10 @@
 #include "adb.h"
+#include "config.h"
 #include "log.h"
 
 #include <windows.h>
 
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 
@@ -31,6 +33,16 @@ std::wstring exeDir() {
 // "-s SERİ " (komut o cihaza gitsin; birden çok cihaz takılıyken adb aksi halde hata verir)
 std::wstring to(const std::string& serial) { return L"-s " + std::wstring(serial.begin(), serial.end()) + L" "; }
 
+// Seri numarası komut satırına tırnaksız girer: boşluk, tırnak vb. başka argüman ekleyebilirdi
+bool validSerial(const std::string& s) {
+    if (s.empty() || s.size() > 64) return false;
+    for (char c : s)
+        if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '_' ||
+              c == ':' || c == '-'))
+            return false;
+    return true;
+}
+
 }  // namespace
 
 App appState(const std::wstring& adbPath, const std::string& serial) {
@@ -46,6 +58,9 @@ std::wstring find() {
         std::wstring p = exeDir() + rel;
         if (exists(p)) return p;
     }
+    // Hizmet / ajan SYSTEM olarak çalışır: ortam değişkenlerindeki ya da PATH'teki bir adb.exe onun yetkisiyle
+    // çalışırdı. Yalnızca kurulumun Program Files'a koyduğu adb.
+    if (config::machineStore()) return {};
     for (const wchar_t* var : {L"ANDROID_HOME", L"ANDROID_SDK_ROOT"}) {
         std::wstring root = env(var);
         if (!root.empty() && exists(root + L"\\platform-tools\\adb.exe")) return root + L"\\platform-tools\\adb.exe";
@@ -107,9 +122,25 @@ std::vector<std::string> devices(const std::wstring& adbPath) {
         while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
         const size_t tab = line.find('\t');
         if (tab == std::string::npos || line.compare(tab + 1, std::string::npos, "device") != 0) continue;
-        list.push_back(line.substr(0, tab));
+        std::string serial = line.substr(0, tab);
+        if (!validSerial(serial)) {
+            static std::atomic<bool> warned{false};
+            if (!warned.exchange(true)) {
+                for (char& c : serial)
+                    if ((unsigned char)c < 0x20 || (unsigned char)c > 0x7e) c = '?';
+                logf("adb: geçersiz seri numaralı cihaz atlandı (%.64s)", serial.c_str());
+            }
+            continue;
+        }
+        list.push_back(std::move(serial));
     }
     return list;
+}
+
+bool isNetworkSerial(const std::string& serial) {
+    // adb connect: "IP:port"; kablosuz hata ayıklama (Android 11+) mDNS adı: "adb-...._adb-tls-connect._tcp"
+    return serial.find(':') != std::string::npos || serial.find("_adb-tls-connect") != std::string::npos ||
+           serial.find("._tcp") != std::string::npos;
 }
 
 void screenOff(const std::wstring& adbPath, const std::string& serial, int sdk) {
