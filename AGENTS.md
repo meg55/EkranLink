@@ -1,7 +1,7 @@
 # AGENTS.md
 
 > **Türkçe:** Bu dosya yapay zekâ kodlama asistanları içindir (Codex, Copilot, Cursor, Claude vb. depoda bu adı
-> arar), bu yüzden İngilizcedir. Proje belgelerinin Türkçeleri: [README.tr.md](README.tr.md),
+> arar), bu yüzden İngilizcedir. Proje belgelerinin Türkçeleri: [README.md](README.md) (Türkçe bölümü),
 > [docs/ARCHITECTURE.tr.md](docs/ARCHITECTURE.tr.md), [docs/PROTOCOL.tr.md](docs/PROTOCOL.tr.md),
 > [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md), [driver/README.tr.md](driver/README.tr.md).
 
@@ -88,8 +88,9 @@ compiles is not a change that works: say what you verified and what you could no
   Turkish (see glossary). Match the style of the surrounding code.
 - Text files are UTF-8. `.ps1`, `.bat` and `.iss` use CRLF (`.gitattributes`); PowerShell scripts and the
   `.iss` file start with a BOM so Windows PowerShell 5 and Inno Setup read Turkish characters correctly.
-- **Every document exists in English and Turkish.** Long documents come in pairs, `X.md` (English) and
-  `X.tr.md` (Turkish): `README`, `docs/ARCHITECTURE`, `docs/PROTOCOL`, `docs/ROADMAP`, `driver/README`. Files
+- **Every document exists in English and Turkish.** `README.md` holds both: an English section (open) and a
+  Turkish section (collapsed `<details>`); keep them in sync. Other long documents come in pairs, `X.md`
+  (English) and `X.tr.md` (Turkish): `docs/ARCHITECTURE`, `docs/PROTOCOL`, `docs/ROADMAP`, `driver/README`. Files
   GitHub looks up by name (`CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`) and `docs/DEVICES.md` hold
   both languages in one file, English first. When you change a document, change both languages in the same
   commit; links in Turkish documents point to `.tr.md` versions. This file is the exception (English only).
