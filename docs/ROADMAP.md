@@ -203,9 +203,11 @@ MSVC + WDK and signed with a local certificate.
       device→PC encryption added no load). Network defences (raw mode rejected from the network, idle connection
       closed after 15 s, 1 MB handshake frame rejected) and that an unknown device on the network cannot open a
       prompt were verified on the real tablet. Found and fixed: (1) after an unexpected drop (e.g. the adb server
-      restarted) there was no reconnect while auto-connect was off: now retried for 1 minute, and these retries
-      cannot open a pairing prompt; (2) the end of a fast swipe was lost (Windows ignores the position in the
-      "up" frame): if the lift position differs, the contact is moved there first
+      restarted) there was no reconnect while auto-connect was off: now retried for 1 minute (measured: back in
+      ~7 s), and these retries cannot open a pairing prompt; a connection the user ended from the PC is not
+      retried. (2) Safeguard: Windows ignores the position in the "up" frame; if the lift position differs from
+      the last move, the contact is moved there first. A realistic drag (raw touch events, 1.5 s) is accurate to
+      1–2 px in both directions; pairing survives a tablet restart
 - [ ] Distribution signing (SignPath Foundation or EV + Microsoft) — for now the driver can only be installed on the PC it was built on
 
 Measurement (S6000, USB, Extend 1280×752): PC→drawn on tablet ~27 ms, PC CPU 0.3% with a static screen.

@@ -202,9 +202,11 @@ MSVC + WDK ile derlenip yerel sertifikayla imzalanıyor.
       şifrelemesi yük getirmedi). Ağ savunmaları (ham mod ağdan reddedilir, boş bağlantı 15 sn'de kapanır, 1 MB
       el sıkışma çerçevesi reddedilir) ve ağda tanınmayan cihazın soru açtıramaması gerçek tablette doğrulandı.
       Bulunan ve düzeltilen: (1) beklenmedik kopmadan sonra (ör. adb sunucusu yeniden başladı) otomatik bağlanma
-      kapalıyken yeniden bağlanılmıyordu: artık 1 dk yeniden denenir, bu denemeler eşleştirme sorusu açtıramaz;
-      (2) hızlı kaydırmanın son kısmı kayboluyordu (Windows "bırak" karesindeki konumu dikkate almaz): kalkış
-      konumu farklıysa önce oraya taşınır
+      kapalıyken yeniden bağlanılmıyordu: artık 1 dk yeniden denenir (ölçüldü: ~7 sn'de geri geldi), bu denemeler
+      eşleştirme sorusu açtıramaz; PC'den bilerek kesilen bağlantı yeniden denenmez. (2) Güvence: Windows "bırak"
+      karesindeki konumu dikkate almaz; kalkış konumu son hareketten farklıysa önce oraya taşınır. Gerçekçi
+      sürükleme (ham dokunma olaylarıyla, 1,5 sn) iki yönde de 1–2 px doğru; tablet yeniden başlayınca eşleşme
+      korunuyor
 - [ ] Dağıtım imzası (SignPath Foundation veya EV + Microsoft) — şu an sürücü yalnızca derlendiği bilgisayarda kurulabiliyor
 
 Ölçüm (S6000, USB, ikinci ekran 1280×752): PC→tablette çizim ~27 ms, ekran sabitken PC CPU %0,3.
