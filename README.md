@@ -195,6 +195,22 @@ Bug reports, device test results and pull requests are welcome, in English or Tu
 [CONTRIBUTING.md](CONTRIBUTING.md). Please report security issues privately as described in
 [SECURITY.md](SECURITY.md). If you use an AI coding assistant, point it to [AGENTS.md](AGENTS.md).
 
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by
+[SignPath Foundation](https://signpath.org/). *(The application is in progress; until it is approved,
+releases are not signed.)*
+
+- **What is signed:** the Windows programs (`EkranLink.exe`, `ekranlink-host.exe`, `ekranlink-surucu.exe`), the
+  installer and the virtual display driver (`EkranLinkVD.dll` and its catalog). Only files built by
+  [GitHub Actions](.github/workflows/derle.yml) from this repository are signed; every release is approved
+  by hand. The bundled `adb` comes from Google's Android SDK platform-tools and keeps Google's signature.
+- **Team roles:** committers and reviewers: [meg55](https://github.com/meg55); approvers:
+  [meg55](https://github.com/meg55).
+- **Privacy:** this program will not transfer any information to other networked systems unless
+  specifically requested by the user. It only connects to the devices you connect; see the
+  [privacy policy](PRIVACY.md).
+
 ## License
 
 EkranLink is licensed under [GPL-3.0](LICENSE). The virtual display driver in [driver/](driver/) is a
@@ -380,6 +396,20 @@ Kaynak koddaki yorumlar ve günlük satırları Türkçe; kullanıcıya görüne
 Hata bildirimleri, cihaz test sonuçları ve pull request'ler Türkçe ya da İngilizce olarak memnuniyetle
 karşılanır: [CONTRIBUTING.md](CONTRIBUTING.md). Güvenlik açıklarını [SECURITY.md](SECURITY.md)'deki gibi
 gizli bildirin. Yapay zekâ kodlama asistanı kullanıyorsanız ona [AGENTS.md](AGENTS.md)'yi gösterin.
+
+## Kod imzalama politikası (Code signing policy)
+
+Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by
+[SignPath Foundation](https://signpath.org/). *(Başvuru sürüyor; onaylanana kadar sürümler imzasız.)*
+
+- **İmzalananlar:** Windows programları (`EkranLink.exe`, `ekranlink-host.exe`, `ekranlink-surucu.exe`), kurulum
+  programı ve sanal ekran sürücüsü (`EkranLinkVD.dll` ve katalog dosyası). Yalnızca bu depodan
+  [GitHub Actions](.github/workflows/derle.yml) ile derlenen dosyalar imzalanır; her sürüm elle onaylanır.
+  Pakette gelen `adb`, Google'ın Android SDK platform-tools'undandır ve Google'ın imzasını taşır.
+- **Ekip rolleri:** kod yazan ve inceleyen: [meg55](https://github.com/meg55); onaylayan:
+  [meg55](https://github.com/meg55).
+- **Gizlilik:** Bu program, kullanıcı özellikle istemedikçe ağdaki başka sistemlere hiçbir bilgi göndermez;
+  yalnızca sizin bağladığınız cihazlara bağlanır. Bkz. [gizlilik politikası](PRIVACY.md#türkçe).
 
 ## Lisans
 

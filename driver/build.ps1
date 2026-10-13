@@ -8,7 +8,7 @@
     İmzalama ve kurulum ayrı: .\kur.ps1 (yönetici).
 #>
 param(
-    [string] $Surum = '1.0.0.0'
+    [string] $Surum = ''  # boşsa host-windows/src/version.h (ürün sürümü tüm dosyalarda aynı olsun)
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,6 +17,10 @@ $src = Join-Path $kok 'src'
 $out = Join-Path $kok 'out'
 $obj = Join-Path $kok 'obj'
 New-Item -ItemType Directory -Force $out, $obj | Out-Null
+
+$vh = Get-Content (Join-Path $kok '..\host-windows\src\version.h') -Raw
+$ver = foreach ($p in 'MAJOR', 'MINOR', 'PATCH') { [int][regex]::Match($vh, "EKRANLINK_VERSION_$p (\d+)").Groups[1].Value }
+if (-not $Surum) { $Surum = "$($ver[0]).$($ver[1]).$($ver[2]).0" }
 
 # --- MSVC ortamı (vcvars64) ---
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -47,9 +51,19 @@ Write-Host 'Derleniyor...' -ForegroundColor Cyan
     (Join-Path $src 'Driver.cpp') "/Fo$obj\"
 if ($LASTEXITCODE -ne 0) { throw 'cl başarısız' }
 
+# Dosya özellikleri: ürün adı ve sürüm (kod imzalama için tüm dosyalarda tutarlı)
+@(
+    "#define VER_MAJOR $($ver[0])"
+    "#define VER_MINOR $($ver[1])"
+    "#define VER_PATCH $($ver[2])"
+    "#define VER_STRING `"$($ver[0]).$($ver[1]).$($ver[2])`""
+) | Set-Content (Join-Path $obj 'ver.h') -Encoding ascii
+& rc.exe /nologo "/i$obj" "/fo$obj\EkranLinkVD.res" (Join-Path $src 'EkranLinkVD.rc')
+if ($LASTEXITCODE -ne 0) { throw 'rc başarısız' }
+
 $libs = @("/LIBPATH:$wdk\Lib\wdf\umdf\x64\$umdf", "/LIBPATH:$wdk\Lib\$sdk\um\x64\iddcx\$iddcx", "/LIBPATH:$wdk\Lib\$sdk\um\x64")
 & link.exe /nologo /DLL /MACHINE:X64 /SUBSYSTEM:WINDOWS /NXCOMPAT /DYNAMICBASE /OPT:REF /OPT:ICF `
-    "/OUT:$out\EkranLinkVD.dll" (Join-Path $obj 'Driver.obj') @libs `
+    "/OUT:$out\EkranLinkVD.dll" (Join-Path $obj 'Driver.obj') (Join-Path $obj 'EkranLinkVD.res') @libs `
     WdfDriverStubUm.lib IddCxStub.lib OneCoreUAP.lib avrt.lib d3d11.lib dxgi.lib ntdll.lib
 if ($LASTEXITCODE -ne 0) { throw 'link başarısız' }
 

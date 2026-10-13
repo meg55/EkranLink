@@ -1,0 +1,34 @@
+// Dosya özellikleri (Windows Gezgini > Özellikler > Ayrıntılar). Sürüm build.ps1'den gelir:
+// host-windows/src/version.h ile aynı (kod imzalamada ürün adı ve sürüm tüm dosyalarda tutarlı olmalı).
+#include <winver.h>
+
+#include "ver.h"  // build.ps1 üretir (obj\ver.h): VER_MAJOR, VER_MINOR, VER_PATCH, VER_STRING
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION VER_MAJOR, VER_MINOR, VER_PATCH, 0
+ PRODUCTVERSION VER_MAJOR, VER_MINOR, VER_PATCH, 0
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+ FILEFLAGS 0
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_DLL
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "EkranLink"
+            VALUE "FileDescription", "EkranLink virtual display driver"
+            VALUE "FileVersion", VER_STRING
+            VALUE "InternalName", "EkranLinkVD"
+            VALUE "LegalCopyright", "MS-PL / MIT (see driver/LICENSE)"
+            VALUE "OriginalFilename", "EkranLinkVD.dll"
+            VALUE "ProductName", "EkranLink"
+            VALUE "ProductVersion", VER_STRING
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

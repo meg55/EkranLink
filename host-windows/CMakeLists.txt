@@ -47,8 +47,12 @@ add_executable(EkranLink WIN32 src/tray.cpp src/ui.cpp src/service.cpp res/app.r
 target_link_libraries(EkranLink PRIVATE ekran_core shell32 advapi32 gdi32 d2d1 dwrite dwmapi)
 
 # ekranlink-surucu.exe: sanal ekran sürücüsü aygıtını kur/kaldır (yönetici)
-add_executable(ekranlink-surucu src/driver_tool.cpp)
+add_executable(ekranlink-surucu src/driver_tool.cpp res/app.rc)
 target_compile_definitions(ekranlink-surucu PRIVATE UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+
+# Sürüm bilgisi version.h'den: CMake .rc dosyasının #include'larını izlemez, sürüm değişince yeniden derlensin
+# (yoksa dosya özelliklerinde eski sürüm kalır; kod imzalamada ürün sürümü tüm dosyalarda aynı olmalı)
+set_source_files_properties(res/app.rc PROPERTIES OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/version.h)
 target_link_libraries(ekranlink-surucu PRIVATE setupapi newdev cfgmgr32)
 
 # ekranlink-test.exe: şifreleme test vektörleri

@@ -19,6 +19,12 @@ AppPublisher=EkranLink
 AppPublisherURL=https://github.com/meg55/EkranLink
 AppSupportURL=https://github.com/meg55/EkranLink/issues
 AppUpdatesURL=https://github.com/meg55/EkranLink/releases
+; Dosya özellikleri: ürün adı ve sürüm diğer dosyalarla aynı (kod imzalama)
+VersionInfoProductName=EkranLink
+VersionInfoProductVersion={#Surum}
+VersionInfoCompany=EkranLink
+VersionInfoDescription=EkranLink Setup
+VersionInfoCopyright=GPL-3.0
 VersionInfoVersion={#Surum}
 DefaultDirName={autopf}\EkranLink
 DisableDirPage=yes

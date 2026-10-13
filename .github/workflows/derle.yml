@@ -171,8 +171,15 @@ jobs:
         run: |
           ls -l paket
           (cd paket && sha256sum * > SHA256SUMS.txt)
+          # Sürüm sayfasında indirme rehberi + kod imzalama politikası (SignPath bunu sürüm sayfalarında ister)
+          cat > notlar.md <<'NOTLAR'
+          **Windows:** `EkranLink-…-windows-setup.exe` (installer / kurulum) or `EkranLink-…-windows.zip` (portable / taşınabilir).
+          **Android:** `EkranLink-…-android.apk`, install it on the tablet or phone / tablete ya da telefona kurun.
+
+          [Code signing policy](https://github.com/meg55/EkranLink#code-signing-policy) · [Privacy policy / Gizlilik](https://github.com/meg55/EkranLink/blob/main/PRIVACY.md) · `SHA256SUMS.txt`: file checksums / dosya özetleri
+          NOTLAR
           gh release create "$GITHUB_REF_NAME" paket/* --draft --verify-tag \
-            --title "EkranLink ${GITHUB_REF_NAME#v}" --generate-notes
+            --title "EkranLink ${GITHUB_REF_NAME#v}" --notes-file notlar.md --generate-notes
           if ! ls paket/*.apk >/dev/null 2>&1; then
             echo "::warning::APK taslakta yok (imza anahtarı tanımlı değil). Yerelde imzalanan APK'yı taslağa ekleyin."
           fi

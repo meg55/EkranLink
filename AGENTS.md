@@ -144,5 +144,5 @@ Each has a Turkish twin (`.tr.md`) except where noted.
 - [docs/ROADMAP.md](docs/ROADMAP.md): plan, decisions and measurements
 - [docs/DEVICES.md](docs/DEVICES.md): tested devices (both languages in one file)
 - [driver/README.md](driver/README.md): virtual display driver, signing, install
-- [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
-  (both languages in one file)
+- [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md),
+  [PRIVACY.md](PRIVACY.md) (both languages in one file)
