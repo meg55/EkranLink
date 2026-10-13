@@ -131,6 +131,11 @@ encrypted (it stays on the cable, and old tablets would slow down); touch from t
 
 **Can I use an iPad or a Mac?** Not yet. A Windows PC and an Android device are required for now.
 
+**The device disconnects while I use Android Studio or other adb tools.** EkranLink brings its own adb. If
+another adb of a different version runs on the same PC, each one restarts the other's server and the USB
+connection drops. EkranLink reconnects by itself within a minute, but if the two keep fighting, use the same
+platform-tools version for both (the version is shown by `adb version`), or close EkranLink while debugging.
+
 ## How it works
 
 ```mermaid
@@ -309,6 +314,12 @@ eski tabletler de yavaşlardı); cihazdan gelen dokunma her zaman şifrelidir. B
 [docs/PROTOCOL.tr.md](docs/PROTOCOL.tr.md) ve [SECURITY.md](SECURITY.md).
 
 **iPad ya da Mac ile kullanabilir miyim?** Henüz değil. Şimdilik Windows bilgisayar ve Android cihaz gerekir.
+
+**Android Studio ya da başka bir adb aracı kullanırken cihazın bağlantısı kopuyor.** EkranLink kendi adb'siyle
+gelir. Aynı bilgisayarda farklı sürümde başka bir adb çalışırsa ikisi birbirinin sunucusunu yeniden başlatır ve
+USB bağlantısı kopar. EkranLink bir dakika içinde kendiliğinden yeniden bağlanır; ama ikisi sürekli çakışırsa
+ikisinde de aynı platform-tools sürümünü kullanın (sürümü `adb version` gösterir) ya da hata ayıklarken
+EkranLink'i kapatın.
 
 ## Nasıl çalışır
 

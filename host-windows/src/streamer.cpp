@@ -178,13 +178,17 @@ void Streamer::disconnect(const std::string& key) {
             if (!key.empty() && k != key) continue;
             if (!key.empty() || d->busy) held_.insert(k);
             wanted_.erase(k);
+            resume_.erase(k);
             d->cancel = true;
             if (d->conn) {
                 logf("Bağlantı kullanıcı tarafından kesiliyor: %s", d->info.name.c_str());
                 d->conn->close();
             }
         }
-        if (key.empty()) wanted_.clear();
+        if (key.empty()) {
+            wanted_.clear();
+            resume_.clear();
+        }
     }
     SetEvent(wake_);
 }
@@ -362,12 +366,14 @@ void Streamer::prune() {
                 // Cihaz çıkarıldı / ağdan ayrıldı: kesme bekletmesi ve bağlan isteği de biter
                 held_.erase(it->first);
                 wanted_.erase(it->first);
+                resume_.erase(it->first);
                 it = devs_.erase(it);
             } else {
                 ++it;
             }
         }
         for (auto it = wanted_.begin(); it != wanted_.end();) it = it->second < now ? wanted_.erase(it) : std::next(it);
+        for (auto it = resume_.begin(); it != resume_.end();) it = it->second < now ? resume_.erase(it) : std::next(it);
     }
     for (auto& t : done) t.join();
 }
@@ -381,7 +387,7 @@ void Streamer::startSessions(const std::wstring& adbPath) {
         if (!d.present || d.busy || now < d.retryAtUs || d.info.state == DeviceState::AppMissing) continue;
         if (!linkAllowed(d) || suppressedLocked(d)) continue;
         if (d.usb && adbPath.empty()) continue;
-        if (!((autoC && !held_.count(k)) || wanted_.count(k))) continue;
+        if (!((autoC && !held_.count(k)) || wanted_.count(k) || resume_.count(k))) continue;
         // Ağdaki eşleşmemiş cihaza kendiliğinden bağlanılmaz: listede görünür, kullanıcı "Bağlan" der
         if (!d.usb && !wanted_.count(k) && !pairing::known(d.info.deviceId)) continue;
         if (d.worker.joinable()) continue;  // önceki iş parçacığı henüz toplanmadı (prune)
@@ -405,7 +411,7 @@ void Streamer::run() {
         bool wantedAny;
         {
             std::lock_guard<std::mutex> lock(m_);
-            wantedAny = !wanted_.empty();
+            wantedAny = !wanted_.empty() || !resume_.empty();
         }
         // Otomatik bağlanma kapalı, pencere kapalı, istek yok: hiç aramaz (bağlı oturumlar sürer)
         const bool scan = autoConnect_ || watching_ || wantedAny;
@@ -532,7 +538,14 @@ void Streamer::sessionWorker(Dev* d, std::wstring adbPath) {
     {
         std::lock_guard<std::mutex> lock(m_);
         if (r == Result::Ended) {
-            wanted_.erase(d->info.key);  // elle bağlanma bir kerelik: kopunca yalnızca otomatikte yeniden bağlanır
+            // Kullanıcı PC'den kestiyse (held_) yeniden bağlanılmaz. Değilse bağlantı beklenmedik koptu (adb
+            // sunucusu yeniden başladı, Wi-Fi kesildi...): otomatik bağlanma kapalı olsa da 1 dk yeniden denenir.
+            // Cihazdan bilerek kesildiyse cihaz sunucusunu kapatır / USB'de açılmayı reddeder; denemeler boşa düşer.
+            wanted_.erase(d->info.key);  // elle "Bağlan" isteği bir kerelik
+            if (held_.count(d->info.key))
+                resume_.erase(d->info.key);
+            else
+                resume_[d->info.key] = nowUs() + kWantUs;
             d->fails = 0;
             retry = kSecond;
         } else {

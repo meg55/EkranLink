@@ -196,6 +196,16 @@ MSVC + WDK and signed with a local certificate.
         numbers are validated; DLLs only from System32 and the app folder; pairing keys are removed from the
         user's registry once moved to the service.
       Known limitations: SECURITY.md
+- [x] Real-device tests (0.5.1, S6000): touch 0 px (USB and Wi-Fi), modes, disconnect / connect, background,
+      display power sync, resolution changed from Windows is remembered, press and hold for right click, lock
+      screen in *Only this*, after a PC restart the service is ready on the lock screen. With continuous motion
+      (counter page) 52–53 fps, PC→draw ~37 ms, decode ~26 ms; PC CPU avg 5.7%; tablet app 6%, decoder 2% (v3's
+      device→PC encryption added no load). Network defences (raw mode rejected from the network, idle connection
+      closed after 15 s, 1 MB handshake frame rejected) and that an unknown device on the network cannot open a
+      prompt were verified on the real tablet. Found and fixed: (1) after an unexpected drop (e.g. the adb server
+      restarted) there was no reconnect while auto-connect was off: now retried for 1 minute, and these retries
+      cannot open a pairing prompt; (2) the end of a fast swipe was lost (Windows ignores the position in the
+      "up" frame): if the lift position differs, the contact is moved there first
 - [ ] Distribution signing (SignPath Foundation or EV + Microsoft) — for now the driver can only be installed on the PC it was built on
 
 Measurement (S6000, USB, Extend 1280×752): PC→drawn on tablet ~27 ms, PC CPU 0.3% with a static screen.

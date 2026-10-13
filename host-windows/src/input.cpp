@@ -212,7 +212,12 @@ void TouchInjector::onTouch(uint8_t action, uint8_t pointerId, int x, int y, int
             break;
         case proto::kTouchUp:
             if (s < 0) return;
-            h.slots[s].pt = pt;
+            if (h.slots[s].pt.x != pt.x || h.slots[s].pt.y != pt.y) {
+                // Windows "bırak" karesindeki konumu dikkate almaz: parmak son hareketten sonra ilerleyip kalktıysa
+                // (hızlı kaydırma) önce oraya taşı, yoksa sürüklenen şey hedefin gerisinde kalır
+                h.slots[s].pt = pt;
+                h.injectLocked(s, kUpdate);
+            }
             h.injectLocked(s, kUp);
             break;
         case proto::kTouchCancel:

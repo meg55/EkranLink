@@ -136,6 +136,9 @@ private:
     std::mutex m_;  // aşağıdakiler
     std::map<std::string, std::unique_ptr<Dev>> devs_;
     std::map<std::string, int64_t> wanted_;  // elle bağlan istenen cihaz → isteğin bitişi (µs)
+    // Beklenmedik kopmadan sonra yeniden denenen cihaz → bitiş (µs). wanted_'ten farkı: eşleştirme sorusu açtıramaz
+    // (ağdaki biri bağlantıyı koparıp cihazı taklit ederek soru açtırmasın)
+    std::map<std::string, int64_t> resume_;
     std::set<std::string> held_;             // kullanıcı bağlantısını kesti: otomatik bağlanma
     std::map<std::string, unsigned> usbPorts_;      // USB seri → PC'deki yerel port (adb forward)
     std::vector<DeviceInfo> published_;

@@ -195,6 +195,16 @@ MSVC + WDK ile derlenip yerel sertifikayla imzalanıyor.
         numarası denetlenir; DLL yalnızca System32 ve uygulama klasöründen; eşleşme anahtarları hizmete geçince
         kullanıcı kaydından silinir.
       Bilinen sınırlar: SECURITY.md
+- [x] Gerçek cihaz testleri (0.5.1, S6000): dokunma 0 px (USB ve Wi-Fi), modlar, kes / bağla, arka plan, ekran gücü
+      eşitleme, Windows'tan çözünürlük değişimi hatırlanıyor, basılı tutunca sağ tık, tek ekranda kilit ekranı,
+      PC yeniden başlayınca hizmet kilit ekranında hazır. Sürekli harekette (sayaç sayfası) 52–53 kare/sn,
+      PC→çizim ~37 ms, çözme ~26 ms; PC işlemcisi ort. %5,7; tabletin uygulaması %6, çözücü %2 (v3'ün cihaz→PC
+      şifrelemesi yük getirmedi). Ağ savunmaları (ham mod ağdan reddedilir, boş bağlantı 15 sn'de kapanır, 1 MB
+      el sıkışma çerçevesi reddedilir) ve ağda tanınmayan cihazın soru açtıramaması gerçek tablette doğrulandı.
+      Bulunan ve düzeltilen: (1) beklenmedik kopmadan sonra (ör. adb sunucusu yeniden başladı) otomatik bağlanma
+      kapalıyken yeniden bağlanılmıyordu: artık 1 dk yeniden denenir, bu denemeler eşleştirme sorusu açtıramaz;
+      (2) hızlı kaydırmanın son kısmı kayboluyordu (Windows "bırak" karesindeki konumu dikkate almaz): kalkış
+      konumu farklıysa önce oraya taşınır
 - [ ] Dağıtım imzası (SignPath Foundation veya EV + Microsoft) — şu an sürücü yalnızca derlendiği bilgisayarda kurulabiliyor
 
 Ölçüm (S6000, USB, ikinci ekran 1280×752): PC→tablette çizim ~27 ms, ekran sabitken PC CPU %0,3.
