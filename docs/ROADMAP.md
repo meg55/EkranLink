@@ -208,6 +208,15 @@ MSVC + WDK and signed with a local certificate.
       retried. (2) Safeguard: Windows ignores the position in the "up" frame; if the lift position differs from
       the last move, the contact is moved there first. A realistic drag (raw touch events, 1.5 s) is accurate to
       1–2 px in both directions; pairing survives a tablet restart
+- [x] First phone (0.5.2, realme RMX3910, Android 15, Wi-Fi): (1) the navigation bar covered the edge of the
+      picture (the Windows taskbar): system bars are now hidden (immersive; a swipe from the edge shows them over
+      the picture without resizing it). (2) Held upright, only the Windows monitor turned while the phone's own
+      screen stayed landscape: on Android 6.0+ the window now turns with the device (`user` orientation, the
+      portrait-window path that was built for Android 16 large screens); older versions stay landscape-locked.
+      (3) Android 15+ draws windows under the camera cutout: the picture now keeps clear of it (safe insets),
+      so the monitor is a little narrower instead of losing pixels under the notch. Verified on the Android 16
+      phone emulator (all four orientations, emulated cutout: 2400×1080 → 2274×1080, taskbar visible) and the
+      Android 4.2 emulator (still landscape, no errors); not yet on the phone itself
 - [ ] Distribution signing (SignPath Foundation or EV + Microsoft) — for now the driver can only be installed on the PC it was built on
 
 Measurement (S6000, USB, Extend 1280×752): PC→drawn on tablet ~27 ms, PC CPU 0.3% with a static screen.

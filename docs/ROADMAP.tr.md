@@ -207,6 +207,15 @@ MSVC + WDK ile derlenip yerel sertifikayla imzalanıyor.
       karesindeki konumu dikkate almaz; kalkış konumu son hareketten farklıysa önce oraya taşınır. Gerçekçi
       sürükleme (ham dokunma olaylarıyla, 1,5 sn) iki yönde de 1–2 px doğru; tablet yeniden başlayınca eşleşme
       korunuyor
+- [x] İlk telefon (0.5.2, realme RMX3910, Android 15, Wi-Fi): (1) gezinme çubuğu görüntünün kenarını (Windows
+      görev çubuğunu) kapatıyordu: sistem çubukları artık gizli (kenardan kaydırınca görüntünün üstünde belirir,
+      görüntüyü küçültmez). (2) Dik tutulunca yalnızca Windows monitörü dönüyor, telefonun kendi ekranı yatay
+      kalıyordu: Android 6.0+'da pencere artık cihazla birlikte döner (`user` yönü; Android 16 büyük ekranlar için
+      yapılan dikey pencere yolu); eski sürümler yatay kilitli kalır. (3) Android 15+ pencereyi kamera çentiğinin
+      altına da yayar: görüntü artık çentikten uzak durur (güvenli kenar boşlukları); pikseller çentiğin altında
+      kaybolmaz, monitör biraz daralır. Android 16 telefon öykünücüsünde (dört yön, öykünülen çentik: 2400×1080 →
+      2274×1080, görev çubuğu görünüyor) ve Android 4.2 öykünücüsünde (yine yatay, hata yok) doğrulandı; telefonun
+      kendisinde henüz değil
 - [ ] Dağıtım imzası (SignPath Foundation veya EV + Microsoft) — şu an sürücü yalnızca derlendiği bilgisayarda kurulabiliyor
 
 Ölçüm (S6000, USB, ikinci ekran 1280×752): PC→tablette çizim ~27 ms, ekran sabitken PC CPU %0,3.

@@ -2,18 +2,22 @@ package org.ekranlink.android;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
+import android.view.DisplayCutout;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 
@@ -37,8 +41,8 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
     private boolean statsPinned;      // kullanıcı üç parmakla ölçüm kartını açtı
     private boolean suppressTouch;    // üç parmak hareketi sürerken PC'ye dokunma gönderme
     private OrientationWatcher orientationWatcher;
-    // Görüntü hep yataydır. Android 16+ büyük ekranlarda yatay kilit yok sayılır; pencere dikey olunca görüntü,
-    // imleç ve dokunma saat yönünde turn kadar çevrilir (bkz. onWindowShape).
+    // Görüntü hep yataydır. Pencere cihazla birlikte döner; dikey olunca görüntü, imleç ve dokunma saat
+    // yönünde turn kadar çevrilir (bkz. onWindowShape).
     private int turn;
     private int lastLandscape = -1;   // pencerenin son yatay ekran dönüşü
     private int windowW, windowH;
@@ -94,6 +98,10 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
+        if (Build.VERSION.SDK_INT < 23) {
+            // Dikey pencerede görüntüyü çözücü çevirir (KEY_ROTATION, 6.0+); öncesinde pencere yatay kalır
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        }
         // Monitör gibi davran: açılınca ekranı uyandır, kilit ekranının üstünde görün.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN
                 | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
@@ -106,9 +114,29 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
         FrameLayout.LayoutParams full = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
 
+        // Görüntü ve imleç: çentik (kamera deliği) ile ekranın kesik kenarlarından uzak dursun. Android 15+
+        // pencereyi bu alanlara da yayar; öncesinde tam ekran pencere onlardan zaten kaçınır (değerler 0).
+        FrameLayout screen = new FrameLayout(this);
+        if (Build.VERSION.SDK_INT >= 28) {
+            screen.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+                @Override
+                public WindowInsets onApplyWindowInsets(View v, WindowInsets wi) {
+                    DisplayCutout c = wi.getDisplayCutout();
+                    if (c != null) {
+                        v.setPadding(c.getSafeInsetLeft(), c.getSafeInsetTop(), c.getSafeInsetRight(),
+                                c.getSafeInsetBottom());
+                    } else {
+                        v.setPadding(0, 0, 0, 0);
+                    }
+                    return wi; // tüketme: bilgi katmanı da aynısını görsün
+                }
+            });
+        }
+        root.addView(screen, full);
+
         SurfaceView surfaceView = new SurfaceView(this);
         surfaceView.getHolder().addCallback(this);
-        root.addView(surfaceView, full);
+        screen.addView(surfaceView, full);
 
         cursorView = new CursorView(this);
         cursorView.setOnTouchListener(new View.OnTouchListener() {
@@ -118,7 +146,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
                 return true;
             }
         });
-        root.addView(cursorView, full);
+        screen.addView(cursorView, full);
 
         String version = "?";
         try {
@@ -187,9 +215,46 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
                 }
             }, "ekran-bench").start();
         }
-        // 4.4 öncesinde gezinme çubuğu kalıcı gizlenemiyor; sadece karartıyoruz.
-        // Böylece yüzey boyutu sabit kalır (S6000'de 1280×752).
-        root.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE);
+        if (Build.VERSION.SDK_INT >= 30) {
+            getWindow().setDecorFitsSystemWindows(false); // pencere çubukların altına da yayılır, boyutu değişmez
+        }
+        hideSystemBars();
+    }
+
+    /**
+     * Gezinme ve durum çubuğunu gizle: PC ekranının kenarı (görev çubuğu) çubukların altında kalmasın. Kenardan
+     * kaydırınca çubuklar bir süre görüntünün üstünde belirir; yüzey boyutu değişmez. 4.4 öncesinde gezinme
+     * çubuğu kalıcı gizlenemiyor, yalnızca karartılır (S6000'de yüzey 1280×752).
+     */
+    @SuppressWarnings("deprecation")
+    private void hideSystemBars() {
+        View decor = getWindow().getDecorView();
+        if (Build.VERSION.SDK_INT >= 30) {
+            hideSystemBars30();
+        } else if (Build.VERSION.SDK_INT >= 19) {
+            decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+        } else {
+            decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE);
+        }
+    }
+
+    @android.annotation.TargetApi(30)
+    private void hideSystemBars30() {
+        WindowInsetsController c = getWindow().getInsetsController();
+        if (c != null) {
+            c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            c.hide(WindowInsets.Type.systemBars());
+        }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            hideSystemBars(); // bildirim paneli, izin penceresi vb. çubukları geri getirmiş olabilir
+        }
     }
 
     /** Hizmeti başlat (zaten çalışıyorsa yalnızca bağlan). */
@@ -275,13 +340,13 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
     }
 
     /**
-     * Pencere boyutu ya da ekran dönüşü değişti. Pencere yataysa görüntü olduğu gibi çizilir. Dikeyse (Android 16+
-     * büyük ekranlar yatay kilidi yok sayar) görüntü, pencerenin son yatay dönüşündeymiş gibi çevrilir: kullanıcı
-     * yatay kilitli uygulamadakiyle aynı şeyi görür, PC de monitörü aynı şekilde döndürür.
+     * Pencere boyutu ya da ekran dönüşü değişti. Pencere yataysa görüntü olduğu gibi çizilir. Dikeyse (cihaz dik
+     * tutuldu) görüntü, pencerenin son yatay dönüşündeymiş gibi çevrilir: kullanıcı yatay kilitli uygulamadakiyle
+     * aynı şeyi görür, PC de monitörü aynı şekilde döndürür.
      */
     private void onWindowShape(boolean portrait) {
         if (Build.VERSION.SDK_INT < 23) {
-            // Çözücü burada görüntüyü çeviremez; yatay kilit de zaten uygulanır (dikey yalnızca açılışta bir an)
+            // Çözücü burada görüntüyü çeviremez; pencere yatay kilitli (dikey yalnızca açılışta bir an)
             portrait = false;
         }
         @SuppressWarnings("deprecation")

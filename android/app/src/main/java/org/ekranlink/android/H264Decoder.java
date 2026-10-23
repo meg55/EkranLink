@@ -239,7 +239,7 @@ final class H264Decoder {
         format.setByteBuffer("csd-1", withStartCode(pps));
         format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, Math.max(info.width * info.height, 512 * 1024));
         if (rotation != 0 && Build.VERSION.SDK_INT >= 23) {
-            format.setInteger(MediaFormat.KEY_ROTATION, rotation); // dikey pencere yalnızca Android 16+'da olur
+            format.setInteger(MediaFormat.KEY_ROTATION, rotation); // dikey pencere yalnızca Android 6.0+'da olur
         }
         // Düşük gecikme istekleri: tanımayan çözücü bu anahtarları yok sayar.
         format.setInteger("low-latency", 1);                                // Android 11+

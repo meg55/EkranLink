@@ -136,7 +136,7 @@ Ajanın yakalama ve dokunma iş parçacıkları, o anda girdiyi alan masaüstü 
 
 | Sınıf | Sorumluluk |
 |---|---|
-| `MainActivity` | Tam ekran yüzey, dokunma eşleme, pencere yönü (Android 16+ büyük ekranlarda pencereler dikey yöne zorlanabilir; bu durumda video `KEY_ROTATION` ile döndürülür) |
+| `MainActivity` | Tam ekran yüzey, dokunma eşleme, pencere yönü (Android 6.0+'da pencere cihazla birlikte döner; dikey pencerede video `KEY_ROTATION` ile döndürülür), gizli sistem çubukları, kamera çentiğinden uzak durma |
 | `EkranService` | Uygulama arka plandayken bağlantıyı sürdüren ön plan hizmeti |
 | `StreamServer`, `Session` | TCP sunucusu (bilgisayar bağlanır), el sıkışma, mesaj döngüsü |
 | `H264Decoder`, `SpsParser`, `SpsRewriter`, `AnnexBReader` | Donanımsal çözme |

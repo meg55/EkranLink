@@ -24,9 +24,9 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard|navigation"
             android:exported="true"
             android:launchMode="singleTask"
-            android:screenOrientation="sensorLandscape">
-            <!-- Android 16+ büyük ekranlarda (600dp+) bu kilit yok sayılır: dikey pencerede görüntü çevrilir
-                 (MainActivity.onWindowShape) -->
+            android:screenOrientation="user">
+            <!-- Pencere cihazla birlikte döner; dikey pencerede görüntü çevrilir (MainActivity.onWindowShape).
+                 Android 6.0 öncesinde çözücü çeviremez: orada MainActivity yatay kilitler. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

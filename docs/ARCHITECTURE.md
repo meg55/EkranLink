@@ -129,7 +129,7 @@ The agent's capture and touch threads switch to whichever desktop currently rece
 
 | Class | Responsibility |
 |---|---|
-| `MainActivity` | Full-screen surface, touch mapping, window orientation (Android 16+ large screens can force portrait windows; the video is then rotated with `KEY_ROTATION`) |
+| `MainActivity` | Full-screen surface, touch mapping, window orientation (on Android 6.0+ the window turns with the device; in a portrait window the video is rotated with `KEY_ROTATION`), hidden system bars, keeping clear of the camera cutout |
 | `EkranService` | Foreground service that keeps the connection while the app is in the background |
 | `StreamServer`, `Session` | TCP server (the PC connects), handshake, message loop |
 | `H264Decoder`, `SpsParser`, `SpsRewriter`, `AnnexBReader` | Hardware decoding |

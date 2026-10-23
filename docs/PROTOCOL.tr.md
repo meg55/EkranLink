@@ -136,7 +136,7 @@ seçer). Tek ekran modunda EkranLink'in tüm monitörleri açık kalır, yalnız
 
 ### Döndürme
 
-Tablet uygulaması hep yatay kalır. Tablet dik tutulunca `Orientation` gönderir; PC ikinci ekran modunda sanal
+Tablet uygulamasının bildirdiği ve aldığı görüntü hep yataydır (dikey pencere onu çevirerek çizer). Tablet dik tutulunca `Orientation` gönderir; PC ikinci ekran modunda sanal
 monitörü döndürür (90 → DMDO_90, 270 → DMDO_270). Windows döndürülmüş ekranın görüntüsünü panelin kendi
 yönünde verdiğinden akış, `Config` ve çözücü değişmez: `kaynakGen×kaynakYük` her zaman bu görüntünün
 boyutudur. PC imleç resmini ve konumunu bu görüntünün yönüne çevirerek gönderir, gelen dokunmayı da tersine

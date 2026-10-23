@@ -9,8 +9,8 @@ import android.provider.Settings;
 import android.view.OrientationEventListener;
 
 /**
- * Tabletin nasıl tutulduğunu izler. Uygulamanın ekranı hep yatay kalır; tablet dikey tutulunca PC sanal
- * monitörü döndürür (gerçek bir monitörü dik çevirmek gibi). Görüntü, çözücü ve dokunma boyutları değişmez.
+ * Tabletin nasıl tutulduğunu izler. Tablet dikey tutulunca PC sanal monitörü döndürür (gerçek bir monitörü dik
+ * çevirmek gibi). Pencere cihazla birlikte döner ama PC'ye giden görüntü, çözücü ve dokunma boyutları hep yataydır.
  *
  * Android'in "otomatik döndür" ayarı kapalıysa algılayıcı açılmaz ve PC'ye yön bildirilmez.
  * Algılayıcı yalnızca uygulama öndeyken (ekran zaten açıkken) ve en yavaş hızda (~5/sn) çalışır.
@@ -58,8 +58,8 @@ final class OrientationWatcher extends OrientationEventListener {
     }
 
     /**
-     * Android 16+ büyük ekranlarda yatay kilit yok sayılır; pencere dikey olunca görüntü saat yönünde bu kadar
-     * (90/270) çevrilerek çizilir. Yön, pencereye değil görüntüye göre bildirilir.
+     * Pencere dikey olunca görüntü saat yönünde bu kadar (90/270) çevrilerek çizilir. Yön, pencereye değil
+     * görüntüye göre bildirilir.
      */
     void setTurn(int degrees) {
         if (degrees != turn) {

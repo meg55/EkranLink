@@ -140,7 +140,7 @@ port). In single-display mode all of EkranLink's monitors stay on; only the othe
 
 ### Rotation
 
-The tablet app always stays in landscape. When the tablet is held upright it sends `Orientation`; in extended-display mode the PC rotates the virtual
+The image the tablet app reports and receives is always landscape (a portrait window draws it rotated). When the tablet is held upright it sends `Orientation`; in extended-display mode the PC rotates the virtual
 monitor (90 → DMDO_90, 270 → DMDO_270). Because Windows delivers the image of a rotated display in the panel's own
 orientation, the stream, `Config` and the decoder do not change: `sourceWidth×sourceHeight` is always the size of this
 image. The PC sends the cursor image and position converted to this image's orientation, and applies incoming touches to the desktop
