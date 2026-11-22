@@ -59,7 +59,7 @@ internet connection, no ads, nothing to configure on most setups.
 | | |
 |---|---|
 | Mirror, extend, only-this-screen, USB, Wi-Fi, touch, several devices, service mode | Working |
-| Windows installer and portable zip | Working; first public release in preparation |
+| Windows installer and portable zip | Released ([latest release](https://github.com/meg55/EkranLink/releases/latest)); not code-signed yet |
 | Virtual display driver (needed for *Extend* and *Only this*) | Working, but **not yet code-signed** for distribution: for now it can only be installed by building it yourself ([driver/](driver/README.md)). Without the driver, EkranLink mirrors. |
 | Android app on Google Play | Planned; meanwhile the APK is a separate download |
 | macOS, Linux, iPad | Not yet |
@@ -278,7 +278,7 @@ bağlantısı ve reklam yok; çoğu durumda ayar da gerekmez.
 | | |
 |---|---|
 | Yansıtma, ikinci ekran, tek ekran, USB, Wi-Fi, dokunma, birden çok cihaz, hizmet modu | Çalışıyor |
-| Windows kurulum programı ve taşınabilir zip | Çalışıyor; ilk herkese açık sürüm hazırlanıyor |
+| Windows kurulum programı ve taşınabilir zip | Yayımlandı ([son sürüm](https://github.com/meg55/EkranLink/releases/latest)); henüz kod imzalı değil |
 | Sanal ekran sürücüsü (*İkinci ekran* ve *Tek ekran* için gerekli) | Çalışıyor, ama dağıtım için **henüz imzalı değil**: şimdilik yalnızca kendiniz derleyerek kurulabiliyor ([driver/](driver/README.tr.md)). Sürücü yoksa EkranLink yansıtır. |
 | Google Play'de Android uygulaması | Planlandı; o zamana kadar APK ayrı indirilir |
 | macOS, Linux, iPad | Henüz yok |
