@@ -77,13 +77,15 @@ The plan and measurements are in [docs/ROADMAP.md](docs/ROADMAP.md); tested devi
    device, or copy it over USB and open it with a file manager). Android asks you to allow installing apps from
    that browser or file manager, and Play Protect may warn about an unknown app: allow it and choose *Install
    anyway*. The PC never installs apps on the device.
-3. **Connect over Wi-Fi** (nothing to set up on the device): open EkranLink on the device and join it to the
-   same Wi-Fi network as the PC. The device shows up in the PC's window and as a notification: click *Connect*
-   (or the notification) and confirm the same 6-digit code on both screens. This is needed only once; after
-   that the device connects by itself whenever EkranLink is open on it.
-4. **Optional, USB cable** (lowest delay): turn on *Developer options > USB debugging* on the device (no
-   *Developer options*? Tap *Settings > About phone/tablet > Build number* 7 times), plug in the cable and tap
-   *Allow* when the device asks *Allow USB debugging?*. When a device is on both, USB is used.
+3. **Connect:** open EkranLink on the device, then either
+   - **Wi-Fi:** join it to the same Wi-Fi network as the PC. The device shows up in the PC's window and as a
+     notification: click *Connect* (or the notification) and confirm the same 6-digit code on both screens.
+   - **USB:** turn on *Developer options > USB debugging* on the device (no *Developer options*? Tap
+     *Settings > About phone/tablet > Build number* 7 times), plug in the cable, tap *Allow* when the device
+     asks *Allow USB debugging?* and confirm the same 6-digit code on both screens.
+
+   The code is asked only once per device; after that it connects by itself whenever EkranLink is open on it.
+   When a device is on both, USB is used.
 
 > **For now EkranLink mirrors.** *Extend* and *Only this* need the virtual display driver, which ships once it
 > is code-signed (see [Code signing policy](#code-signing-policy)).
@@ -109,6 +111,12 @@ in the device is enough. Otherwise click *Connect* in the *Status* page list, or
 **Several devices:** each connected device has a *Disconnect* button on the *Status* page; devices that
 were found but are not connected have *Connect* (also in the tray's right-click menu). A device you
 disconnect is not reconnected automatically until you connect it again or unplug it.
+
+**Privacy on shared Wi-Fi:** once a device is paired with a PC, it answers only the PCs it is paired with, so
+it does not show up for other people on the same network and they cannot ask it to pair. To add another PC,
+tap *Add a new computer* on the device's welcome screen: it is visible to every PC on the network for
+5 minutes. A device that has never been paired is visible to everyone (first setup). Pairing always needs the
+same code confirmed on both screens, and everything is encrypted.
 
 **In the background:** you can switch to another app on the device; the Windows monitor stays, and the
 picture resumes when you come back. To disconnect from the device, use the notification or the
@@ -289,13 +297,14 @@ Plan ve ölçümler: [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md) · Test edilen cih
    ya da USB ile kopyalayıp dosya yöneticisinden açın). Android o tarayıcıdan ya da dosya yöneticisinden
    uygulama yüklemeye izin vermenizi ister, Play Protect de bilinmeyen uygulama uyarısı gösterebilir: izin
    verip *Yine de yükle*'yi seçin. Bilgisayar cihaza uygulama kurmaz.
-3. **Wi-Fi ile bağlanın** (cihazda hiçbir ayar gerekmez): cihazda EkranLink'i açın ve cihazı bilgisayarla aynı
-   Wi-Fi ağına bağlayın. Cihaz bilgisayardaki pencerede ve bildirim olarak görünür: *Bağlan*'a (ya da
-   bildirime) tıklayın ve iki ekranda aynı 6 haneli kodu onaylayın. Bu yalnızca bir kez gerekir; sonra cihazda
-   EkranLink her açıldığında kendiliğinden bağlanır.
-4. **İsteğe bağlı, USB kablosu** (en düşük gecikme): cihazda *Geliştirici seçenekleri > USB hata ayıklama*'yı
-   açın (*Geliştirici seçenekleri* yoksa: *Ayarlar > Telefon/Tablet hakkında > Yapı numarası*'na 7 kez
-   dokunun), kabloyu takın ve cihaz *USB hata ayıklamaya izin verilsin mi?* diye sorunca *İzin ver*'e dokunun.
+3. **Bağlanın:** cihazda EkranLink'i açın, sonra
+   - **Wi-Fi:** cihazı bilgisayarla aynı Wi-Fi ağına bağlayın. Cihaz bilgisayardaki pencerede ve bildirim
+     olarak görünür: *Bağlan*'a (ya da bildirime) tıklayın ve iki ekranda aynı 6 haneli kodu onaylayın.
+   - **USB:** cihazda *Geliştirici seçenekleri > USB hata ayıklama*'yı açın (*Geliştirici seçenekleri* yoksa:
+     *Ayarlar > Telefon/Tablet hakkında > Yapı numarası*'na 7 kez dokunun), kabloyu takın, cihaz *USB hata
+     ayıklamaya izin verilsin mi?* diye sorunca *İzin ver*'e dokunun ve iki ekranda aynı 6 haneli kodu onaylayın.
+
+   Kod her cihaz için yalnızca bir kez sorulur; sonra cihazda EkranLink her açıldığında kendiliğinden bağlanır.
    Cihaz ikisinde de varsa USB kullanılır.
 
 > **Şimdilik EkranLink yansıtır.** *İkinci ekran* ve *Tek ekran* için sanal ekran sürücüsü gerekir; sürücü kod
@@ -321,6 +330,12 @@ sayfasındaki listeden *Bağlan*'a tıklayın ya da cihazda EkranLink'i açın.
 **Birden çok cihaz:** *Durum* sayfasında bağlı her cihazın *Bağlantıyı kes* düğmesi, bulunan ama bağlı
 olmayan cihazların *Bağlan* düğmesi vardır (simgenin sağ tık menüsünde de). Bağlantısını kestiğiniz cihaza,
 siz yeniden bağlanana ya da cihazı çıkarana kadar otomatik bağlanılmaz.
+
+**Ortak Wi-Fi'de gizlilik:** bir cihaz bir bilgisayarla eşleştikten sonra yalnızca eşleştiği bilgisayarlara
+cevap verir; aynı ağdaki başkalarının listesinde görünmez, onlar da eşleştirme isteyemez. Başka bir bilgisayar
+eklemek için cihazın karşılama ekranında *Yeni bilgisayar ekle*'ye dokunun: cihaz 5 dakika ağdaki bütün
+bilgisayarlara görünür. Hiç eşleşmemiş cihaz herkese görünür (ilk kurulum). Eşleştirme her zaman iki ekranda
+aynı kodun onaylanmasını ister; her şey şifrelidir.
 
 **Arka plan:** cihazda başka bir uygulamaya geçebilirsiniz; Windows'taki monitör kopmaz, dönünce görüntü
 kaldığı yerden sürer. Cihazdan bağlantıyı kesmek için bildirimi ya da üç parmakla açılan ölçüm kartını

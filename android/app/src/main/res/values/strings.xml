@@ -4,9 +4,12 @@
 
     <!-- Karşılama ekranı -->
     <string name="welcome_tagline">This device is ready to be your computer\'s screen.</string>
-    <string name="welcome_usb_step">Optional, for the lowest delay: plug in the cable. This needs USB debugging on this device (Settings › Developer options; if you don\'t see Developer options, tap Settings › About phone › Build number 7 times).</string>
+    <string name="welcome_usb_step">Plug in the cable. This needs USB debugging on this device (Settings › Developer options; if you don\'t see Developer options, tap Settings › About phone › Build number 7 times).</string>
     <string name="welcome_wifi_found">Join the same Wi-Fi network as the computer: this device appears in EkranLink there. The first time, click Connect on the computer and confirm the same code on both screens.\nThis device\'s address: %1$s</string>
     <string name="welcome_wifi_pc_found">%1$s found this device. On the computer, click Connect (or the \"New device found\" notification), then confirm the same code on both screens.</string>
+    <string name="welcome_wifi_pc_hidden">%1$s is looking for this device. To add it, tap \"Add a new computer\" below.</string>
+    <string name="add_pc">+ Add a new computer</string>
+    <string name="add_pc_open">Visible to new computers on this network · %1$s</string>
     <string name="welcome_wifi_none">This device is not connected to a Wi-Fi network. You can connect over USB.</string>
     <string name="auto_open_title">Open automatically when plugged into a computer</string>
     <string name="auto_open_hint">In EkranLink on the computer, \"Connect automatically\" must also be on</string>
@@ -23,6 +26,7 @@
     <string name="status_connected_wifi">Connected · Wi-Fi, encrypted</string>
     <string name="status_connected_usb">Connected · USB</string>
     <string name="status_connection_lost">Connection lost</string>
+    <string name="status_new_pc_blocked">A computer this device doesn\'t know tried to connect. To add it, tap \"Add a new computer\".</string>
     <string name="status_pair_declined">Pairing was not confirmed. To try again, click Connect on the computer.</string>
     <string name="tip_three_fingers">Tip: tap with three fingers for measurements and Disconnect</string>
     <string name="status_port_busy">Port %1$d is used by another app; will connect once it closes</string>

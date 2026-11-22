@@ -85,7 +85,7 @@ public final class EkranService extends Service implements Session.Host {
         instance = this;
         deviceId = AutoStartReceiver.deviceId(this);
         pairStore = new PairStore(this);
-        discovery = new DiscoveryResponder(Build.MANUFACTURER + " " + Build.MODEL, deviceId);
+        discovery = new DiscoveryResponder(Build.MANUFACTURER + " " + Build.MODEL, deviceId, pairStore);
         discovery.start();
 
         WifiManager wm = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);

@@ -15,7 +15,7 @@ The PC asks on the broadcast address of every network interface (e.g. 192.168.1.
 - Query (P→T): `"EKRN?"` + `u16 version` + (0.5.3+) `16 pcId, str pcName` — the device only uses these to show "*PC name* found this device, click Connect there" when it is not paired with that PC yet; older devices read only the first 5 bytes
 - Reply (T→P, to the sender's address): `"EKRN!"` + `u16 version, u16 tcpPort, str name, str id`
 
-While idle, the tablet sends no packets at all; it only replies when a query arrives.
+While idle, the tablet sends no packets at all; it only replies when a query arrives. Once the tablet is paired with at least one PC, it replies only to queries carrying the `pcId` of a paired PC (and to old queries without one), unless the user tapped *Add a new computer* in the last 5 minutes; in the same state a handshake from an unknown PC over the network is closed before any pairing prompt (USB is not affected).
 
 The query is sent from every interface through a separate socket bound to that interface's address: on a PC
 connected to the same network with two adapters (Ethernet + Wi-Fi), a broadcast from an unbound socket leaves only through the adapter chosen by routing.

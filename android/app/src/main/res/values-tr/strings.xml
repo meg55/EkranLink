@@ -2,9 +2,12 @@
 <resources>
     <!-- Karşılama ekranı -->
     <string name="welcome_tagline">Bu cihaz bilgisayarınızın ekranı olmaya hazır.</string>
-    <string name="welcome_usb_step">İsteğe bağlı, en düşük gecikme için: kabloyu takın. Bunun için bu cihazda USB hata ayıklama açık olmalı (Ayarlar › Geliştirici seçenekleri; Geliştirici seçenekleri görünmüyorsa Ayarlar › Telefon hakkında › Yapı numarası\'na 7 kez dokunun).</string>
+    <string name="welcome_usb_step">Kabloyu takın. Bunun için bu cihazda USB hata ayıklama açık olmalı (Ayarlar › Geliştirici seçenekleri; Geliştirici seçenekleri görünmüyorsa Ayarlar › Telefon hakkında › Yapı numarası\'na 7 kez dokunun).</string>
     <string name="welcome_wifi_found">Bilgisayarla aynı Wi-Fi ağına bağlanın: bu cihaz oradaki EkranLink\'te görünür. İlk seferde bilgisayarda Bağlan\'a tıklayın ve iki ekranda aynı kodu onaylayın.\nBu cihazın adresi: %1$s</string>
     <string name="welcome_wifi_pc_found">%1$s bu cihazı buldu. Bilgisayarda Bağlan\'a (ya da \"Yeni cihaz bulundu\" bildirimine) tıklayın, sonra iki ekranda aynı kodu onaylayın.</string>
+    <string name="welcome_wifi_pc_hidden">%1$s bu cihazı arıyor. Eklemek için aşağıdaki \"Yeni bilgisayar ekle\"ye dokunun.</string>
+    <string name="add_pc">+ Yeni bilgisayar ekle</string>
+    <string name="add_pc_open">Bu ağdaki yeni bilgisayarlara görünür · %1$s</string>
     <string name="welcome_wifi_none">Cihaz bir Wi-Fi ağına bağlı değil. USB ile bağlanabilirsiniz.</string>
     <string name="auto_open_title">Bilgisayara takılınca otomatik aç</string>
     <string name="auto_open_hint">Bilgisayardaki EkranLink\'te de \"otomatik bağlan\" açık olmalı</string>
@@ -21,6 +24,7 @@
     <string name="status_connected_wifi">Bağlı · Wi-Fi, şifreli</string>
     <string name="status_connected_usb">Bağlı · USB</string>
     <string name="status_connection_lost">Bağlantı koptu</string>
+    <string name="status_new_pc_blocked">Bu cihazın tanımadığı bir bilgisayar bağlanmak istedi. Eklemek için \"Yeni bilgisayar ekle\"ye dokunun.</string>
     <string name="status_pair_declined">Eşleştirme onaylanmadı. Yeniden denemek için bilgisayarda Bağlan\'a basın.</string>
     <string name="tip_three_fingers">İpucu: ölçümler ve Bağlantıyı kes için üç parmakla dokunun</string>
     <string name="status_port_busy">Port %1$d başka bir uygulamada; o kapanınca bağlanılır</string>

@@ -35,14 +35,14 @@ namespace ekran::i18n {
     X(StepsTitle, L"Bağlanmak için", L"To connect")                                                                 \
     X(StepApp, L"1.  Cihaza EkranLink'in Android uygulamasını (APK) kurun ve açın.",                                    \
       L"1.  Install the EkranLink Android app (APK) on the device and open it.")                                       \
-    X(StepWifi, L"2.  Cihazı bu bilgisayarla aynı Wi-Fi ağına bağlayın. Listede görününce Bağlan'a tıklayın ve iki " \
+    X(StepWifi, L"2.  Wi-Fi: cihazı bu bilgisayarla aynı ağa bağlayın. Listede görününce Bağlan'a tıklayın ve iki "   \
       L"ekranda aynı kodu onaylayın (yalnızca ilk seferde; sonra kendiliğinden bağlanır).",                         \
-      L"2.  Join the device to the same Wi-Fi network as this computer. When it appears in the list, click "       \
+      L"2.  Wi-Fi: join the device to the same network as this computer. When it appears in the list, click "      \
       L"Connect and confirm the same code on both screens (first time only; after that it connects by itself).")    \
-    X(StepUsb, L"3.  İsteğe bağlı, en düşük gecikme için USB kablosu: cihazda Geliştirici seçenekleri > USB hata "    \
-      L"ayıklama açık olmalı (görünmüyorsa Ayarlar > Telefon/Tablet hakkında > Yapı numarası'na 7 kez dokunun).",   \
-      L"3.  Optional, for the lowest delay, a USB cable: the device needs Developer options > USB debugging "       \
-      L"(not shown? Tap Settings > About phone/tablet > Build number 7 times).")                                    \
+    X(StepUsb, L"     USB: kabloyla takın. Cihazda Geliştirici seçenekleri > USB hata ayıklama açık olmalı "          \
+      L"(görünmüyorsa Ayarlar > Telefon/Tablet hakkında > Yapı numarası'na 7 kez dokunun).",                        \
+      L"     USB: plug in the cable. The device needs Developer options > USB debugging (not shown? Tap "          \
+      L"Settings > About phone/tablet > Build number 7 times).")                                                    \
     X(DownloadApp, L"Android uygulamasını indir", L"Download the Android app")                                      \
     X(SecConnection, L"Bağlantı", L"Connection")                                                                    \
     X(LinkType, L"Bağlantı türü", L"Connection type")                                                               \

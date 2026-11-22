@@ -183,6 +183,13 @@ final class Session implements H264Decoder.FrameListener {
         }
     }
 
+    /** Tanımadığımız bir bilgisayar ağdan bağlanmak istedi; cihaz yeni bilgisayarlara açık değil. */
+    static final class NewPcBlockedException extends IOException {
+        NewPcBlockedException() {
+            super("tanınmayan bilgisayar: cihaz yalnızca eşleştiği bilgisayarlara açık");
+        }
+    }
+
     /** PC'nin protokol sürümünü desteklemiyoruz: kendi sürümümüzü bildirip kapat (PC de kullanıcıyı uyarır). */
     private void rejectVersion(int peerVersion) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -226,6 +233,10 @@ final class Session implements H264Decoder.FrameListener {
 
         PairStore store = host.pairStore();
         byte[] pairKey = store.load(pcId);
+        // Eşleştikten sonra ağdan tanımadığımız bir bilgisayar eşleştirme isteyemez (Visibility); kablo hariç
+        if (pairKey == null && !localLink && !Visibility.openToNewPcs(store.count())) {
+            throw new NewPcBlockedException();
+        }
         Crypto.Ecdh ecdh = new Crypto.Ecdh();
         byte[] tPub = ecdh.publicKey();
         byte[] tNonce = Crypto.random(16);

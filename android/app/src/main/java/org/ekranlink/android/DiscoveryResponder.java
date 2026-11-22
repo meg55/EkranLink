@@ -14,7 +14,8 @@ import java.net.SocketException;
 /**
  * Ağda bulunma: PC UDP yayınıyla "EKRN?" sorar, tablet kendini tanıtan bir cevap döner.
  * Sadece soru gelince çalışır; boşta hiçbir paket göndermez (pil ve ağ dostu). PC hem ağ yayınıyla hem
- * (daha önce bağlandıysa) doğrudan bu tabletin adresine sorar.
+ * (daha önce bağlandıysa) doğrudan bu tabletin adresine sorar. Cihaz bir bilgisayarla eşleştikten sonra
+ * tanımadığı bilgisayarlara cevap vermez (Visibility).
  *
  * Soru:  "EKRN?" + u16 sürüm [+ 16 pcKimlik + str pcAdı (0.5.3+)]
  * Cevap: "EKRN!" + u16 sürüm + u16 tcpPort + str ad + str kimlik
@@ -37,6 +38,7 @@ final class DiscoveryResponder extends Thread {
 
     private final String name;
     private final String id;
+    private final PairStore pairs;
     private volatile boolean stopped;
     private volatile DatagramSocket socket;
     private volatile Asker lastAsker;
@@ -46,10 +48,11 @@ final class DiscoveryResponder extends Thread {
         return lastAsker;
     }
 
-    DiscoveryResponder(String name, String id) {
+    DiscoveryResponder(String name, String id, PairStore pairs) {
         super("ekran-discovery");
         this.name = name;
         this.id = id;
+        this.pairs = pairs;
         setDaemon(true);
     }
 
@@ -93,16 +96,22 @@ final class DiscoveryResponder extends Thread {
                 int n = in.getLength();
                 if (n >= 5 && buf[0] == 'E' && buf[1] == 'K' && buf[2] == 'R' && buf[3] == 'N'
                         && buf[4] == '?') {
-                    socket.send(new DatagramPacket(reply, reply.length, in.getSocketAddress()));
-                    // Yalnızca ekranda bir ipucu için: ad temizlenir, kimlik yalnızca eşleşme kaydıyla karşılaştırılır
+                    // 0.5.3+ PC'ler kimliğini ve adını da gönderir. Kimlik yalnızca eşleşme kaydıyla karşılaştırılır,
+                    // ad yalnızca ekranda gösterilir (temizlenmiş)
+                    byte[] pcId = null;
                     if (n >= 7 + 16 + 2) {
                         int nameLen = ((buf[23] & 0xFF) << 8) | (buf[24] & 0xFF);
                         if (nameLen <= n - 25) {
-                            byte[] pcId = new byte[16];
+                            pcId = new byte[16];
                             System.arraycopy(buf, 7, pcId, 0, 16);
                             String pcName = Session.cleanName(new String(buf, 25, nameLen, "UTF-8"));
                             lastAsker = new Asker(pcId, pcName, SystemClock.elapsedRealtime());
                         }
+                    }
+                    // Eşleştikten sonra yalnızca tanıdığımız bilgisayarlara cevap ver (bkz. Visibility). Kimlik
+                    // göndermeyen eski PC'ler ayırt edilemez: onlara cevap verilir.
+                    if (pcId == null || Visibility.openToNewPcs(pairs.count()) || pairs.load(pcId) != null) {
+                        socket.send(new DatagramPacket(reply, reply.length, in.getSocketAddress()));
                     }
                 }
             } catch (IOException e) {

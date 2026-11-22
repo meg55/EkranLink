@@ -25,7 +25,7 @@ devices, and only when you connect them.
 ## Finding devices on your network
 
 To find devices over Wi-Fi, the PC sends a small query (UDP, port 27183) to the local network it is
-connected to, and to the addresses of devices it connected to before; the query carries the PC's name and a random PC identifier. The Android app answers only while it
+connected to, and to the addresses of devices it connected to before; the query carries the PC's name and a random PC identifier. Once paired, the Android app answers only the PCs it is paired with (except for 5 minutes after you tap *Add a new computer*). It answers only while it
 is open, with its name and identifier. These packets do not leave your local network.
 
 ## What is stored, and where
@@ -91,7 +91,7 @@ yalnızca kendi bilgisayarınızla kendi Android cihazlarınız arasında ve yal
 ### Ağda cihaz bulma
 
 Wi-Fi'de cihaz bulmak için PC bağlı olduğu yerel ağa ve daha önce bağlandığı cihazların adreslerine küçük bir
-soru (UDP, port 27183) gönderir; soruda PC'nin adı ve rastgele bir PC kimliği bulunur. Android uygulaması yalnızca açıkken, adı ve kimliğiyle yanıt verir. Bu paketler
+soru (UDP, port 27183) gönderir; soruda PC'nin adı ve rastgele bir PC kimliği bulunur. Eşleştikten sonra Android uygulaması yalnızca eşleştiği bilgisayarlara cevap verir (*Yeni bilgisayar ekle*'ye dokunduktan sonraki 5 dakika hariç). Yalnızca açıkken, adı ve kimliğiyle yanıt verir. Bu paketler
 yerel ağınızın dışına çıkmaz.
 
 ### Ne, nerede saklanır

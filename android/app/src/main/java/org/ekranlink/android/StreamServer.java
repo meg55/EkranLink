@@ -175,6 +175,10 @@ final class StreamServer extends Thread {
             // PC birkaç saniyede bir yeniden dener: uyarı ekranda kalsın
             incompatible = true;
             stats.setStatus(Stats.ERROR, e.messageRes);
+        } catch (Session.NewPcBlockedException e) {
+            incompatible = false;
+            declined = true; // "bekleniyor" ile ezilmesin: kullanıcı ne yapacağını görsün
+            stats.setStatus(Stats.ERROR, R.string.status_new_pc_blocked);
         } catch (Session.PairingDeclinedException e) {
             // Kullanıcı ne olduğunu görsün: bir sonraki bağlantıya kadar "bekleniyor" ile ezilmez
             incompatible = false;

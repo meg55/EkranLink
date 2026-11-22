@@ -241,6 +241,11 @@ MSVC + WDK and signed with a local certificate.
       Verified on the Android 16 phone emulator (pairing declined / accepted, both silence timeouts, orientation
       with auto-rotate on and off) and the Android 4.2 emulator (connects, no errors). The settings window changes
       and the USB permission state still need a check on real hardware.
+- [x] Easiest path first (0.5.3): Wi-Fi and USB shown side by side; the discovery query carries the PC's ID and
+      name, so an unpaired device says "*PC* found this device, click Connect there". Privacy on shared Wi-Fi: a
+      paired device answers only its paired PCs (and refuses pairing from unknown PCs over the network) unless
+      *Add a new computer* was tapped in the last 5 minutes. Verified on the Android 16 emulator: hidden from an
+      unknown PC with the hint shown, visible after *Add a new computer* (countdown, PC found it at once).
 - [ ] Distribution signing (SignPath Foundation or EV + Microsoft) — for now the driver can only be installed on the PC it was built on
 
 Measurement (S6000, USB, Extend 1280×752): PC→drawn on tablet ~27 ms, PC CPU 0.3% with a static screen.

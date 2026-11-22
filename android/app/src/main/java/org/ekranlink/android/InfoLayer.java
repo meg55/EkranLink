@@ -69,6 +69,7 @@ final class InfoLayer extends ViewGroup {
     private final View welcome;
     private final View welcomeDot;
     private final TextView welcomeStatus, wifiText, footer, forget;
+    private TextView addPc;
     private boolean forgetArmed;
     private TextView autoToggle;
 
@@ -111,11 +112,23 @@ final class InfoLayer extends ViewGroup {
         col.addView(statusRow, margins(0, 0, 0, size(24, 12)));
 
         col.addView(divider(ctx), new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 1));
-        // Önce Wi-Fi: cihazda hiçbir ayar gerektirmez. USB isteğe bağlı (hata ayıklama ister).
+        // İki yol eşit; Wi-Fi önce, çünkü cihazda hiçbir ayar gerektirmez (USB hata ayıklama ister)
         wifiText = text(ctx, "", font(15, 14), TEXT, false);
         col.addView(step(ctx, "Wi-Fi", wifiText), wide(0, size(20, 12), 0, 0));
         col.addView(step(ctx, "USB", text(ctx, res.getString(R.string.welcome_usb_step), font(15, 14), TEXT, false)),
                 wide(0, size(16, 10), 0, 0));
+        // Eşleşme varsa cihaz yalnızca tanıdığı bilgisayarlara görünür; yeni bilgisayar için 5 dk açılır (Visibility)
+        addPc = text(ctx, "", font(15, 14), ACCENT, true);
+        addPc.setPadding(0, size(10, 6), 0, size(10, 6));
+        addPc.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Visibility.openForNewPcs();
+                refreshAddPc();
+            }
+        });
+        col.addView(addPc, wide(0, size(10, 6), 0, 0));
+        refreshAddPc();
 
         // Bilgisayara takılınca otomatik aç (PC'nin "Otomatik bağlan" ayarıyla birlikte)
         LinearLayout autoRow = row(ctx);
@@ -338,10 +351,13 @@ final class InfoLayer extends ViewGroup {
             setDotColor(welcomeDot, color);
             welcomeStatus.setText(s.status);
             boolean hint = nearbyPc != null && s.state != Stats.CONNECTING && s.state != Stats.CONNECTED;
+            boolean hidden = !Visibility.openToNewPcs(actions.pairCount());
             wifiText.setTextColor(hint ? ACCENT : TEXT);
-            wifiText.setText(hint ? res.getString(R.string.welcome_wifi_pc_found, nearbyPc)
+            wifiText.setText(hint ? res.getString(hidden ? R.string.welcome_wifi_pc_hidden
+                    : R.string.welcome_wifi_pc_found, nearbyPc)
                     : addresses != null ? res.getString(R.string.welcome_wifi_found, addresses)
                     : res.getString(R.string.welcome_wifi_none));
+            refreshAddPc();
             if (!forgetArmed) {
                 forget.setVisibility(actions.pairCount() > 0 ? VISIBLE : GONE);
             }
@@ -358,6 +374,24 @@ final class InfoLayer extends ViewGroup {
                     : "–");
             statValues[4].setText(s.decoder);
             statValues[5].setText(s.droppedFrames + " / " + s.totalFrames);
+        }
+    }
+
+    /** "Yeni bilgisayar ekle": yalnızca eşleşme varken; açıksa kalan süre (saniyede bir tazelenir). */
+    private void refreshAddPc() {
+        if (actions.pairCount() == 0) {
+            addPc.setVisibility(GONE);
+            return;
+        }
+        addPc.setVisibility(VISIBLE);
+        long left = Visibility.remainingMs();
+        if (left > 0) {
+            long sec = (left + 999) / 1000;
+            addPc.setText(res.getString(R.string.add_pc_open, sec / 60 + ":" + (sec % 60 < 10 ? "0" : "") + sec % 60));
+            addPc.setTextColor(GREEN);
+        } else {
+            addPc.setText(res.getString(R.string.add_pc));
+            addPc.setTextColor(ACCENT);
         }
     }
 

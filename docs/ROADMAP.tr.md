@@ -239,6 +239,12 @@ MSVC + WDK ile derlenip yerel sertifikayla imzalanıyor.
       Android 16 telefon öykünücüsünde (eşleştirme reddi / onayı, iki yönde sessizlik zaman aşımı, otomatik
       döndürme açık ve kapalıyken yön) ve Android 4.2 öykünücüsünde (bağlanıyor, hata yok) doğrulandı. Ayar
       penceresindeki değişiklikler ve USB izin durumu gerçek donanımda henüz denenmedi.
+- [x] En kolay yol önde (0.5.3): Wi-Fi ve USB yan yana; cihaz arama sorusu PC'nin kimliğini ve adını taşır,
+      eşleşmemiş cihaz "*PC* bu cihazı buldu, orada Bağlan'a tıklayın" der. Ortak Wi-Fi'de gizlilik: eşleşmiş
+      cihaz yalnızca eşleştiği PC'lere cevap verir (ağdan tanımadığı PC'nin eşleştirme isteğini de geri çevirir);
+      son 5 dakikada *Yeni bilgisayar ekle*'ye dokunulduysa herkese açıktır. Android 16 öykünücüsünde doğrulandı:
+      tanımadığı PC'den gizli ve ipucu görünüyor, *Yeni bilgisayar ekle*'den sonra görünür (geri sayım, PC hemen
+      buldu).
 - [ ] Dağıtım imzası (SignPath Foundation veya EV + Microsoft) — şu an sürücü yalnızca derlendiği bilgisayarda kurulabiliyor
 
 Ölçüm (S6000, USB, ikinci ekran 1280×752): PC→tablette çizim ~27 ms, ekran sabitken PC CPU %0,3.

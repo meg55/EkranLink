@@ -14,7 +14,7 @@ PC, her ağ arayüzünün yayın adresine (ör. 192.168.1.255, USB internet payl
 - Soru (P→T): `"EKRN?"` + `u16 sürüm` + (0.5.3+) `16 pcKimlik, str pcAdı` — cihaz bunları yalnızca o PC ile henüz eşleşmemişse "*PC adı* bu cihazı buldu, orada Bağlan'a tıklayın" demek için kullanır; eski cihazlar yalnızca ilk 5 bayta bakar
 - Cevap (T→P, soranın adresine): `"EKRN!"` + `u16 sürüm, u16 tcpPort, str ad, str kimlik`
 
-Tablet boştayken hiçbir paket göndermez; yalnızca soru gelince cevap verir.
+Tablet boştayken hiçbir paket göndermez; yalnızca soru gelince cevap verir. Tablet en az bir PC ile eşleştikten sonra yalnızca eşleştiği bir PC'nin `pcKimlik`'ini taşıyan sorulara (ve kimliksiz eski sorulara) cevap verir; kullanıcı son 5 dakikada *Yeni bilgisayar ekle*'ye dokunduysa herkese. Bu durumda ağdan tanınmayan bir PC'nin el sıkışması da eşleştirme sorusu açılmadan kapatılır (USB etkilenmez).
 
 Soru her arayüzden, o arayüzün adresine bağlı ayrı bir soketle gönderilir: aynı ağa iki kartla
 (Ethernet + Wi-Fi) bağlı PC'de bağlanmamış soketin yayını yalnızca yönlendirmenin seçtiği karttan çıkar.
