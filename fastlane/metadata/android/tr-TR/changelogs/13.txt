@@ -1,0 +1,4 @@
+• Wi-Fi cihazda hiçbir ayar gerektirmeden çalışır; USB ve Wi-Fi eşit seçenekler.
+• Eşleştikten sonra cihaz ortak Wi-Fi'de yalnızca kendi bilgisayarlarına görünür.
+• Otomatik döndürme açıksa ekran cihazla birlikte döner; Windows görev çubuğu artık gizlenmez.
+• Daha güvenilir yeniden bağlanma ve daha anlaşılır mesajlar.

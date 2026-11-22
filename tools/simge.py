@@ -4,8 +4,9 @@
 
 Çıktılar (depoya eklenir, her değişiklikte yeniden üretilir):
   art/ekranlink.svg                         kaynak çizim (1024 birim)
-  art/play-icon-512.png                     Google Play simgesi (köşeleri Play yuvarlar)
-  art/play-feature-tr.png, -en.png          Google Play tanıtım görseli (1024×500)
+  fastlane/metadata/android/en-US/images/icon.png      Google Play simgesi (512, alfa; köşeleri Play yuvarlar)
+  fastlane/metadata/android/*/images/featureGraphic.png  Google Play tanıtım görseli (1024×500, alfasız)
+  art/github-social-preview.png             GitHub depo önizlemesi
   host-windows/res/ekranlink.ico            Windows: exe, pencere ve bağlıyken tepsi
   host-windows/res/ekranlink-bosta.ico      Windows: bağlı değilken tepsi (gri)
   android/.../mipmap-*/ic_launcher.png      Android 8 öncesi başlatıcı
@@ -176,7 +177,7 @@ def svg():
         f.write(metin)
 
 
-def tanitim(ad, alt_yazi, W=1024, H=500):
+def tanitim(hedef, alt_yazi, W=1024, H=500):
     # Yerleşim 1024x500 için; başka boyutta oranlanır ve dikeyde ortalanır
     o = W / 1024
     dy = (H - 500 * o) / 2
@@ -193,16 +194,18 @@ def tanitim(ad, alt_yazi, W=1024, H=500):
     for satir in alt_yazi:
         d.text(p(414, y), satir, font=normal, fill=(225, 236, 255))
         y += 50
-    im.convert('RGB').save(yol('art', ad + '.png'))
+    im.convert('RGB').save(hedef)
 
 
 def main():
     svg()
-    ciz(512, arka='kare').convert('RGB').save(yol('art', 'play-icon-512.png'))
-    tanitim('play-feature-tr', ['Tablet ve telefonunuzu', 'bilgisayarınıza ekran yapın'])
-    tanitim('play-feature-en', ['Use your tablet or phone', 'as a display for your PC'])
+    # Mağaza görselleri: fastlane/metadata (Google Play ve F-Droid'in okuduğu düzen)
+    magaza = lambda dil, ad: yol('fastlane', 'metadata', 'android', dil, 'images', ad)
+    ciz(512, arka='kare').convert('RGBA').save(magaza('en-US', 'icon.png'))
+    tanitim(magaza('tr-TR', 'featureGraphic.png'), ['Tablet ve telefonunuzu', 'bilgisayarınıza ekran yapın'])
+    tanitim(magaza('en-US', 'featureGraphic.png'), ['Use your tablet or phone', 'as a display for your PC'])
     # GitHub depo önizlemesi (Settings > Social preview; elle yüklenir)
-    tanitim('github-social-preview', ['Use your tablet or phone', 'as a display for your PC'], 1280, 640)
+    tanitim(yol('art', 'github-social-preview.png'), ['Use your tablet or phone', 'as a display for your PC'], 1280, 640)
     ico('ekranlink.ico')
     ico('ekranlink-bosta.ico', gri)
     for yogunluk, olcu in (('mdpi', 1), ('hdpi', 1.5), ('xhdpi', 2), ('xxhdpi', 3), ('xxxhdpi', 4)):

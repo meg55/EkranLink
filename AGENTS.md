@@ -34,7 +34,8 @@ device. It can run as a Windows service so the sign-in screen appears on the dev
 | Android user-visible strings | `android/app/src/main/res/values/strings.xml` (English) and `values-tr/` (Turkish) |
 | Installer | `host-windows/installer/EkranLink.iss` (Inno Setup) |
 | Packaging, CI | `tools/paketle.ps1`, `.github/workflows/derle.yml` |
-| Icons and store graphics | `tools/simge.py` (generates everything in `art/` and the app icons) |
+| Icons and store graphics | `tools/simge.py` (generates the icons, `art/` and the store icon / feature graphic) |
+| Google Play listing (texts, release notes, screenshots) | `fastlane/metadata/android/en-US`, `tr-TR` (`changelogs/<versionCode>.txt` per release) |
 | Version | `host-windows/src/version.h` and `android/app/build.gradle` (must match) |
 
 ## Build and test

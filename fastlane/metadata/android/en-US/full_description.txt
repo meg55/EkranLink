@@ -1,0 +1,25 @@
+EkranLink turns your Android tablet or phone into a monitor for your Windows PC, over Wi-Fi or a USB cable.
+
+<b>How it works</b>
+1. Install EkranLink for Windows on your PC. It is free and open source: https://github.com/meg55/EkranLink/releases
+2. Open EkranLink on your tablet or phone and join the same Wi-Fi network as the PC.
+3. Click Connect on the PC and confirm the same 6-digit code on both screens. From then on it connects by itself whenever EkranLink is open.
+
+<b>Features</b>
+• Wi-Fi needs no setup on the device. A USB cable works too (turn on USB debugging once).
+• Touch works like a Windows touch screen: scroll, pinch to zoom, press and hold for right click, on-screen keyboard. A simple mouse mode is also available.
+• With Auto-rotate on, turn the device upright and the Windows screen turns portrait.
+• Several tablets and phones at once, each with its own settings.
+• Low latency and easy on the battery: the picture is decoded in hardware, and nothing is sent while the screen is still.
+• Optionally shows the Windows sign-in screen too (service mode on the PC).
+• English and Turkish.
+
+<b>Privacy and security</b>
+• No account, no ads, no tracking. The app talks only to the PCs you connect it to, over your own network or cable.
+• Connections are encrypted (ECDH P-256 and ChaCha20-Poly1305).
+• Once paired, the device answers only its own PCs, so others on the same Wi-Fi do not see it.
+
+<b>Good to know</b>
+• Needs EkranLink for Windows (Windows 10 or 11), a separate free download from the link above.
+• Extend (the device as an extra monitor) and Only this need EkranLink's virtual display driver. Until the driver ships with the Windows installer, EkranLink mirrors the PC screen.
+• Open source (GPL-3.0): https://github.com/meg55/EkranLink

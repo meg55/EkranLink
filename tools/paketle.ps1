@@ -1,7 +1,8 @@
 ﻿<#
 .SYNOPSIS
     İndirmeleri üretir: dist\EkranLink-<sürüm>-windows-setup.exe (kurulum), dist\EkranLink-<sürüm>-windows.zip
-    (taşınabilir) ve dist\EkranLink-<sürüm>-android.apk
+    (taşınabilir), dist\EkranLink-<sürüm>-android.apk ve (anahtar varsa) Google Play için
+    dist\EkranLink-<sürüm>-android-play.aab
 
 .DESCRIPTION
     Windows paketi: EkranLink.exe (bildirim alanı), ekranlink-host.exe (konsol), adb\ (Android SDK platform-tools'tan),
@@ -35,7 +36,8 @@ try {
     # --no-daemon: arkada kalan Gradle sunucusu yüzlerce MB bellek tutar ve çıktı borusunu açık bırakır
     # Sürüm anahtarı tanımlıysa (android/app/build.gradle: releaseKeystoreProperties / RELEASE_KEYSTORE_PROPERTIES)
     # imzalı sürüm, değilse geliştirme anahtarıyla imzalı hata ayıklama derlemesi
-    & .\gradlew.bat assembleRelease assembleDebug --no-daemon --console=plain -q
+    # bundleRelease: Google Play'e yüklenen .aab (GitHub sürümüne konmaz)
+    & .\gradlew.bat assembleRelease bundleRelease assembleDebug --no-daemon --console=plain -q
     if ($LASTEXITCODE -ne 0) { throw 'Android derlemesi başarısız' }
 } finally { Pop-Location }
 $apk = Join-Path $kok 'android\app\build\outputs\apk\release\app-release.apk'
@@ -168,3 +170,10 @@ if ($iscc) {
 $apkHedef = Join-Path $dist "EkranLink-$versionName-android.apk"
 Copy-Item -Force $apk $apkHedef
 '{0}  ({1:N1} MB)' -f $apkHedef, ((Get-Item $apkHedef).Length / 1MB)
+
+# Google Play paketi: yalnızca sürüm anahtarıyla imzalıysa (imzasız .aab Play'e yüklenemez)
+if ($apk -like '*app-release.apk') {
+    $aabHedef = Join-Path $dist "EkranLink-$versionName-android-play.aab"
+    Copy-Item -Force (Join-Path $kok 'android\app\build\outputs\bundle\release\app-release.aab') $aabHedef
+    '{0}  ({1:N1} MB, Google Play için)' -f $aabHedef, ((Get-Item $aabHedef).Length / 1MB)
+}

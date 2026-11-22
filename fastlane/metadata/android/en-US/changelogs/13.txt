@@ -1,0 +1,4 @@
+• Wi-Fi works with no setup on the device; USB and Wi-Fi are equal choices.
+• Once paired, the device is visible only to its own PCs on shared Wi-Fi.
+• The screen turns with the device when Auto-rotate is on; the Windows taskbar is no longer hidden.
+• More reliable reconnection and clearer messages.

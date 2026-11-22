@@ -1,0 +1,25 @@
+EkranLink, Android tabletinizi ya da telefonunuzu Wi-Fi veya USB kablosuyla Windows bilgisayarınızın ekranı yapar.
+
+<b>Nasıl çalışır</b>
+1. Bilgisayara EkranLink for Windows'u kurun. Ücretsiz ve açık kaynaklıdır: https://github.com/meg55/EkranLink/releases
+2. Tablette ya da telefonda EkranLink'i açın ve bilgisayarla aynı Wi-Fi ağına bağlanın.
+3. Bilgisayarda Bağlan'a tıklayın ve iki ekranda görünen aynı 6 haneli kodu onaylayın. Bundan sonra EkranLink açık olduğunda kendiliğinden bağlanır.
+
+<b>Özellikler</b>
+• Wi-Fi ile cihazda hiçbir ayar gerekmez. USB kablosu da olur (USB hata ayıklamayı bir kez açın).
+• Dokunma Windows dokunmatik ekranı gibi çalışır: kaydırma, iki parmakla yakınlaştırma, basılı tutarak sağ tık, ekran klavyesi. İsterseniz basit fare modu da var.
+• Otomatik döndürme açıksa cihazı dik çevirince Windows ekranı da dikey olur.
+• Aynı anda birden çok tablet ve telefon; her birinin ayarları ayrı.
+• Gecikmesi düşük, pili yormaz: görüntü donanımla çözülür, ekran durgunken hiçbir şey gönderilmez.
+• İsterseniz Windows oturum açma ekranı da cihazda görünür (bilgisayarda hizmet modu).
+• Türkçe ve İngilizce.
+
+<b>Gizlilik ve güvenlik</b>
+• Hesap yok, reklam yok, izleme yok. Uygulama yalnızca sizin bağladığınız bilgisayarlarla, kendi ağınız ya da kablonuz üzerinden konuşur.
+• Bağlantılar şifrelidir (ECDH P-256 ve ChaCha20-Poly1305).
+• Eşleştikten sonra cihaz yalnızca kendi bilgisayarlarınıza cevap verir; aynı Wi-Fi'deki başkaları onu görmez.
+
+<b>Bilmeniz gerekenler</b>
+• EkranLink for Windows gerekir (Windows 10 ya da 11); yukarıdaki bağlantıdan ayrıca ve ücretsiz indirilir.
+• İkinci ekran (cihazın ayrı bir monitör olması) ve Tek ekran için EkranLink'in sanal ekran sürücüsü gerekir. Sürücü Windows kurulumuna eklenene kadar EkranLink bilgisayar ekranını yansıtır.
+• Açık kaynak (GPL-3.0): https://github.com/meg55/EkranLink
