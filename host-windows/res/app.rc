@@ -20,7 +20,7 @@ BEGIN
             VALUE "CompanyName", "EkranLink"
             VALUE "FileDescription", "EkranLink"
             VALUE "FileVersion", EKRANLINK_VERSION
-            VALUE "LegalCopyright", "GPL-3.0"
+            VALUE "LegalCopyright", "The EkranLink authors (MIT License)"
             VALUE "ProductName", "EkranLink"
             VALUE "ProductVersion", EKRANLINK_VERSION
         END

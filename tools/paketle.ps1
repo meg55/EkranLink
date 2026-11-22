@@ -143,7 +143,7 @@ EKRANSIZ MİNİ PC
 SORUN OLURSA
   Genel > "Günlüğü aç" (%LOCALAPPDATA%\EkranLink\ekranlink.log). Ölçümlü konsol sürümü: ekranlink-host.exe
 
-License / Lisans: GPL-3.0 (LICENSE). adb comes from the Android SDK platform-tools / adb, Android SDK
+License / Lisans: MIT (LICENSE). adb comes from the Android SDK platform-tools / adb, Android SDK
 platform-tools'tandır (adb\NOTICE.txt).
 "@ | Set-Content (Join-Path $hedef 'README.txt') -Encoding utf8
 

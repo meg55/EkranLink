@@ -22,4 +22,4 @@ EkranLink turns your Android tablet or phone into a monitor for your Windows PC,
 <b>Good to know</b>
 • Needs EkranLink for Windows (Windows 10 or 11), a separate free download from the link above.
 • Extend (the device as an extra monitor) and Only this need EkranLink's virtual display driver. Until the driver ships with the Windows installer, EkranLink mirrors the PC screen.
-• Open source (GPL-3.0): https://github.com/meg55/EkranLink
+• Open source (MIT License): https://github.com/meg55/EkranLink

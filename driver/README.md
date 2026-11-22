@@ -8,7 +8,7 @@ the kernel.
 
 ## Origin and license
 
-This directory is **licensed separately from the rest of EkranLink (GPL-3.0)**; the full license texts are in
+This directory is **licensed separately from the rest of EkranLink (MIT)**; the full license texts are in
 [LICENSE](LICENSE). The driver is a separate program; EkranLink talks to it only through device I/O control
 codes (IOCTL). Because parts of it come from the Microsoft sample, the source in this directory as a whole is
 distributed under the **MS-PL**.

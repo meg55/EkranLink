@@ -22,4 +22,4 @@ EkranLink, Android tabletinizi ya da telefonunuzu Wi-Fi veya USB kablosuyla Wind
 <b>Bilmeniz gerekenler</b>
 • EkranLink for Windows gerekir (Windows 10 ya da 11); yukarıdaki bağlantıdan ayrıca ve ücretsiz indirilir.
 • İkinci ekran (cihazın ayrı bir monitör olması) ve Tek ekran için EkranLink'in sanal ekran sürücüsü gerekir. Sürücü Windows kurulumuna eklenene kadar EkranLink bilgisayar ekranını yansıtır.
-• Açık kaynak (GPL-3.0): https://github.com/meg55/EkranLink
+• Açık kaynak (MIT Lisansı): https://github.com/meg55/EkranLink

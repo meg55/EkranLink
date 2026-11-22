@@ -63,8 +63,9 @@ compiles is not a change that works: say what you verified and what you could no
   keys, passwords, certificates or tokens to code, docs, CI files or logs.
 - **Android API 16 must keep working.** No AndroidX, no Java language level above 8, no API newer than 16
   without a `Build.VERSION.SDK_INT` check. Check every new Android call against its API level.
-- **Licenses.** Everything is GPL-3.0 except `driver/`, which is MS-PL / MIT and a separate program. Do not
-  copy code between `driver/` and the rest. Third-party code needs a compatible license and attribution.
+- **Licenses.** Everything is MIT except `driver/`, which is MS-PL / MIT because it contains code from
+  Microsoft's IndirectDisplay sample. Keep that code inside `driver/`; only `driver/src/ekranvd-ioctl.h` (MIT) is
+  shared with the app. Third-party code needs a compatible license and attribution.
 - **Both languages.** Every user-visible string exists in Turkish and English (`i18n.h`; Android `values` and
   `values-tr`). Use the terms Windows itself uses (e.g. *Extend*, *Display resolution*).
 - **Protocol changes** go to both sides and to `docs/PROTOCOL.md`. Older apps on the other side must get the

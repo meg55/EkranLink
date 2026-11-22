@@ -10,7 +10,7 @@ or Windows' only screen (Only this); over USB or Wi-Fi.
 | Topic | Decision | Why |
 |---|---|---|
 | Name | EkranLink (package `org.ekranlink.android`, Windows service `EkranLink`); EKRAN up to 0.4.x | A more general, international name; no conflicting app or trademark found (2026-10) |
-| License | GPL-3.0 | To reuse code and old-device fixes from GPL projects like Moonlight/Sunshine; derivatives stay open |
+| License | MIT | Simple and permissive: works with every app store (Apple's too) and anyone may reuse the code |
 | Windows side | C++ (service, capture, encoding, driver) | The IddCx driver is C++ anyway; all DXGI/NVENC/AMF samples are C/C++ |
 | Android client | Java, minSdk 16 (4.1), no AndroidX | MediaCodec arrived in 4.1; current AndroidX/NDK don't support 4.x |
 | iOS client | Swift, VideoToolbox | A native app is wanted; very old iOS versions via the web client |

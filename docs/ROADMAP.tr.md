@@ -10,7 +10,7 @@ ve Windows'un tek ekranı olarak; USB veya Wi-Fi ile.
 | Konu | Karar | Neden |
 |---|---|---|
 | Ad | EkranLink (paket `org.ekranlink.android`, Windows hizmeti `EkranLink`); 0.4.x'e kadar EKRAN | Daha genel, uluslararası bir ad; çakışan uygulama ya da marka bulunmadı (2026-10) |
-| Lisans | GPL-3.0 | Moonlight/Sunshine gibi GPL projelerden kod ve eski cihaz düzeltmeleri alabilmek; türevlerin açık kalması |
+| Lisans | MIT | Basit ve serbest: Apple dahil her uygulama mağazasıyla uyumlu, herkes kodu kullanabilir |
 | Windows tarafı | C++ (servis, yakalama, kodlama, sürücü) | IddCx sürücüsü zaten C++; DXGI/NVENC/AMF örneklerinin tamamı C/C++ |
 | Android istemci | Java, minSdk 16 (4.1), AndroidX yok | MediaCodec 4.1'de geldi; güncel AndroidX/NDK 4.x'i desteklemiyor |
 | iOS istemci | Swift, VideoToolbox | Yerel uygulama isteniyor; çok eski iOS sürümleri web istemcisiyle |

@@ -32,7 +32,7 @@ It is also valuable to hear that EkranLink worked, or did not, on a device we ha
 
 ## License
 
-Contributions are published under the license of the directory they are added to: GPL-3.0 for the repository
+Contributions are published under the license of the directory they are added to: MIT for the repository
 in general, MS-PL / MIT in `driver/` ([driver/LICENSE](driver/LICENSE)). If you bring code from another
 project, state its source and license.
 
@@ -70,6 +70,6 @@ EkranLink'in denemediğimiz bir cihazda çalıştığını ya da çalışmadığ
 
 ### Lisans
 
-Gönderdiğiniz katkılar, eklendikleri klasörün lisansıyla yayımlanır: depo genelinde GPL-3.0, `driver/`
+Gönderdiğiniz katkılar, eklendikleri klasörün lisansıyla yayımlanır: depo genelinde MIT, `driver/`
 klasöründe MS-PL / MIT ([driver/LICENSE](driver/LICENSE)). Başka bir projeden kod alıyorsanız kaynağını ve
 lisansını belirtin.

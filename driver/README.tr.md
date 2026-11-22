@@ -7,7 +7,7 @@ kaldıran IddCx (Indirect Display) sürücüsü. Kullanıcı modunda (UMDF 2) ç
 
 ## Kaynak ve lisans
 
-Bu klasör **EkranLink'in geri kalanından (GPL-3.0) ayrı lisanslıdır**; lisans metinlerinin tamamı
+Bu klasör **EkranLink'in geri kalanından (MIT) ayrı lisanslıdır**; lisans metinlerinin tamamı
 [LICENSE](LICENSE) dosyasındadır. Sürücü ayrı bir programdır; EkranLink onunla yalnızca aygıt komutlarıyla
 (IOCTL) konuşur. Microsoft örneğinden gelen kısımlar nedeniyle bu klasörün kaynağı bir bütün olarak
 **MS-PL** koşullarıyla dağıtılır.

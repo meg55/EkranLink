@@ -2,7 +2,7 @@ EkranLink virtual display driver (this directory) — license notices
 ===================================================================
 
 This directory is licensed separately from the rest of EkranLink (which is
-GPL-3.0, see ../LICENSE). The driver is a separate program; the EkranLink
+MIT, see ../LICENSE). The driver is a separate program; the EkranLink
 application talks to it only through device I/O control codes.
 
 It is derived from, in order:
@@ -27,7 +27,7 @@ copyright notices present in the files are retained (section 3(C)).
 Exception: src/ekranvd-ioctl.h (the I/O control codes and structures shared
 by the driver and the EkranLink application) contains no code from the
 Microsoft sample. It is derived from SudoVDA's MIT-licensed interface and is
-licensed under the MIT License below, so the GPL-3.0 application can include it.
+licensed under the MIT License below, like the EkranLink application that includes it.
 
 
 -------------------------------------------------------------------------------

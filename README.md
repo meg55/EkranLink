@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/meg55/EkranLink/actions/workflows/derle.yml"><img src="https://github.com/meg55/EkranLink/actions/workflows/derle.yml/badge.svg" alt="Build"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License: GPL-3.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/Windows-10%201809%2B%20%7C%2011-0078D4" alt="Windows 10 1809+ / 11">
   <img src="https://img.shields.io/badge/Android-4.1%2B-3DDC84" alt="Android 4.1+">
 </p>
@@ -232,8 +232,9 @@ releases are not signed.)*
 
 ## License
 
-EkranLink is licensed under [GPL-3.0](LICENSE). The virtual display driver in [driver/](driver/) is a
-separate program, licensed under MS-PL / MIT ([driver/LICENSE](driver/LICENSE)).
+EkranLink is licensed under the [MIT License](LICENSE). This applies to every version of EkranLink, including
+earlier ones. The virtual display driver in [driver/](driver/) contains code from a Microsoft sample and is
+licensed under MS-PL / MIT ([driver/LICENSE](driver/LICENSE)).
 
 </details>
 
@@ -450,7 +451,8 @@ Free code signing provided by [SignPath.io](https://about.signpath.io/), certifi
 
 ## Lisans
 
-EkranLink [GPL-3.0](LICENSE) ile lisanslıdır. Sanal ekran sürücüsü ([driver/](driver/)) ayrı bir programdır;
-MS-PL / MIT ile lisanslıdır ([driver/LICENSE](driver/LICENSE)).
+EkranLink [MIT Lisansı](LICENSE) ile lisanslıdır. Bu, önceki sürümler dahil EkranLink'in bütün sürümleri için
+geçerlidir. Sanal ekran sürücüsü ([driver/](driver/)) Microsoft örneğinden kod içerdiği için MS-PL / MIT ile
+lisanslıdır ([driver/LICENSE](driver/LICENSE)).
 
 </details>
