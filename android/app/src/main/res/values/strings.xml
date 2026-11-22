@@ -28,7 +28,8 @@
     <string name="status_connection_lost">Connection lost</string>
     <string name="status_new_pc_blocked">A computer this device doesn\'t know tried to connect. To add it, tap \"Add a new computer\".</string>
     <string name="status_pair_declined">Pairing was not confirmed. To try again, click Connect on the computer.</string>
-    <string name="tip_three_fingers">Tip: tap with three fingers for measurements and Disconnect</string>
+    <string name="tip_menu">Tap with three fingers for the menu</string>
+    <string name="welcome_menu_hint">While connected, tap the screen with three fingers for the menu: rotate the screen, connection details, Disconnect.</string>
     <string name="status_port_busy">Port %1$d is used by another app; will connect once it closes</string>
     <string name="status_pc_newer">EkranLink on the computer is newer: install the new version of EkranLink on this device</string>
     <string name="status_pc_older">EkranLink on the computer is outdated: install the new version of EkranLink on the computer</string>
@@ -44,7 +45,9 @@
     <string name="stat_data_value">%1$.2f Mbit/s</string>
     <string name="stat_decode_value">%1$.1f ms  (min %2$.1f · max %3$.1f)</string>
     <string name="stat_decoder_default">(default)</string>
-    <string name="stats_hide_hint">Tap with three fingers to hide</string>
+    <string name="stats_hide_hint">To close, tap with three fingers again or press Back</string>
+    <string name="menu_rotate">Rotate</string>
+    <string name="menu_follow">Auto</string>
     <string name="disconnect">Disconnect</string>
 
     <!-- Uyku örtüsü -->

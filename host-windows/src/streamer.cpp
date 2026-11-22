@@ -916,6 +916,16 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
             conn.send(proto::kConfig, w.buf);
         };
         sendConfig();
+        // Masaüstünün akıştaki yönü (yansıtmada düzeltilmiş: 0; ikinci ekranda monitörün yönü)
+        int sentContentRotation = -1;
+        auto sendContentRotation = [&] {
+            if (sent.rotation == sentContentRotation) return;
+            sentContentRotation = sent.rotation;
+            proto::Writer w;
+            w.u16(uint16_t(sent.rotation));
+            conn.send(proto::kContentRotation, w.buf);
+        };
+        sendContentRotation();
         touch.setMapping(gpu.desktopRect, content, srcW, srcH, sent);
 
         Encoder enc;
@@ -1067,6 +1077,7 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
                 if (!initScaler()) break;
                 content = scaler.content();
                 if (srcW != w0 || srcH != h0) sendConfig();
+                sendContentRotation();
                 touch.setMapping(gpu.desktopRect, content, srcW, srcH, sent);
                 // Yönü ya da çözünürlüğü biz değiştirmediysek kullanıcı Windows ekran ayarlarından değiştirdi:
                 // hatırla (bir sonraki bağlantıda da öyle açılır)

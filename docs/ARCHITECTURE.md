@@ -135,7 +135,7 @@ The agent's capture and touch threads switch to whichever desktop currently rece
 | `StreamServer`, `Session` | TCP server (the PC connects), handshake, message loop |
 | `H264Decoder`, `SpsParser`, `SpsRewriter`, `AnnexBReader` | Hardware decoding |
 | `CursorView` | Draws the PC cursor locally |
-| `InfoLayer`, `Stats` | Welcome screen, three-finger performance overlay, pairing prompt |
+| `InfoLayer`, `Stats` | Welcome screen, three-finger menu (measurements, Rotate, Disconnect; turned to match the picture via `ContentRotation`), pairing prompt |
 | `OrientationWatcher` | Reports how the device is held so Windows can rotate the monitor |
 | `DiscoveryResponder` | Answers Wi-Fi discovery queries |
 | `AutoStartReceiver`, `AutoStart` | Lets the PC ask over adb whether the app may open, and get the device ID |

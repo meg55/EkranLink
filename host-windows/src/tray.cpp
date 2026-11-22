@@ -27,6 +27,7 @@
 #include "service.h"
 #include "streamer.h"
 #include "ui.h"
+#include "theme.h"
 #include "virtual_display.h"
 
 using namespace ekran;
@@ -132,6 +133,9 @@ void applyLanguage() {
     if (g_serviceMode) {
         const DWORD ui = i18n::systemLanguage() == i18n::Lang::Tr ? 1 : 2;
         if (config::get(L"UiLanguage", 0) != ui) config::set(L"UiLanguage", ui);
+        // Eşleştirme sorusunu hizmet ajanı (SYSTEM) açar: kullanıcının temasını o da bilsin
+        const DWORD dark = theme::systemDark() ? 1 : 0;
+        if (config::get(L"UiDark", 2) != dark) config::set(L"UiDark", dark);
     }
 }
 

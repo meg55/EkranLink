@@ -113,6 +113,7 @@ debugging) does not count as local, and video is encrypted there too.
 | 12 | DisplayPower | P→T | `u8 on` — Windows turned the displays off (0) / on (1). The tablet dims and lets its screen turn off via its own timeout; the connection stays up. When turned on, the tablet lights its screen |
 | 13 | KeyRequest | T→P | (empty) — the tablet re-created its decoder (its surface was destroyed and came back); the PC sends a key frame and resets the acknowledgement counter |
 | 14 | VideoVisible | T→P | `u8 foreground` — the tablet app was sent to the background (0) / came to the foreground (1). While in the background the PC stops capturing and encoding, the connection stays up; on returning to the foreground the tablet sends `KeyRequest`. While in the background the PC does not turn off the tablet's screen |
+| 25 | ContentRotation | P→T | `u16 degrees` (0, 90, 180, 270, same measure as `Orientation`) — how the PC desktop is rotated in the stream: the virtual monitor's rotation in *Extend* / *Only this*, 0 in *Mirror* (a portrait PC monitor is turned upright before encoding). Sent after `Config` and when it changes. The tablet turns its overlay (menu, hints) to match the picture; older apps ignore it, and without it the tablet assumes the PC follows how it is held |
 | 20–24 | PcHello, TabletKey, Mode, PairResult, Incompatible | | above |
 
 If the first 4 bytes are not `"EKRN"`, the tablet treats the stream as raw H.264 Annex-B (diagnostic mode: e.g. `adb forward tcp:27183 tcp:27183`, then ffmpeg with `-f h264 tcp://127.0.0.1:27183`).

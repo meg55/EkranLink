@@ -2,7 +2,13 @@ package org.ekranlink.android;
 
 import android.content.Context;
 import android.content.res.Resources;
+import android.graphics.Canvas;
+import android.graphics.ColorFilter;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.PixelFormat;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -21,8 +27,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 /**
- * Tabletteki bilgi katmanı: bağlantı beklerken karşılama ekranı, bağlıyken üç parmakla açılan ölçüm kartı ve
- * Wi-Fi eşleştirme onayı.
+ * Tabletteki bilgi katmanı: bağlantı beklerken karşılama ekranı, bağlıyken üç parmakla açılan menü (ölçümler,
+ * Döndür, Bağlantıyı kes) ve Wi-Fi eşleştirme onayı.
  *
  * Uygulamanın ekranı hep yatay kalır (görüntü akışı bozulmasın diye); tablet dik tutulunca bu katman kendini
  * çevirir. Android'in iletişim kutuları ve bildirimleri çevrilemediğinden hepsi burada çizilir.
@@ -42,6 +48,12 @@ final class InfoLayer extends ViewGroup {
 
         /** Bağlantıyı kes ve uygulamayı kapat. */
         void disconnect();
+
+        /** Ekranı elle döndür (yatay / dikey); cihazın kendi döndürmesinden bağımsız. */
+        void rotate();
+
+        /** Elle döndürmeyi bırak: yön yine cihazın tutuluşuna (otomatik döndürmeye) uysun. */
+        void followDevice();
     }
 
     private static final int BG = 0xFF0B0E13;
@@ -77,6 +89,8 @@ final class InfoLayer extends ViewGroup {
     private final View statsDot;
     private final TextView statsTitle;
     private final TextView[] statValues = new TextView[STAT_LABELS.length];
+    private final TextView rotateButton, followButton;
+    private final TextView menuHint; // bağlanınca kısa süre: "Menü için üç parmakla dokunun"
 
     private final View sleepCover;
     private final View pairView;
@@ -116,6 +130,9 @@ final class InfoLayer extends ViewGroup {
         wifiText = text(ctx, "", font(15, 14), TEXT, false);
         col.addView(step(ctx, "Wi-Fi", wifiText), wide(0, size(20, 12), 0, 0));
         col.addView(step(ctx, "USB", text(ctx, res.getString(R.string.welcome_usb_step), font(15, 14), TEXT, false)),
+                wide(0, size(16, 10), 0, 0));
+        // Bağlıyken ekranda menü düğmesi yok: nasıl açılacağı baştan söylenir
+        col.addView(text(ctx, res.getString(R.string.welcome_menu_hint), font(14, 13), MUTED, false),
                 wide(0, size(16, 10), 0, 0));
         // Eşleşme varsa cihaz yalnızca tanıdığı bilgisayarlara görünür; yeni bilgisayar için 5 dk açılır (Visibility)
         addPc = text(ctx, "", font(15, 14), ACCENT, true);
@@ -175,7 +192,7 @@ final class InfoLayer extends ViewGroup {
         welcome = welcomeRoot;
         content.addView(welcome, full());
 
-        // --- Ölçüm kartı (bağlıyken, üç parmakla) ---
+        // --- Menü kartı (bağlıyken, üç parmakla): ölçümler, Döndür, Bağlantıyı kes ---
         LinearLayout card = new LinearLayout(ctx);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setBackground(round(CARD, 14));
@@ -203,22 +220,51 @@ final class InfoLayer extends ViewGroup {
         }
         card.addView(text(ctx, res.getString(R.string.stats_hide_hint), 12, MUTED, false),
                 margins(0, size(10, 6), 0, 0));
-        // Kart dokunmaları geçirir (arkadaki masaüstüne); yalnızca bu düğme tutar
-        TextView cut = button(ctx, res.getString(R.string.disconnect), 0x00000000, 0x33FF5A52, RED);
-        cut.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        cut.setPadding(size(14, 12), size(8, 6), size(14, 12), size(8, 6));
+        // Kart dokunmaları geçirir (arkadaki masaüstüne); yalnızca düğmeler tutar
+        LinearLayout actionsRow = row(ctx);
+        rotateButton = smallButton(ctx, res.getString(R.string.menu_rotate), 0x263D8BFD, 0x443D8BFD, ACCENT);
+        Drawable icon = new RotateIcon(ACCENT, dp(16));
+        rotateButton.setCompoundDrawables(icon, null, null, null);
+        rotateButton.setCompoundDrawablePadding(dp(6));
+        rotateButton.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                InfoLayer.this.actions.rotate();
+            }
+        });
+        actionsRow.addView(rotateButton, margins(0, 0, dp(8), 0));
+        followButton = smallButton(ctx, res.getString(R.string.menu_follow), 0x00000000, 0x22FFFFFF, TEXT);
+        followButton.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                InfoLayer.this.actions.followDevice();
+            }
+        });
+        followButton.setVisibility(GONE);
+        actionsRow.addView(followButton, margins(0, 0, dp(8), 0));
+        TextView cut = smallButton(ctx, res.getString(R.string.disconnect), 0x00000000, 0x33FF5A52, RED);
         cut.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
                 InfoLayer.this.actions.disconnect();
             }
         });
-        card.addView(cut, margins(0, size(12, 8), 0, 0));
+        actionsRow.addView(cut);
+        card.addView(actionsRow, margins(0, size(12, 8), 0, 0));
         statsCard = card;
         // Kenar boşlukları applyInsets'te verilir (çentik ve sistem çubukları eklenerek)
         content.addView(statsCard, new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT,
                 LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START));
         statsCard.setVisibility(GONE);
+
+        // --- Menü ipucu: bağlanınca birkaç saniye alt ortada ---
+        menuHint = text(ctx, res.getString(R.string.tip_menu), font(15, 14), TEXT, false);
+        menuHint.setGravity(Gravity.CENTER);
+        menuHint.setBackground(round(CARD, 22));
+        menuHint.setPadding(size(20, 16), size(10, 8), size(20, 16), size(10, 8));
+        content.addView(menuHint, new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
+        menuHint.setVisibility(GONE);
 
         // --- Uyku örtüsü: Windows ekranı kapattı; tablet ekranı kendi zaman aşımıyla kapanana kadar kararık ---
         // Dokunmalar geçer: dokunmak (gerçek dokunmatik monitörde olduğu gibi) Windows'u uyandırır.
@@ -286,7 +332,15 @@ final class InfoLayer extends ViewGroup {
                 public WindowInsets onApplyWindowInsets(View v, WindowInsets wi) {
                     int l = wi.getSystemWindowInsetLeft(), t = wi.getSystemWindowInsetTop();
                     int r = wi.getSystemWindowInsetRight(), b = wi.getSystemWindowInsetBottom();
-                    if (Build.VERSION.SDK_INT >= 28 && wi.getDisplayCutout() != null) {
+                    if (Build.VERSION.SDK_INT >= 30) {
+                        // Tam ekran pencerede eski değerler durum çubuğunu saymaz; menü açıkken çubuklar görünür
+                        android.graphics.Insets in = wi.getInsets(WindowInsets.Type.systemBars()
+                                | WindowInsets.Type.displayCutout());
+                        l = in.left;
+                        t = in.top;
+                        r = in.right;
+                        b = in.bottom;
+                    } else if (Build.VERSION.SDK_INT >= 28 && wi.getDisplayCutout() != null) {
                         android.view.DisplayCutout c = wi.getDisplayCutout();
                         l = Math.max(l, c.getSafeInsetLeft());
                         t = Math.max(t, c.getSafeInsetTop());
@@ -330,6 +384,43 @@ final class InfoLayer extends ViewGroup {
 
     void setStatsVisible(boolean visible) {
         statsCard.setVisibility(visible ? VISIBLE : GONE);
+    }
+
+    /**
+     * Menüdeki döndürme düğmeleri. canRotate: bu Android sürümü dikey pencere çizebilir (6.0+). manual: ekran elle
+     * döndürüldü; "Otomatik" ile cihazın tutuluşuna geri dönülür.
+     */
+    void setRotationControls(boolean canRotate, boolean manual) {
+        rotateButton.setVisibility(canRotate ? VISIBLE : GONE);
+        followButton.setVisibility(canRotate && manual ? VISIBLE : GONE);
+    }
+
+    private final Runnable fadeMenuHint = new Runnable() {
+        @Override
+        public void run() {
+            menuHint.animate().alpha(0f).setDuration(400).withEndAction(new Runnable() {
+                @Override
+                public void run() {
+                    menuHint.setVisibility(GONE);
+                }
+            }).start();
+        }
+    };
+
+    /** "Menü için üç parmakla dokunun": birkaç saniye görünüp kaybolur. */
+    void showMenuHint() {
+        removeCallbacks(fadeMenuHint);
+        menuHint.animate().cancel();
+        menuHint.setAlpha(0f);
+        menuHint.setVisibility(VISIBLE);
+        menuHint.animate().alpha(1f).setDuration(300).start();
+        postDelayed(fadeMenuHint, 6000);
+    }
+
+    void hideMenuHint() {
+        removeCallbacks(fadeMenuHint);
+        menuHint.animate().cancel();
+        menuHint.setVisibility(GONE);
     }
 
     boolean statsVisible() {
@@ -497,6 +588,9 @@ final class InfoLayer extends ViewGroup {
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) statsCard.getLayoutParams();
         lp.setMargins(m + l, m + t, m + r, m + b);
         statsCard.setLayoutParams(lp);
+        FrameLayout.LayoutParams hp = (FrameLayout.LayoutParams) menuHint.getLayoutParams();
+        hp.setMargins(m + l, m + t, m + r, size(28, 16) + b);
+        menuHint.setLayoutParams(hp);
     }
 
     // --- Döndürme: içerik dik tutuluşta en/boy yer değiştirmiş ölçülür, ortalanır ve çevrilir ---
@@ -655,6 +749,86 @@ final class InfoLayer extends ViewGroup {
         b.setBackground(bg);
         b.setClickable(true);
         return b;
+    }
+
+    /** Menü kartındaki küçük düğme. */
+    private TextView smallButton(Context ctx, String label, int fill, int pressed, int textColor) {
+        TextView b = text(ctx, label, 14, textColor, true);
+        b.setGravity(Gravity.CENTER);
+        b.setPadding(size(14, 12), size(8, 7), size(14, 12), size(8, 7));
+        StateListDrawable bg = new StateListDrawable();
+        bg.addState(new int[]{android.R.attr.state_pressed}, round(pressed, 10));
+        Drawable normal = round(fill, 10);
+        if (fill == 0) {
+            ((GradientDrawable) normal).setStroke(dp(1), 0x44FFFFFF);
+        }
+        bg.addState(new int[]{}, normal);
+        b.setBackground(bg);
+        b.setClickable(true);
+        return b;
+    }
+
+    /** Döndürme simgesi: ucunda ok olan çember yayı (yazı tipine bağlı değil; Android 4.1'de de aynı). */
+    private static final class RotateIcon extends Drawable {
+        private final Paint line = new Paint(Paint.ANTI_ALIAS_FLAG), head = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final int size;
+
+        RotateIcon(int color, int sizePx) {
+            size = sizePx;
+            line.setColor(color);
+            line.setStyle(Paint.Style.STROKE);
+            line.setStrokeWidth(sizePx / 8f);
+            line.setStrokeCap(Paint.Cap.ROUND);
+            head.setColor(color);
+            head.setStyle(Paint.Style.FILL);
+            setBounds(0, 0, sizePx, sizePx);
+        }
+
+        @Override
+        public void draw(Canvas c) {
+            Rect b = getBounds();
+            float cx = b.exactCenterX(), cy = b.exactCenterY(), r = size * 0.34f;
+            // Saat yönünde 280 derecelik yay; ok ucu yayın sonunda (sağ üst)
+            c.drawArc(new RectF(cx - r, cy - r, cx + r, cy + r), 20, 280, false, line);
+            double a = Math.toRadians(300);
+            float ex = cx + r * (float) Math.cos(a), ey = cy + r * (float) Math.sin(a);
+            float tx = (float) -Math.sin(a), ty = (float) Math.cos(a); // saat yönündeki teğet
+            float nx = (float) Math.cos(a), ny = (float) Math.sin(a);  // dışa doğru
+            float h = size * 0.30f;
+            Path p = new Path();
+            p.moveTo(ex + tx * h * 0.7f, ey + ty * h * 0.7f);
+            p.lineTo(ex + nx * h * 0.55f - tx * h * 0.3f, ey + ny * h * 0.55f - ty * h * 0.3f);
+            p.lineTo(ex - nx * h * 0.55f - tx * h * 0.3f, ey - ny * h * 0.55f - ty * h * 0.3f);
+            p.close();
+            c.drawPath(p, head);
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+            line.setAlpha(alpha);
+            head.setAlpha(alpha);
+        }
+
+        @Override
+        public void setColorFilter(ColorFilter cf) {
+            line.setColorFilter(cf);
+            head.setColorFilter(cf);
+        }
+
+        @Override
+        public int getOpacity() {
+            return PixelFormat.TRANSLUCENT;
+        }
+
+        @Override
+        public int getIntrinsicWidth() {
+            return size;
+        }
+
+        @Override
+        public int getIntrinsicHeight() {
+            return size;
+        }
     }
 
     private GradientDrawable round(int color, int radiusDp) {

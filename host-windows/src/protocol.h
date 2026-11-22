@@ -35,6 +35,9 @@ enum Msg : uint8_t {
     // T→P, kPcHello yerine: tablet PC'nin protokol sürümünü desteklemiyor (u16 tablet sürümü, str uygulama sürümü).
     // Ardından tablet bağlantıyı kapatır; PC kullanıcıya hangi tarafın güncelleneceğini söyler.
     kIncompatible = 24,
+    // P→T: PC masaüstünün akıştaki yönü (u16 derece, kOrientation ile aynı ölçü). Cihaz bilgi katmanını görüntüyle
+    // aynı yöne çevirir. Eski uygulamalar bilmedikleri mesajı yok sayar.
+    kContentRotation = 25,
 };
 
 enum PcHelloFlags : uint8_t {

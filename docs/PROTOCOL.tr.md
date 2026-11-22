@@ -109,6 +109,7 @@ kalır. Tablet, yerel olmayan bir bağlantıdan gelen `şifresizGörüntü = 1` 
 | 12 | DisplayPower | P→T | `u8 açık` — Windows ekranları kapattı (0) / açtı (1). Tablet kararır ve ekranının kendi zaman aşımıyla kapanmasına izin verir; bağlantı sürer. Açılınca tablet ekranını yakar |
 | 13 | KeyRequest | T→P | (boş) — tablet çözücüsünü yeniden kurdu (yüzeyi yok olup geri geldi); PC anahtar kare gönderir ve onay sayacını sıfırlar |
 | 14 | VideoVisible | T→P | `u8 önde` — tablet uygulaması arka plana alındı (0) / öne geldi (1). Arkadayken PC yakalama ve kodlamayı durdurur, bağlantı sürer; öne gelince tablet `KeyRequest` gönderir. Arkadayken PC tablet ekranını kapatmaz |
+| 25 | ContentRotation | P→T | `u16 derece` (0, 90, 180, 270; `Orientation` ile aynı ölçü) — PC masaüstünün akıştaki yönü: *İkinci ekran* / *Tek ekran*da sanal monitörün yönü, *Yansıtma*da 0 (dikey kullanılan PC monitörü kodlamadan önce düzeltilir). `Config`ten sonra ve değişince gönderilir. Tablet bilgi katmanını (menü, ipuçları) görüntüyle aynı yöne çevirir; eski uygulamalar yok sayar, bu mesaj gelmezse tablet PC'nin tutuluş yönüne uyduğunu varsayar |
 | 20–24 | PcHello, TabletKey, Mode, PairResult, Incompatible | | yukarıda |
 
 Tablet ilk 4 bayt `"EKRN"` değilse akışı ham H.264 Annex-B kabul eder (tanı modu: ör. `adb forward tcp:27183 tcp:27183`, sonra ffmpeg ile `-f h264 tcp://127.0.0.1:27183`).

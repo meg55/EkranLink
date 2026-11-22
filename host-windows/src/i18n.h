@@ -153,14 +153,18 @@ namespace ekran::i18n {
     X(ServiceRemoved, L"Hizmet kaldırıldı; yayını bu uygulama yapıyor.",                                            \
       L"Service removed; this app is streaming now.")                                                               \
     X(PairTitle, L"EkranLink — eşleştirme", L"EkranLink — pairing")                                                         \
-    X(PairText,                                                                                                     \
-      L"\"%ls\" bu bilgisayarla eşleşmek istiyor.\n\nCihazda görünen kod:\n\n        %ls\n\nKodlar aynıysa "      \
-      L"Evet'e basın ve cihazda da onaylayın.\nFarklıysa ya da bu cihazı siz bağlamadıysanız Hayır'a basın: "      \
-      L"başka bir cihaz ya da program araya girmeye çalışıyor olabilir.\n\nBu soru her cihaz için bir kez sorulur.", \
-      L"\"%ls\" wants to pair with this computer.\n\nCode shown on the device:\n\n        %ls\n\nIf the codes "    \
-      L"match, press Yes and confirm on the device too.\nIf they differ, or you did not connect this device, "    \
-      L"press No: another device or program may be trying to intercept the connection.\n\nYou are asked only "    \
-      L"once per device.")                                                                                          \
+    X(PairHeading, L"Yeni bir cihaz bağlanmak istiyor", L"A new device wants to connect")                         \
+    X(PairCodeLabel, L"Cihazda görünen kod", L"Code shown on the device")                                           \
+    X(PairCheck, L"Kod cihazdakiyle aynıysa Eşleştir'e basın, sonra cihazda da onaylayın.",                       \
+      L"If the code matches the one on the device, click Pair, then confirm on the device too.")                    \
+    X(PairWarn,                                                                                                     \
+      L"Kod farklıysa ya da bu cihazı siz bağlamadıysanız Reddet'e basın: başka biri araya girmeye çalışıyor "     \
+      L"olabilir.",                                                                                                 \
+      L"If the code differs, or you did not connect this device, click Decline: someone may be trying to "         \
+      L"intercept the connection.")                                                                                 \
+    X(PairOnce, L"Bu soru her cihaz için yalnızca bir kez sorulur.", L"You are asked only once per device.")        \
+    X(PairAccept, L"Eşleştir", L"Pair")                                                                             \
+    X(PairDecline, L"Reddet", L"Decline")                                                                           \
     X(NoticeAppMissingTitle, L"Cihazda EkranLink uygulaması yok", L"EkranLink app not found on the device")                \
     X(NoticeAppMissing,                                                                                             \
       L"EkranLink'in Android uygulamasını (APK) cihaza indirip kurun. Kurulunca bağlantı kendiliğinden kurulur.",     \

@@ -32,6 +32,8 @@ public final class EkranService extends Service implements Session.Host {
         void onCursorPos(int x, int y, boolean visible);
         void onSessionActive(boolean active);
         void onDisplayPower(boolean on);
+        /** PC masaüstünün görüntüdeki yönü (bilinmiyorsa -1); menü kartı ona göre döner. */
+        void onContentRotation(int degrees);
         Session.PairPrompt showPairing(String pcName, String code, Runnable onReject);
     }
 
@@ -56,6 +58,7 @@ public final class EkranService extends Service implements Session.Host {
     private volatile int surfaceW, surfaceH;
     private volatile boolean active;
     private volatile boolean pcDisplayOn = true;
+    private volatile int contentRotation = -1; // PC bildirmediyse (eski sürüm) -1
     // Son durum: arayüz yeniden bağlanınca (ör. uygulama öne gelince) aynen verilir
     private volatile Session.Config config;
     private int cursorW, cursorH, cursorX, cursorY;
@@ -304,6 +307,19 @@ public final class EkranService extends Service implements Session.Host {
     }
 
     @Override
+    public void onContentRotation(int degrees) {
+        contentRotation = degrees;
+        Ui u = ui;
+        if (u != null) {
+            u.onContentRotation(degrees);
+        }
+    }
+
+    int contentRotation() {
+        return contentRotation;
+    }
+
+    @Override
     public void onSessionActive(final boolean isActive, boolean encrypted) {
         active = isActive;
         if (isActive) {
@@ -313,6 +329,7 @@ public final class EkranService extends Service implements Session.Host {
             stats.setStatus(Stats.WAITING, R.string.status_waiting);
             config = null;
             pcDisplayOn = true;
+            contentRotation = -1;
             synchronized (this) {
                 cursorArgb = null;
                 cursorVisible = false;

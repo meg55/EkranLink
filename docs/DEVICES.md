@@ -1,10 +1,10 @@
 # Tested devices / Test edilen cihazlar
 
 Add the device you tested with a pull request, or open an issue with the *Device report* template. For the
-numbers, read the performance overlay on the device (three-finger tap).
+numbers, read the menu on the device (three-finger tap).
 
 Test ettiğiniz cihazı pull request ile ekleyin ya da *Cihaz test sonucu* şablonuyla issue açın. Değerler için
-cihazdaki ölçüm kartını okuyun (üç parmakla dokunun).
+cihazdaki menüyü okuyun (üç parmakla dokunun).
 
 | Device / Cihaz | Android | SoC / decoder (çözücü) | Screen (usable) / Ekran (kullanılabilir) | USB | Result / Sonuç |
 |---|---|---|---|---|---|

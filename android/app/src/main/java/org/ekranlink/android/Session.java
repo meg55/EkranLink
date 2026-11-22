@@ -44,6 +44,7 @@ final class Session implements H264Decoder.FrameListener {
     static final int MSG_MODE = 22;
     static final int MSG_PAIR_RESULT = 23;
     static final int MSG_INCOMPATIBLE = 24;
+    static final int MSG_CONTENT_ROTATION = 25;
 
     static final int TOUCH_DOWN = 0, TOUCH_MOVE = 1, TOUCH_UP = 2, TOUCH_CANCEL = 3;
 
@@ -80,6 +81,9 @@ final class Session implements H264Decoder.FrameListener {
         void onSessionActive(boolean active, boolean encrypted);
         /** Windows ekranları kapattı / açtı (ağ iş parçacığından). */
         void onDisplayPower(boolean on);
+
+        /** PC masaüstünün akıştaki yönü (tutuluş yönüyle aynı ölçü: 0, 90, 180, 270). Ağ iş parçacığı. */
+        void onContentRotation(int degrees);
     }
 
     private static final String TAG = "EkranSession";
@@ -507,6 +511,14 @@ final class Session implements H264Decoder.FrameListener {
             case MSG_DISPLAY_POWER:
                 if (len >= 1) {
                     host.onDisplayPower(b[o] != 0);
+                }
+                break;
+            case MSG_CONTENT_ROTATION:
+                if (len >= 2) {
+                    int deg = readU16(b, o);
+                    if (deg % 90 == 0 && deg < 360) {
+                        host.onContentRotation(deg);
+                    }
                 }
                 break;
             default:

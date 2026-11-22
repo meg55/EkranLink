@@ -10,6 +10,7 @@
 
 #include "log.h"
 #include "streamer.h"
+#include "pair_prompt.h"
 #include "virtual_display.h"
 
 using namespace ekran;
@@ -40,7 +41,8 @@ void usage() {
         "  --bitrate KBPS    Bit hızı (varsayılan 8000)\n"
         "  --itici N         Değişimden sonraki itici kare sayısı (varsayılan 3, 0 = kapalı)\n"
         "  --itici-ara MS    İtici kareler arası süre (varsayılan 8)\n"
-        "  --sanal-ekran-dene  Sanal ekran sürücüsünü dene: 10 sn'lik bir monitör ekler, kaldırır (yönetici)\n");
+        "  --sanal-ekran-dene  Sanal ekran sürücüsünü dene: 10 sn'lik bir monitör ekler, kaldırır (yönetici)\n"
+        "  --eslestirme-dene   Eşleştirme sorusunun görünümü (örnek cihaz ve kodla)\n");
 }
 
 // Tanı: sanal ekran aygıtını oluşturur, bir monitör ekler, 10 sn sonra kaldırır. Yayın yapmaz; hizmet çalışırken de
@@ -103,6 +105,12 @@ int main(int argc, char** argv) {
     SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
     SetConsoleOutputCP(CP_UTF8);
     if (argc == 2 && std::string(argv[1]) == "--sanal-ekran-dene") return testVirtualDisplay();
+    if (argc == 2 && std::string(argv[1]) == "--eslestirme-dene") {  // eşleştirme sorusunun görünümü (tanı)
+        SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        const bool ok = askPairing(L"Xiaomi M2101K9AG", L"282 066", CreateEventW(nullptr, TRUE, FALSE, nullptr));
+        std::printf("%s\n", ok ? "Eşleştir" : "Reddet");
+        return 0;
+    }
     Options opt;
     if (!parse(argc, argv, opt)) {
         usage();

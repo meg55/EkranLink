@@ -90,7 +90,10 @@ The plan and measurements are in [docs/ROADMAP.md](docs/ROADMAP.md); tested devi
 > **For now EkranLink mirrors.** *Extend* and *Only this* need the virtual display driver, which ships once it
 > is code-signed (see [Code signing policy](#code-signing-policy)).
 
-Three-finger tap on the device shows or hides the performance overlay and its *Disconnect* button.
+**Menu on the device:** tap the screen with three fingers (the device shows this hint the first few times). The menu
+shows connection details and has *Rotate* (turn the screen yourself, e.g. when the device lies flat; *Auto*
+follows the device again) and *Disconnect*; Android's navigation buttons appear too. Three fingers again or
+*Back* closes it.
 
 ## Using EkranLink
 
@@ -120,7 +123,7 @@ same code confirmed on both screens, and everything is encrypted.
 
 **In the background:** you can switch to another app on the device; the Windows monitor stays, and the
 picture resumes when you come back. To disconnect from the device, use the notification or the
-three-finger overlay.
+three-finger menu.
 
 **Headless mini PC:** *General > Start before sign-in* (asks for administrator permission once). EkranLink
 then runs as a Windows service from boot; the lock and sign-in screens appear on the device (swipe up on
@@ -311,7 +314,9 @@ Plan ve ölçümler: [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md) · Test edilen cih
 > **Şimdilik EkranLink yansıtır.** *İkinci ekran* ve *Tek ekran* için sanal ekran sürücüsü gerekir; sürücü kod
 > imzası tamamlanınca gelecek (bkz. [Kod imzalama politikası](#kod-imzalama-politikası-code-signing-policy)).
 
-Cihazda üç parmakla dokunmak ölçüm kartını ve *Bağlantıyı kes* düğmesini gösterir ya da gizler.
+**Cihazdaki menü:** ekrana üç parmakla dokunun (cihaz ilk birkaç seferde bunu hatırlatır). Menüde bağlantı bilgileri,
+*Döndür* (ekranı elle çevirir, ör. cihaz masada düz dururken; *Otomatik* yeniden cihaza uyar) ve *Bağlantıyı kes*
+vardır; Android'in gezinme tuşları da görünür. Yine üç parmakla ya da *Geri* ile kapanır.
 
 ## Kullanım
 
@@ -339,7 +344,7 @@ bilgisayarlara görünür. Hiç eşleşmemiş cihaz herkese görünür (ilk kuru
 aynı kodun onaylanmasını ister; her şey şifrelidir.
 
 **Arka plan:** cihazda başka bir uygulamaya geçebilirsiniz; Windows'taki monitör kopmaz, dönünce görüntü
-kaldığı yerden sürer. Cihazdan bağlantıyı kesmek için bildirimi ya da üç parmakla açılan ölçüm kartını
+kaldığı yerden sürer. Cihazdan bağlantıyı kesmek için bildirimi ya da üç parmakla açılan menüyü
 kullanın.
 
 **Ekransız mini PC:** *Genel > Oturum açılmadan önce başlat* (bir kez yönetici izni ister). EkranLink

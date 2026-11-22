@@ -26,7 +26,8 @@
     <string name="status_connection_lost">Bağlantı koptu</string>
     <string name="status_new_pc_blocked">Bu cihazın tanımadığı bir bilgisayar bağlanmak istedi. Eklemek için \"Yeni bilgisayar ekle\"ye dokunun.</string>
     <string name="status_pair_declined">Eşleştirme onaylanmadı. Yeniden denemek için bilgisayarda Bağlan\'a basın.</string>
-    <string name="tip_three_fingers">İpucu: ölçümler ve Bağlantıyı kes için üç parmakla dokunun</string>
+    <string name="tip_menu">Menü için ekrana üç parmakla dokunun</string>
+    <string name="welcome_menu_hint">Bağlıyken menü için ekrana üç parmakla dokunun: ekranı döndürme, bağlantı bilgileri, Bağlantıyı kes.</string>
     <string name="status_port_busy">Port %1$d başka bir uygulamada; o kapanınca bağlanılır</string>
     <string name="status_pc_newer">Bilgisayardaki EkranLink daha yeni: bu cihaza EkranLink\'in yeni sürümünü kurun</string>
     <string name="status_pc_older">Bilgisayardaki EkranLink eski: bilgisayara EkranLink\'in yeni sürümünü kurun</string>
@@ -42,7 +43,9 @@
     <string name="stat_data_value">%1$.2f Mbit/sn</string>
     <string name="stat_decode_value">%1$.1f ms  (en az %2$.1f · en çok %3$.1f)</string>
     <string name="stat_decoder_default">(varsayılan)</string>
-    <string name="stats_hide_hint">Gizlemek için üç parmakla dokunun</string>
+    <string name="stats_hide_hint">Kapatmak için yine üç parmakla dokunun ya da Geri\'ye basın</string>
+    <string name="menu_rotate">Döndür</string>
+    <string name="menu_follow">Otomatik</string>
     <string name="disconnect">Bağlantıyı kes</string>
 
     <!-- Uyku örtüsü -->

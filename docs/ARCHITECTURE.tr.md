@@ -143,7 +143,7 @@ Ajanın yakalama ve dokunma iş parçacıkları, o anda girdiyi alan masaüstü 
 | `StreamServer`, `Session` | TCP sunucusu (bilgisayar bağlanır), el sıkışma, mesaj döngüsü |
 | `H264Decoder`, `SpsParser`, `SpsRewriter`, `AnnexBReader` | Donanımsal çözme |
 | `CursorView` | Bilgisayarın imlecini yerelde çizer |
-| `InfoLayer`, `Stats` | Karşılama ekranı, üç parmakla açılan performans katmanı, eşleştirme istemi |
+| `InfoLayer`, `Stats` | Karşılama ekranı, üç parmakla açılan menü (ölçümler, Döndür, Bağlantıyı kes; `ContentRotation` ile görüntüyle aynı yöne döner), eşleştirme istemi |
 | `OrientationWatcher` | Windows'un monitörü döndürebilmesi için cihazın nasıl tutulduğunu bildirir |
 | `DiscoveryResponder` | Wi-Fi keşif sorgularını yanıtlar |
 | `AutoStartReceiver`, `AutoStart` | Bilgisayarın adb üzerinden uygulamanın açılıp açılamayacağını sormasını ve cihaz kimliğini almasını sağlar |

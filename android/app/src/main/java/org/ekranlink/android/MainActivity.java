@@ -38,7 +38,9 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
     private Surface surface;          // hizmet hazır olmadan gelen yüzey
     private int surfaceW, surfaceH;
     private volatile Session.Config config;
-    private boolean statsPinned;      // kullanıcı üç parmakla ölçüm kartını açtı
+    private boolean menuOpen;         // kullanıcı üç parmakla menüyü açtı (gezinme tuşları da görünür)
+    // Elle döndürme (menüdeki Döndür): -1 cihazın tutuluşuna uy; 0 yatay; 90 dikey. Uygulama açıkken geçerli.
+    private int manualDeg = -1;
     private boolean suppressTouch;    // üç parmak hareketi sürerken PC'ye dokunma gönderme
     private OrientationWatcher orientationWatcher;
     // Görüntü hep yataydır. Pencere cihazla birlikte döner; dikey olunca görüntü, imleç ve dokunma saat
@@ -48,6 +50,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
     private int windowW, windowH;
     private Object displayListener;   // API 17+: 180° dönüşte boyut değişmez, yalnızca bu haber verir
     private int sentOrientation = -1; // oturuma son bildirilen tutuluş yönü
+    private int pcRotation = -1;      // PC masaüstünün görüntüdeki yönü (PC bildirmediyse -1)
     // Uyku eşitleme: Windows ekranları kapattı. Tablet ekranı kendi zaman aşımıyla kapanır, bağlantı sürer.
     private boolean sleeping;
     private boolean started, resumed;
@@ -82,6 +85,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
                 return;
             }
             service = s;
+            pcRotation = s.contentRotation(); // bağlıyken yeniden açılan pencere
             s.setUiVisible(started);
             s.setVideoRotation(turn);
             if (surfaceW > 0) {
@@ -182,6 +186,23 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
                 }
                 finish();
             }
+
+            @Override
+            public void rotate() {
+                // Şu an yataysa dikeye, dikeyse yataya; cihaz masada düzken ya da döndürme kilitliyken de çalışır
+                manualDeg = currentDegrees() <= 0 ? 90 : 0;
+                applyWindowOrientation(OrientationWatcher.autoRotate(MainActivity.this));
+                applyOrientation();
+                refreshRotationControls();
+            }
+
+            @Override
+            public void followDevice() {
+                manualDeg = -1;
+                applyWindowOrientation(OrientationWatcher.autoRotate(MainActivity.this));
+                applyOrientation();
+                refreshRotationControls();
+            }
         });
         root.addView(info, full);
         setContentView(root);
@@ -229,8 +250,15 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
      * durmasın. Android 6.0 öncesinde dikey pencere çizilemez (KEY_ROTATION yok): hep yatay.
      */
     private void applyWindowOrientation(boolean autoRotate) {
-        int want = Build.VERSION.SDK_INT >= 23 && autoRotate ? ActivityInfo.SCREEN_ORIENTATION_USER
-                : ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE;
+        int want;
+        if (Build.VERSION.SDK_INT >= 23 && manualDeg >= 0) {
+            // Elle döndürüldü: pencere o yönde kalır (iki yatay / iki dikey arasında yine algılayıcıya uyar)
+            want = manualDeg == 0 ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    : ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT;
+        } else {
+            want = Build.VERSION.SDK_INT >= 23 && autoRotate ? ActivityInfo.SCREEN_ORIENTATION_USER
+                    : ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE;
+        }
         if (getRequestedOrientation() != want) {
             setRequestedOrientation(want);
         }
@@ -264,10 +292,77 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
         }
     }
 
+    /**
+     * Menü açıkken Android'in gezinme tuşları (Geri, Ana ekran) da görünsün: kullanıcı uygulamadan nasıl çıkacağını
+     * görür. Çubuklar görüntünün üstüne biner; pencere ve yüzey boyutu değişmez.
+     */
+    @SuppressWarnings("deprecation")
+    private void showSystemBars() {
+        if (Build.VERSION.SDK_INT >= 30) {
+            showSystemBars30();
+        } else {
+            getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        }
+    }
+
+    @android.annotation.TargetApi(30)
+    private void showSystemBars30() {
+        WindowInsetsController c = getWindow().getInsetsController();
+        if (c != null) {
+            c.show(WindowInsets.Type.systemBars());
+        }
+    }
+
+    /** Üç parmak: menüyü aç / kapat (yalnızca bağlıyken). */
+    private void setMenuOpen(boolean open) {
+        menuOpen = open && session() != null;
+        Log.i("EkranMenu", open ? (menuOpen ? "Menü açıldı" : "Menü açılmadı (bağlı değil)") : "Menü kapandı");
+        info.setStatsVisible(menuOpen);
+        if (Build.VERSION.SDK_INT >= 33) {
+            watchBack33(menuOpen); // Android 13+ (hedef 33+): Geri artık onBackPressed'e gelmiyor
+        }
+        if (menuOpen) {
+            info.hideMenuHint();
+            // Menüyü bulan kullanıcıya ipucu bir daha gösterilmez
+            getSharedPreferences("ekran_ipucu", MODE_PRIVATE).edit().putBoolean("menu_acildi", true).apply();
+            refreshRotationControls();
+            handler.removeCallbacks(tick);
+            handler.post(tick); // hemen doldur
+            showSystemBars();
+        } else {
+            hideSystemBars();
+        }
+    }
+
+    private Object backCallback; // API 33+: menü açıkken Geri menüyü kapatır
+
+    @android.annotation.TargetApi(33)
+    private void watchBack33(boolean on) {
+        android.window.OnBackInvokedDispatcher d = getOnBackInvokedDispatcher();
+        if (on && backCallback == null) {
+            android.window.OnBackInvokedCallback cb = new android.window.OnBackInvokedCallback() {
+                @Override
+                public void onBackInvoked() {
+                    setMenuOpen(false);
+                }
+            };
+            d.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, cb);
+            backCallback = cb;
+        } else if (!on && backCallback != null) {
+            d.unregisterOnBackInvokedCallback((android.window.OnBackInvokedCallback) backCallback);
+            backCallback = null;
+        }
+    }
+
+    private void refreshRotationControls() {
+        info.setRotationControls(Build.VERSION.SDK_INT >= 23, manualDeg >= 0);
+    }
+
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) {
+        if (hasFocus && !menuOpen) {
             hideSystemBars(); // bildirim paneli, izin penceresi vb. çubukları geri getirmiş olabilir
         }
     }
@@ -288,7 +383,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
         int action = e.getActionMasked();
         Session ses = session();
         Session.Config c = config;
-        // Üç parmak: ölçüm kartını aç/kapat. PC'deki yarım kalan dokunmalar iptal edilir ve
+        // Üç parmak: menüyü aç/kapat. PC'deki yarım kalan dokunmalar iptal edilir ve
         // tüm parmaklar kalkana kadar hiçbir şey gönderilmez.
         if (suppressTouch) {
             if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
@@ -297,12 +392,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
             return;
         }
         if (action == MotionEvent.ACTION_POINTER_DOWN && e.getPointerCount() == 3) {
-            statsPinned = !statsPinned;
-            info.setStatsVisible(statsPinned && ses != null);
-            if (statsPinned) {
-                handler.removeCallbacks(tick);
-                handler.post(tick); // hemen doldur
-            }
+            setMenuOpen(!menuOpen);
             suppressTouch = true;
             if (ses != null) {
                 ses.sendTouch(Session.TOUCH_CANCEL, 0, 0, 0, 0);
@@ -392,16 +482,31 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
      * cihaz masada düz) dikey pencerenin kendisi dik tutuluş sayılır.
      */
     private void applyOrientation() {
-        int deg = orientationWatcher.current();
-        if (deg < 0 && turn != 0) {
-            deg = turn;
-        }
-        info.setOrientation(((Math.max(deg, 0) - turn) % 360 + 360) % 360);
+        int deg = currentDegrees();
+        // Bilgi katmanı ekrandaki görüntüyle aynı yönde dursun: PC görüntüyü döndürmediyse (yansıtma, Windows'ta
+        // elle sabitlenmiş yön) görüntü yan durur, kart da onunla birlikte. PC bildirmediyse tutuluş yönüne göre.
+        int content = pcRotation >= 0 ? pcRotation : Math.max(deg, 0);
+        info.setOrientation(((content - turn) % 360 + 360) % 360);
         Session ses = session();
         if (deg >= 0 && deg != sentOrientation && ses != null) {
             sentOrientation = deg;
             ses.sendOrientation(deg);
         }
+    }
+
+    /**
+     * PC'ye bildirilecek yön (yatay görüntüye göre saat yönünde 0, 90, 270; bilinmiyorsa -1). Elle döndürülmüşse
+     * pencerenin kendisi (dikeyde görüntünün çevrildiği açı); yoksa algılayıcı, o da yoksa yine pencere.
+     */
+    private int currentDegrees() {
+        if (manualDeg >= 0) {
+            return turn;
+        }
+        int deg = orientationWatcher.current();
+        if (deg < 0 && turn != 0) {
+            deg = turn;
+        }
+        return deg;
     }
 
     @Override
@@ -415,8 +520,11 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
 
     @Override
     public void onBackPressed() {
-        // Bağlıyken Geri de uygulamayı alta alır (bağlantı sürer); kesmek için bildirimdeki "Bağlantıyı kes"
-        if (connected) {
+        // Menü açıksa Geri menüyü kapatır. Bağlıyken Geri uygulamayı alta alır (bağlantı sürer); kesmek için
+        // menüdeki ya da bildirimdeki "Bağlantıyı kes".
+        if (menuOpen) {
+            setMenuOpen(false);
+        } else if (connected) {
             moveTaskToBack(true);
         } else {
             super.onBackPressed();
@@ -440,6 +548,10 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
         // Tanı: `--ez uyku true|false` Windows'un ekranı kapatıp açmasını taklit eder
         if (intent.hasExtra("uyku")) {
             onDisplayPower(!intent.getBooleanExtra("uyku", false));
+        }
+        // Tanı: `--ez menu true|false` üç parmakla dokunmayı taklit eder (öykünücüde çok parmak yok)
+        if (intent.hasExtra("menu")) {
+            setMenuOpen(intent.getBooleanExtra("menu", false));
         }
     }
 
@@ -706,6 +818,17 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
     }
 
     @Override
+    public void onContentRotation(final int degrees) {
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                pcRotation = degrees;
+                applyOrientation();
+            }
+        });
+    }
+
+    @Override
     public void onDisplayPower(final boolean on) {
         handler.post(new Runnable() {
             @Override
@@ -727,17 +850,21 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
                 connected = active;
                 if (!active) {
                     config = null;
+                    pcRotation = -1;
                     cursorView.clear();
                 }
                 if (active) {
                     sentOrientation = -1;
                     applyOrientation(); // yeni sanal monitör yatay başlar
-                    showThreeFingerTipOnce();
+                    showMenuHintWhileNew();
                 }
-                // Bağlıyken yalnızca görüntü; ölçüm kartı üç parmakla açılır
+                // Bağlıyken yalnızca görüntü; menü üç parmakla açılır
                 info.setConnected(active);
-                info.setStatsVisible(active && statsPinned);
                 if (!active) {
+                    if (menuOpen) {
+                        setMenuOpen(false);
+                    }
+                    info.hideMenuHint();
                     info.hidePair();
                     exitSleep(false);
                 }
@@ -747,14 +874,18 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
         });
     }
 
-    /** İlk bağlantıda bir kez: ölçüm kartı ve "Bağlantıyı kes" üç parmakla açılır (başka yerde görünmüyor). */
-    private void showThreeFingerTipOnce() {
+    /**
+     * "Menü için üç parmakla dokunun": ilk birkaç bağlantıda (menü hiç açılmadıysa) birkaç saniye. Ekranda menü
+     * düğmesi yok (PC'nin görüntüsünü örtmesin); karşılama ekranı da aynısını söyler.
+     */
+    private void showMenuHintWhileNew() {
         android.content.SharedPreferences p = getSharedPreferences("ekran_ipucu", MODE_PRIVATE);
-        if (p.getBoolean("uc_parmak", false)) {
+        int shown = p.getInt("menu_ipucu", 0);
+        if (shown >= 5 || p.getBoolean("menu_acildi", false)) {
             return;
         }
-        p.edit().putBoolean("uc_parmak", true).apply();
-        android.widget.Toast.makeText(this, R.string.tip_three_fingers, android.widget.Toast.LENGTH_LONG).show();
+        p.edit().putInt("menu_ipucu", shown + 1).apply();
+        info.showMenuHint();
     }
 
     /** Tabletin IPv4 adresleri ("192.168.1.23, 192.168.42.129"); ağ yoksa null. */
