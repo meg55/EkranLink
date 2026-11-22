@@ -22,8 +22,14 @@ class VirtualDisplay {
 public:
     ~VirtualDisplay() { remove(); }
 
-    // Sürücü kurulu ve çalışıyor mu?
-    static bool driverAvailable();
+    // Sürücü kurulu mu (sürücü deposunda; aygıt ancak kullanılırken vardır)
+    static bool driverInstalled();
+    // Bu süreç aygıtı oluşturabilir mi (yönetici ya da SYSTEM: hizmet modunda ajan)
+    static bool canCreateDevice();
+    // İkinci ekran / tek ekran bu süreçte kullanılabilir mi (ikisi birden)
+    static bool usable() { return canCreateDevice() && driverInstalled(); }
+    // Program kapanırken: kullanan monitör yoksa aygıtı beklemeden kaldırır
+    static void closeIdleDevice();
     // Cihaz kimliğinden sabit bir monitör GUID'i üretir.
     static GUID guidFor(const std::string& deviceId);
 
@@ -49,6 +55,7 @@ public:
     bool added() const { return added_; }
 
 private:
+    bool holdsDevice_ = false;  // yazılım aygıtını kullananlardan biri (sayaç; son çıkan aygıtı kaldırır)
     HANDLE dev_ = INVALID_HANDLE_VALUE;
     GUID guid_{};
     std::wstring gdiName_;

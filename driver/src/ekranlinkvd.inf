@@ -17,7 +17,8 @@ DriverVer= ; stampinf ile yazilir
 %ManufacturerName%=Standard,NT$ARCH$
 
 [Standard.NT$ARCH$]
-%DeviceName%=EkranVD_Install, Root\EkranLink\VirtualDisplay
+; Yazilim aygiti (SwDeviceCreate): PC programi gerektiginde olusturur, is bitince Windows kaldirir
+%DeviceName%=EkranVD_Install, EkranLinkVD
 
 [SourceDisksFiles]
 EkranLinkVD.dll=1
@@ -36,8 +37,8 @@ AddReg = EkranVD_HardwareDeviceSettings
 [EkranVD_HardwareDeviceSettings]
 HKR,, "UpperFilters",  %REG_MULTI_SZ%, "IndirectKmd"
 HKR, "WUDF", "DeviceGroupId", %REG_SZ%, "EkranLinkVDGroup"
-; Tam erisim: SYSTEM ve Yoneticiler. Okuma/yazma (monitor ekle/cikar): yalnizca oturum acmis kullanicilar (IU).
-HKR,, "Security",, "D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;IU)"
+; Yalnizca SYSTEM ve Yoneticiler: monitoru EkranLink ajani (SYSTEM) ekler; siradan programlar ekran ekleyemez
+HKR,, "Security",, "D:P(A;;GA;;;SY)(A;;GA;;;BA)"
 
 [EkranVD_Install.NT.Services]
 AddService=WUDFRd,0x000001fa,WUDFRD_ServiceInstall
@@ -49,7 +50,7 @@ UmdfKernelModeClientPolicy = AllowKernelModeClients
 
 [EkranVD_Install]
 UmdfLibraryVersion=$UMDFVERSION$
-ServiceBinary=%12%\UMDF\EkranLinkVD.dll
+ServiceBinary=%13%\EkranLinkVD.dll
 UmdfExtensions = IddCx0102
 
 [WUDFRD_ServiceInstall]
@@ -60,7 +61,8 @@ ErrorControl = 1
 ServiceBinary = %12%\WUDFRd.sys
 
 [DestinationDirs]
-UMDriverCopy=12,UMDF
+; 13: surucu deposundan calisir (System32'ye kopyalanmaz; kaldirinca iz kalmaz)
+UMDriverCopy=13
 
 [UMDriverCopy]
 EkranLinkVD.dll

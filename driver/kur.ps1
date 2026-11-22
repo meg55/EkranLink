@@ -10,6 +10,8 @@
       3. Sertifikanın yalnızca açık kısmı "Güvenilen Kök" ve "Güvenilen Yayımcılar" deposuna eklenir.
       4. ÖZEL ANAHTAR HEMEN SİLİNİR: bu sertifikayla başka hiçbir şey imzalanamaz.
       5. Önceki EkranLink sertifikaları temizlenir.
+    Sürücü yalnızca kullanılırken bir aygıta bağlıdır: ikinci ekran / tek ekran açılınca EkranLink (hizmet modunda,
+    SYSTEM) aygıtı oluşturur, iş bitince ya da program kapanınca Windows kaldırır.
     Kaldırmak için: .\kaldir.ps1
 #>
 param(
@@ -79,9 +81,10 @@ try {
     New-Item -Path 'HKLM:\SOFTWARE\EkranLink\VirtualDisplay' -Force | Out-Null
     New-ItemProperty -Path 'HKLM:\SOFTWARE\EkranLink\VirtualDisplay' -Name watchdog -Value 3 -PropertyType DWord -Force | Out-Null
 
-    # Aygıtı oluştur ve sürücüyü kur
+    # Sürücüyü sürücü deposuna koy (aygıt oluşturulmaz: EkranLink bağlanınca oluşturur, iş bitince Windows kaldırır).
+    # Eski kalıcı kök aygıt ve eski sürücü paketleri de kaldırılır.
     & $Arac kur $inf
-    if ($LASTEXITCODE -ne 0) { throw 'Aygıt kurulamadı' }
+    if ($LASTEXITCODE -ne 0) { throw 'Sürücü kurulamadı' }
     & $Arac durum
     Write-Host 'EkranLink sanal ekran sürücüsü kuruldu.' -ForegroundColor Green
     exit 0

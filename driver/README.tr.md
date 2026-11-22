@@ -21,8 +21,9 @@ Bu klasör **EkranLink'in geri kalanından (MIT) ayrı lisanslıdır**; lisans m
   (SudoVDA veya Apollo kurulu makinelerde çakışmasın), dış girdiler için sınır denetimleri ve
   sonlandırılmış dizgiler (EDID'e kopyalanan 14 baytlık alanlar), tabletin fiziksel boyutunun EDID'e
   yazılması (Windows ölçeklemeyi buna göre önerir), "EKR" üretici kodu, gereksiz yüksek süreç önceliğinin
-  kaldırılması, eksik `break`'ler, imleç olayı sızıntısı, aygıt erişiminin oturum açmış kullanıcılarla
-  sınırlanması (`IU`).
+  kaldırılması, eksik `break`'ler, imleç olayı sızıntısı, aygıt erişiminin SYSTEM ve yöneticilerle
+  sınırlanması, yalnızca kullanılırken var olan yazılım aygıtı (donanım kimliği `EkranLinkVD`), sürücü
+  deposundan çalışma, iş parçacıklarına karşı korunan monitör listesi ve bekçi köpeği.
 
 ## Komutlar (`src/ekranvd-ioctl.h`)
 
@@ -31,6 +32,16 @@ Bu klasör **EkranLink'in geri kalanından (MIT) ayrı lisanslıdır**; lisans m
 | `IOCTL_ADD_VIRTUAL_DISPLAY` | Genişlik, yükseklik, tazeleme, monitör GUID'i, ad, seri no, fiziksel boyut (mm) → monitör ekler |
 | `IOCTL_REMOVE_VIRTUAL_DISPLAY` | GUID ile monitörü kaldırır |
 | `IOCTL_DRIVER_PING` | Bekçi köpeğini besler. PC programı 3 sn ses vermezse tüm sanal monitörler kaldırılır (program çökerse "görünmeyen ekran" kalmaz) |
+
+## Aygıt ne zaman var
+
+Sürücü kalıcı bir aygıta bağlı değildir. Bir cihaz *İkinci ekran* ya da *Tek ekran* ile bağlanınca EkranLink
+(hizmetin SYSTEM olarak çalışan ajanı) bir yazılım aygıtı oluşturur (`SwDeviceCreate`); Windows sürücüyü
+yükler ve monitör görünür. Son monitör gittikten 15 saniye sonra ya da EkranLink kapanır veya çökerse hemen,
+Windows aygıtı kaldırır; bu yüzden kullanılmazken Aygıt Yöneticisi'nde görünmez (yalnızca *Görünüm > Gizli
+aygıtları göster* ile). Aygıt oluşturmak yönetici yetkisi ister; bu yüzden *İkinci ekran* ve *Tek ekran* için
+EkranLink hizmeti gerekir, hizmet yoksa EkranLink yansıtır. 0.5.3'e kadarki sürümler kalıcı bir kök aygıt
+kuruyordu; `kur.ps1` onu kaldırır.
 
 Aynı tablet her bağlanışında aynı monitör GUID'ini alır (cihaz kimliğinden türetilir), böylece Windows
 her tabletin ekran yerleşimini ve ölçeğini ayrı hatırlar.
@@ -41,8 +52,8 @@ Gerekenler: Visual Studio Build Tools (MSVC x64) + WDK 10.0.26100. MSBuild'in s�
 
 ```powershell
 .\build.ps1      # out\EkranLinkVD.dll + ekranlinkvd.inf
-.\kur.ps1        # yönetici: imzala + güven + kök aygıtı oluştur (host-windows\build\ekranlink-surucu.exe gerekir)
-.\kaldir.ps1     # yönetici: aygıtı, sürücü paketini, sertifikayı ve sürücü ayarlarını kaldırır (eşleşmeler kalır)
+.\kur.ps1        # yönetici: imzala + güven + sürücü deposuna ekle; aygıt oluşturmaz (host-windows\build\ekranlink-surucu.exe gerekir)
+.\kaldir.ps1     # yönetici: aygıt kayıtlarını, sürücü paketini, sertifikayı ve sürücü ayarlarını kaldırır (eşleşmeler kalır)
 ```
 
 **İmza:** UMDF sürücüsü olduğu için Windows test modu gerekmez. `kur.ps1` her seferinde yeni bir kod

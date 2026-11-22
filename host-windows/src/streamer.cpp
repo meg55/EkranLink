@@ -812,7 +812,7 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
         // --- Monitör: istenen moda göre ekle / kaldır / tek ekran ---
         const DisplayMode want = DisplayMode(display_.load());
         const int wantOutput = output_;
-        const bool extend = want != DisplayMode::Mirror && W > 0 && H > 0 && VirtualDisplay::driverAvailable();
+        const bool extend = want != DisplayMode::Mirror && W > 0 && H > 0 && VirtualDisplay::usable();
         if (extend && !vdisp.added()) {
             VirtualDisplaySpec s;
             s.width = W;

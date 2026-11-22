@@ -27,9 +27,17 @@ typedef struct _EKRANVD_PROTOCOL_VERSION {
 } EKRANVD_PROTOCOL_VERSION;
 
 // Komutlar değişince artır
-static const EKRANVD_PROTOCOL_VERSION EkranVdProtocolVersion = { 1, 0, 0, 0 };
+static const EKRANVD_PROTOCOL_VERSION EkranVdProtocolVersion = { 1, 1, 0, 0 };  // 1.1: yazılım aygıtı
 
-#define EKRANVD_HARDWARE_ID L"Root\\EkranLink\\VirtualDisplay"
+// Aygıt kalıcı değildir: PC programı (yönetici / SYSTEM) gerektiğinde yazılım aygıtı olarak oluşturur (SwDeviceCreate);
+// iş bitince ya da program kapanınca Windows kaldırır, kullanılmazken Aygıt Yöneticisi'nde görünmez.
+#define EKRANVD_HARDWARE_ID L"EkranLinkVD"
+#define EKRANVD_ENUMERATOR L"EkranLinkVD"
+#define EKRANVD_INSTANCE_ID L"0"
+// 0.5.3 ve öncesi: kalıcı kök aygıt. Kurulum aracı bulursa kaldırır.
+#define EKRANVD_LEGACY_HARDWARE_ID L"Root\\EkranLink\\VirtualDisplay"
+// Kurulum aracının yazdığı yer (HKLM): "Inf" = sürücü deposundaki oemNN.inf; sürücünün ayarları da burada
+#define EKRANVD_SETTINGS_KEY L"SOFTWARE\\EkranLink\\VirtualDisplay"
 
 // {b1a52822-f3e2-4092-b7ee-abebada70d27}
 static const GUID EKRANVD_INTERFACE_GUID = { 0xb1a52822, 0xf3e2, 0x4092, { 0xb7, 0xee, 0xab, 0xeb, 0xad, 0xa7, 0x0d, 0x27 } };

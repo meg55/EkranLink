@@ -40,7 +40,8 @@ struct Model {
     // Çözülene kadar Durum sayfasında kalan uyarı (0: yok)
     Notice notice = Notice(0);
     std::wstring noticeArg;
-    bool driver = false;        // sanal ekran sürücüsü kurulu (ikinci ekran / tek ekran)
+    bool driver = false;        // ikinci ekran / tek ekran kullanılabilir (sürücü kurulu, yayın hizmette)
+    bool driverInstalled = false;  // sürücü kurulu (hizmet yoksa kullanılamaz)
     bool serviceMode = false;   // hizmet kurulu
     bool serviceStale = false;  // kurulu hizmet bu sürümden eski
     bool autostart = false;

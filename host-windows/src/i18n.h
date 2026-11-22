@@ -83,7 +83,12 @@ namespace ekran::i18n {
       L"Other monitors turn off while the device is connected and come back when it disconnects.")                 \
     X(HintMirror, L"Seçili bilgisayar ekranının kopyası cihazda görünür.",                                          \
       L"The device shows a copy of the selected computer screen.")                                                  \
-    X(DriverMissing, L"İkinci ekran ve Tek ekran için sanal ekran sürücüsü gerekir; bu sürümde henüz yok (kod "     \
+    X(DriverNeedsService,                                                                                           \
+      L"İkinci ekran ve Tek ekran için EkranLink hizmeti gerekir: Genel sayfasında \"Oturum açılmadan önce "        \
+      L"başlat\"ı açın (yönetici izni ister). Şimdilik yansıtma kullanılabilir.",                                  \
+      L"Extend and Only this need the EkranLink service: turn on \"Start before sign-in\" on the General page "     \
+      L"(asks for administrator permission). Mirroring works now.")                                                 \
+    X(DriverMissing,L"İkinci ekran ve Tek ekran için sanal ekran sürücüsü gerekir; bu sürümde henüz yok (kod "     \
       L"imzası tamamlanınca gelecek). Şimdilik yansıtma kullanılabilir.",                                           \
       L"Extend and Only this need the virtual display driver, which this release does not include yet (it comes "  \
       L"once it is code-signed). Mirroring works now.")                                                             \

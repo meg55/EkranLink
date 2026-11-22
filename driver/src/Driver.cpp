@@ -26,6 +26,9 @@ Environment:
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <atomic>
+#include <utility>
+#include <vector>
 
 #include "AdapterOption.h"
 #include "ekranvd-ioctl.h"
@@ -36,16 +39,19 @@ using namespace Microsoft::WRL;
 using namespace EKRANVD;
 
 LUID preferredAdapterLuid{};
-bool preferredAdapterChanged = false;
+std::atomic<bool> preferredAdapterChanged{false};
 
+// monitorCtxList ve freeConnectorSlots yalnızca bu kilitle değişir. IddCxMonitorDeparture kilit dışında çağrılır:
+// Windows monitör nesnesini silerken bağlamın yıkıcısı da listeye dokunur (aynı kilit).
 std::mutex monitorListOp;
 std::queue<size_t> freeConnectorSlots;
 std::list<IndirectMonitorContext*> monitorCtxList;
 
 bool isHDRSupported = false;
 bool testMode = false;
-DWORD watchdogTimeout = 3; // seconds
-DWORD watchdogCountdown = 0;
+// Bekçi köpeği: bekçi iş parçacığı ile komut iş parçacıkları aynı anda okur/yazar
+std::atomic<DWORD> watchdogTimeout{3}; // seconds
+std::atomic<DWORD> watchdogCountdown{0};
 std::thread watchdogThread;
 
 DWORD MaxVirtualMonitorCount = 10;
@@ -363,32 +369,41 @@ void LoadSettings() {
 	RegCloseKey(hKey);
 }
 
-void DisconnectAllMonitors() {
+// Monitörü Windows'tan çıkarır (kilit dışında çağrılmalı); bağlantı yuvası ancak sonra yeniden kullanılır
+void DepartMonitor(IDDCX_MONITOR monitor, size_t slot) {
+	IddCxMonitorDeparture(monitor);
 	std::lock_guard<std::mutex> lg(monitorListOp);
+	freeConnectorSlots.push(slot);
+}
 
-	if (monitorCtxList.empty()) {
-		return;
+void DisconnectAllMonitors() {
+	std::vector<std::pair<IDDCX_MONITOR, size_t>> gone;
+	{
+		std::lock_guard<std::mutex> lg(monitorListOp);
+		for (auto* ctx : monitorCtxList) {
+			gone.emplace_back(ctx->GetMonitor(), ctx->connectorId);
+		}
+		monitorCtxList.clear();
 	}
-
-	for (auto it = monitorCtxList.begin(); it != monitorCtxList.end(); ++it) {
-		auto* ctx = *it;
-		// Remove the monitor
-		freeConnectorSlots.push(ctx->connectorId);
-		IddCxMonitorDeparture(ctx->GetMonitor());
+	for (auto& m : gone) {
+		DepartMonitor(m.first, m.second);
 	}
+}
 
-	monitorCtxList.clear();
+bool AnyMonitor() {
+	std::lock_guard<std::mutex> lg(monitorListOp);
+	return !monitorCtxList.empty();
 }
 
 void RunWatchdog() {
 	if (watchdogTimeout) {
-		watchdogCountdown = watchdogTimeout;
+		watchdogCountdown = watchdogTimeout.load();
 		watchdogThread = std::thread([]{
 			for (;;) {
 				if (watchdogTimeout) {
 					Sleep(1000);
 
-					if (!watchdogCountdown || monitorCtxList.empty()) {
+					if (!watchdogCountdown || !AnyMonitor()) {
 						continue;
 					}
 
@@ -439,8 +454,8 @@ extern "C" NTSTATUS DriverEntry(
 
 _Use_decl_annotations_
 void EkranVDDriverUnload(_In_ WDFDRIVER) {
-	if (watchdogTimeout > 0) {
-		watchdogTimeout = 0;
+	if (watchdogThread.joinable()) {
+		watchdogTimeout = 0;  // iş parçacığı monitörleri kaldırıp çıkar
 		watchdogThread.join();
 	} else {
 		DisconnectAllMonitors();
@@ -768,9 +783,13 @@ IndirectDeviceContext::IndirectDeviceContext(_In_ WDFDEVICE WdfDevice) :
 	m_WdfDevice(WdfDevice)
 {
 	m_Adapter = {};
+	// Aygıt aynı süreçte kaldırılıp yeniden oluşturulabilir (yazılım aygıtı): yuvalar baştan, eski liste boş
+	std::lock_guard<std::mutex> lg(monitorListOp);
+	freeConnectorSlots = {};
 	for (size_t i = 0; i < MaxVirtualMonitorCount; i++) {
 		freeConnectorSlots.push(i);
 	}
+	monitorCtxList.clear();
 }
 
 IndirectDeviceContext::~IndirectDeviceContext()
@@ -851,6 +870,15 @@ NTSTATUS IndirectDeviceContext::CreateMonitor(IndirectMonitorContext*& pMonitorC
 
 	WDF_OBJECT_ATTRIBUTES Attr;
 	WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&Attr, IndirectMonitorContextWrapper);
+	// Windows monitör nesnesini silince bağlam da silinir (yıkıcı kendini listeden çıkarır)
+	Attr.EvtCleanupCallback = [](WDFOBJECT Object)
+	{
+		auto* pContext = WdfObjectGet_IndirectMonitorContextWrapper(Object);
+		if (pContext)
+		{
+			pContext->Cleanup();
+		}
+	};
 
 	// In the sample driver, we report a monitor right away but a real driver would do this when a monitor connection event occurs
 	IDDCX_MONITOR_INFO MonitorInfo = {};
@@ -910,6 +938,10 @@ IndirectMonitorContext::IndirectMonitorContext(_In_ IDDCX_MONITOR Monitor) :
 IndirectMonitorContext::~IndirectMonitorContext()
 {
 	m_ProcessingThread.reset();
+	{
+		std::lock_guard<std::mutex> lg(monitorListOp);
+		monitorCtxList.remove(this);
+	}
 	if (pEdidData && pEdidData != edid_base) {
 		free(pEdidData);
 	}
@@ -1480,7 +1512,7 @@ VOID EkranVDIoDeviceControl(
 {
 	// Reset watchdog
 	if (IoControlCode != IOCTL_GET_WATCHDOG) {
-		watchdogCountdown = watchdogTimeout;
+		watchdogCountdown = watchdogTimeout.load();
 	}
 
 	NTSTATUS Status = STATUS_INVALID_DEVICE_REQUEST;
@@ -1488,11 +1520,6 @@ VOID EkranVDIoDeviceControl(
 
 	switch (IoControlCode) {
 	case IOCTL_ADD_VIRTUAL_DISPLAY: {
-		if (freeConnectorSlots.empty()) {
-			Status = STATUS_TOO_MANY_NODES;
-			break;
-		}
-
 		if (InputBufferLength < sizeof(VIRTUAL_DISPLAY_ADD_PARAMS) || OutputBufferLength < sizeof(VIRTUAL_DISPLAY_ADD_OUT)) {
 			Status = STATUS_BUFFER_TOO_SMALL;
 			break;
@@ -1526,6 +1553,11 @@ VOID EkranVDIoDeviceControl(
 
 		if (guidFound) {
 			Status = STATUS_SUCCESS;
+			break;
+		}
+
+		if (freeConnectorSlots.empty()) {  // kilit altında: iki istek aynı yuvayı almasın
+			Status = STATUS_TOO_MANY_NODES;
 			break;
 		}
 
@@ -1576,18 +1608,23 @@ VOID EkranVDIoDeviceControl(
 
 		Status = STATUS_NOT_FOUND;
 
-		std::lock_guard<std::mutex> lg(monitorListOp);
-
-		for (auto it = monitorCtxList.begin(); it != monitorCtxList.end(); ++it) {
-			auto* ctx = *it;
-			if (ctx->monitorGuid == params->MonitorGuid) {
-				// Remove the monitor
-				freeConnectorSlots.push(ctx->connectorId);
-				IddCxMonitorDeparture(ctx->GetMonitor());
-				monitorCtxList.erase(it);
-				Status = STATUS_SUCCESS;
-				break;
+		IDDCX_MONITOR gone = nullptr;
+		size_t slot = 0;
+		{
+			std::lock_guard<std::mutex> lg(monitorListOp);
+			for (auto it = monitorCtxList.begin(); it != monitorCtxList.end(); ++it) {
+				auto* ctx = *it;
+				if (ctx->monitorGuid == params->MonitorGuid) {
+					gone = ctx->GetMonitor();
+					slot = ctx->connectorId;
+					monitorCtxList.erase(it);
+					Status = STATUS_SUCCESS;
+					break;
+				}
 			}
+		}
+		if (gone) {
+			DepartMonitor(gone, slot);
 		}
 
 		break;

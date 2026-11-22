@@ -13,7 +13,7 @@ Turkish names that appear in code are explained in the glossary in [../AGENTS.md
 |---|---|---|
 | `EkranLink.exe` | `host-windows/src/tray.cpp`, `ui.cpp`, `service.cpp` | Windows app. The same executable has several roles, chosen by its first argument (below). |
 | `ekranlink-host.exe` | `host-windows/src/main.cpp` | Console version for diagnostics: same streaming core, per-second stats, command-line options. |
-| `ekranlink-surucu.exe` | `host-windows/src/driver_tool.cpp` | Creates / removes the virtual display's root device (`kur`, `kaldir`, `durum`). Administrator only. |
+| `ekranlink-surucu.exe` | `host-windows/src/driver_tool.cpp` | Adds / removes the virtual display driver in the driver store (`kur`, `kaldir`, `durum`); removes the old permanent device. Administrator only. |
 | `ekranlink-test.exe` | `host-windows/tests/crypto_test.cpp` | Encryption test vectors (RFC 8439, CNG). Runs in packaging and CI. |
 | `EkranLinkVD.dll` | `driver/src/Driver.cpp` | Virtual display driver (IddCx, user-mode UMDF 2). Separate program, separate license. |
 | Android app | `android/app/src/main/java/org/ekranlink/android/` | Receives and shows the picture, sends touch and orientation. |
@@ -59,7 +59,8 @@ flowchart LR
 
 1. **Monitor.** In *Extend* / *Only this* mode `virtual_display.cpp` asks the driver (IOCTL) to add a monitor
    with the device's resolution, physical size and a GUID derived from the device ID, so Windows remembers
-   placement and scaling per device. In *Mirror* mode an existing monitor is captured instead.
+   placement and scaling per device. The driver's device exists only while it is used: the first monitor
+   creates it as a software device, and it is removed 15 s after the last one (at once if the program exits). In *Mirror* mode an existing monitor is captured instead.
 2. **Capture.** DXGI Desktop Duplication; the image stays in GPU memory. The cursor is reported separately and
    sent as `CursorShape` / `CursorPos` messages; the device draws it, so moving the mouse costs no video.
 3. **Scale and convert.** The GPU's video processor scales the image into the stream size (aspect ratio kept,
@@ -148,7 +149,10 @@ The app targets API 36 but runs on API 16: no AndroidX, Java 8 language level, n
 `driver/` is an IddCx (Indirect Display) driver running in user mode (UMDF 2), based on SudoVDA. The
 Windows app talks to it with three IOCTLs (`driver/src/ekranvd-ioctl.h`): add a monitor, remove a monitor,
 ping. If the app stops pinging for 3 seconds the driver removes all its monitors, so a crash never leaves an
-invisible screen behind. The EDID carries the device's physical size, so Windows suggests a sensible
+invisible screen behind. The device itself is a software device (`SwDeviceCreate`, hardware ID
+`EkranLinkVD`) created by the program that streams; creating it needs administrator rights, so *Extend* and
+*Only this* run in service mode (the agent is SYSTEM). If the program exits or crashes, Windows removes the
+device and its monitors, and it no longer shows in Device Manager. The EDID carries the device's physical size, so Windows suggests a sensible
 scaling. Distribution needs a code signature that Windows trusts; until then `driver/kur.ps1` signs it with
 a local, single-use certificate on the build machine.
 

@@ -27,6 +27,7 @@
 #include "pair_prompt.h"
 #include "pairing.h"
 #include "streamer.h"
+#include "virtual_display.h"
 
 namespace ekran::service {
 
@@ -505,6 +506,7 @@ int runAgent() {
         worker.join();
     }
 
+    VirtualDisplay::closeIdleDevice();  // sanal ekran aygıtı beklemeden kalksın
     config::writeDevices({});
     logf("EkranLink ajanı kapandı");
     if (settings) RegCloseKey(settings);

@@ -22,7 +22,9 @@ distributed under the **MS-PL**.
   clash on machines with SudoVDA or Apollo installed), bounds checks and terminated strings for external input
   (the 14-byte fields copied into the EDID), the device's physical size written into the EDID (Windows suggests
   scaling from it), "EKR" manufacturer code, removal of an unnecessary high process priority, missing `break`s,
-  a cursor event leak, and device access limited to signed-in users (`IU`).
+  a cursor event leak, device access limited to SYSTEM and administrators, a software device that exists only
+  while in use (hardware ID `EkranLinkVD`), running from the driver store, and a thread-safe monitor list and
+  watchdog.
 
 ## Commands (`src/ekranvd-ioctl.h`)
 
@@ -31,6 +33,16 @@ distributed under the **MS-PL**.
 | `IOCTL_ADD_VIRTUAL_DISPLAY` | Width, height, refresh rate, monitor GUID, name, serial number, physical size (mm) → adds a monitor |
 | `IOCTL_REMOVE_VIRTUAL_DISPLAY` | Removes the monitor with the given GUID |
 | `IOCTL_DRIVER_PING` | Feeds the watchdog. If the PC program is silent for 3 s, all virtual monitors are removed (a crash never leaves an "invisible screen" behind) |
+
+## When the device exists
+
+The driver is not tied to a permanent device. When a device connects in *Extend* or *Only this*, EkranLink
+(the service's agent, running as SYSTEM) creates a software device (`SwDeviceCreate`); Windows loads the
+driver and the monitor appears. 15 seconds after the last monitor leaves, or as soon as EkranLink exits or
+crashes, Windows removes the device, so it is not listed in Device Manager while unused (only under
+*View > Show hidden devices*). Creating a device needs administrator rights, so *Extend* and *Only this* need
+the EkranLink service; without it EkranLink mirrors. Versions up to 0.5.3 installed a permanent root device;
+`kur.ps1` removes it.
 
 A device gets the same monitor GUID every time it connects (derived from the device ID), so Windows remembers
 each device's display arrangement and scaling separately.
@@ -41,8 +53,8 @@ Requirements: Visual Studio Build Tools (MSVC x64) + WDK 10.0.26100. The MSBuild
 
 ```powershell
 .\build.ps1      # out\EkranLinkVD.dll + ekranlinkvd.inf
-.\kur.ps1        # administrator: sign + trust + create the root device (needs host-windows\build\ekranlink-surucu.exe)
-.\kaldir.ps1     # administrator: removes the device, driver package, certificate and driver settings (pairings stay)
+.\kur.ps1        # administrator: sign + trust + add to the driver store; creates no device (needs host-windows\build\ekranlink-surucu.exe)
+.\kaldir.ps1     # administrator: removes the device records, driver package, certificate and driver settings (pairings stay)
 ```
 
 **Signing:** as a UMDF driver it does not need Windows test mode. `kur.ps1` creates a new code-signing

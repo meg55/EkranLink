@@ -10,6 +10,7 @@
 
 #include "log.h"
 #include "streamer.h"
+#include "virtual_display.h"
 
 using namespace ekran;
 
@@ -38,7 +39,35 @@ void usage() {
         "  --dusuk-gecikme   Hareket sırasında da itici kare (gecikme ~20 ms, tablet ~2 kat daha çok çalışır)\n"
         "  --bitrate KBPS    Bit hızı (varsayılan 8000)\n"
         "  --itici N         Değişimden sonraki itici kare sayısı (varsayılan 3, 0 = kapalı)\n"
-        "  --itici-ara MS    İtici kareler arası süre (varsayılan 8)\n");
+        "  --itici-ara MS    İtici kareler arası süre (varsayılan 8)\n"
+        "  --sanal-ekran-dene  Sanal ekran sürücüsünü dene: 10 sn'lik bir monitör ekler, kaldırır (yönetici)\n");
+}
+
+// Tanı: sanal ekran aygıtını oluşturur, bir monitör ekler, 10 sn sonra kaldırır. Yayın yapmaz; hizmet çalışırken de
+// kullanılabilir. Aygıtın Aygıt Yöneticisi'nde yalnızca bu sırada göründüğü buradan denetlenebilir.
+int testVirtualDisplay() {
+    setLogSink([](const std::string& s) { std::printf("%s\n", s.c_str()); std::fflush(stdout); });
+    logf("Sürücü kurulu: %s, aygıt oluşturma yetkisi: %s", VirtualDisplay::driverInstalled() ? "evet" : "hayır",
+         VirtualDisplay::canCreateDevice() ? "var" : "yok (yönetici olarak çalıştırın)");
+    if (!VirtualDisplay::usable()) return 1;
+    VirtualDisplay vd;
+    VirtualDisplaySpec s;
+    s.width = 1920;
+    s.height = 1080;
+    s.monitorGuid = VirtualDisplay::guidFor("sanal-ekran-dene");
+    s.name = "EkranLink";
+    s.serial = "deneme";
+    std::wstring gdi;
+    if (!vd.add(s, gdi)) {
+        logf("Monitör eklenemedi");
+        return 1;
+    }
+    logf("Monitör eklendi (%ls); 10 sn sonra kaldırılacak", gdi.c_str());
+    Sleep(10000);
+    vd.remove();
+    VirtualDisplay::closeIdleDevice();
+    logf("Bitti: aygıt kaldırıldı");
+    return 0;
 }
 
 bool parse(int argc, char** argv, Options& o) {
@@ -73,6 +102,7 @@ int main(int argc, char** argv) {
     // DLL yalnızca System32'den ve exe'nin klasöründen (geçerli klasör ve PATH'teki DLL'ler yüklenmesin)
     SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
     SetConsoleOutputCP(CP_UTF8);
+    if (argc == 2 && std::string(argv[1]) == "--sanal-ekran-dene") return testVirtualDisplay();
     Options opt;
     if (!parse(argc, argv, opt)) {
         usage();
@@ -132,6 +162,7 @@ int main(int argc, char** argv) {
          opt.ip.c_str());
     streamer.run();
     g_streamer = nullptr;
+    VirtualDisplay::closeIdleDevice();
 
     WSACleanup();
     MFShutdown();

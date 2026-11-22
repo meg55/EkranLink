@@ -83,7 +83,7 @@ HANDLE g_statusQuit = nullptr;
 std::thread g_statusWatcher;
 // Pencere için önbellek (pencere açılınca ve ekranlar değişince tazelenir)
 std::vector<std::wstring> g_outputs;
-bool g_driver = false, g_serviceStale = false;
+bool g_driverInstalled = false, g_serviceStale = false;
 
 int connectedCount() {
     return int(std::count_if(g_devices.begin(), g_devices.end(),
@@ -318,6 +318,7 @@ void stopStreamer() {
     if (g_streamer) g_streamer->stop();
     if (g_worker.joinable()) g_worker.join();
     g_streamer.reset();
+    VirtualDisplay::closeIdleDevice();
     g_devices.clear();
     g_stats.clear();
 }
@@ -414,7 +415,7 @@ void reloadCaches() {
     readDisplayModes();
     g_opt = config::loadOptions();
     g_outputs = listOutputs();
-    g_driver = VirtualDisplay::driverAvailable();
+    g_driverInstalled = VirtualDisplay::driverInstalled();
     g_serviceStale = g_serviceMode && olderVersion(service::installedVersion(), config::kVersion);
 }
 
@@ -478,7 +479,10 @@ public:
         m.modes = g_modes;
         m.notice = g_notice;
         m.noticeArg = g_noticeArg;
-        m.driver = g_driver;
+        // Sanal ekran aygıtını yayını yapan süreç oluşturur: hizmet modunda ajan (SYSTEM), değilse bu program
+        // (yalnızca yönetici olarak çalışıyorsa)
+        m.driverInstalled = g_driverInstalled;
+        m.driver = g_driverInstalled && (g_serviceMode || VirtualDisplay::canCreateDevice());
         m.serviceMode = g_serviceMode;
         m.serviceStale = g_serviceStale;
         m.autostart = autostartEnabled();

@@ -729,7 +729,7 @@ void Window::displayPage() {
         segmented({W(i18n::ModeExtend), W(i18n::ModeOnly), W(i18n::ModeMirror)}, mode, {m.driver, m.driver, true},
                   [this](int i) { host_->act(Act::Display, i); });
         hint(m.driver ? W(mode == 0 ? i18n::HintExtend : mode == 1 ? i18n::HintOnly : i18n::HintMirror)
-                      : W(i18n::DriverMissing),
+                      : W(m.driverInstalled ? i18n::DriverNeedsService : i18n::DriverMissing),
              m.driver ? t.sub : t.warn);
     });
 

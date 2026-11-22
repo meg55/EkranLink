@@ -6,9 +6,12 @@
     Gerekenler: Visual Studio Build Tools (MSVC, x64) + Windows Driver Kit (WDK 10.0.26100).
     MSBuild'in sürücü araç setine gerek yok; cl/link doğrudan çağrılır.
     İmzalama ve kurulum ayrı: .\kur.ps1 (yönetici).
+    -Katalog: imzasız katalog (.cat) da üretilir. Katalog DLL'in özetini içerir: DLL sonradan imzalanırsa katalog
+    yeniden üretilmelidir (sıra: DLL'i imzala, kataloğu üret, kataloğu imzala).
 #>
 param(
-    [string] $Surum = ''  # boşsa host-windows/src/version.h (ürün sürümü tüm dosyalarda aynı olsun)
+    [string] $Surum = '',  # boşsa host-windows/src/version.h (ürün sürümü tüm dosyalarda aynı olsun)
+    [switch] $Katalog
 )
 
 $ErrorActionPreference = 'Stop'
@@ -72,5 +75,15 @@ Copy-Item (Join-Path $src 'ekranlinkvd.inf') $out -Force
 $stampinf = Join-Path $wdk "bin\$sdk\x64\stampinf.exe"
 & $stampinf -f (Join-Path $out 'ekranlinkvd.inf') -a amd64 -d * -v $Surum -u "$umdf.0" | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'stampinf başarısız' }
+
+# Eski adlarla kalmış dosyalar (EkranVD.*, ekranvd.*) ve bağlayıcı yan ürünleri pakete girmesin
+Get-ChildItem $out -File | Where-Object { $_.Name -notin 'EkranLinkVD.dll', 'ekranlinkvd.inf', 'ekranlinkvd.cat' } |
+    Remove-Item -Force
+
+if ($Katalog) {
+    Remove-Item (Join-Path $out 'ekranlinkvd.cat') -ErrorAction SilentlyContinue
+    & (Join-Path $wdk "bin\$sdk\x86\Inf2Cat.exe") "/driver:$out" /os:10_X64 | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Inf2Cat başarısız' }
+}
 
 Get-ChildItem $out | Select-Object Name, Length | Format-Table -AutoSize

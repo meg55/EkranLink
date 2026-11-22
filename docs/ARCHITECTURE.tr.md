@@ -13,7 +13,7 @@ içindedir. Kodda geçen Türkçe adlar [../AGENTS.md](../AGENTS.md) içindeki s
 |---|---|---|
 | `EkranLink.exe` | `host-windows/src/tray.cpp`, `ui.cpp`, `service.cpp` | Windows uygulaması. Aynı çalıştırılabilir dosyanın birkaç rolü vardır; rol, ilk argümana göre seçilir (aşağıda). |
 | `ekranlink-host.exe` | `host-windows/src/main.cpp` | Tanılama için konsol sürümü: aynı yayın çekirdeği, saniyelik istatistikler, komut satırı seçenekleri. |
-| `ekranlink-surucu.exe` | `host-windows/src/driver_tool.cpp` | Sanal ekranın kök cihazını oluşturur / kaldırır (`kur`, `kaldir`, `durum`). Yalnızca yönetici. |
+| `ekranlink-surucu.exe` | `host-windows/src/driver_tool.cpp` | Sanal ekran sürücüsünü sürücü deposuna ekler / kaldırır (`kur`, `kaldir`, `durum`); eski kalıcı aygıtı kaldırır. Yalnızca yönetici. |
 | `ekranlink-test.exe` | `host-windows/tests/crypto_test.cpp` | Şifreleme test vektörleri (RFC 8439, CNG). Paketleme ve CI sırasında çalışır. |
 | `EkranLinkVD.dll` | `driver/src/Driver.cpp` | Sanal ekran sürücüsü (IddCx, kullanıcı modu UMDF 2). Ayrı program, ayrı lisans. |
 | Android uygulaması | `android/app/src/main/java/org/ekranlink/android/` | Görüntüyü alır ve gösterir; dokunma ve yön bilgisini gönderir. |
@@ -59,7 +59,9 @@ flowchart LR
 
 1. **Monitör.** *İkinci ekran* / *Tek ekran* modunda `virtual_display.cpp`, sürücüden (IOCTL ile) cihazın
    çözünürlüğüne ve fiziksel boyutuna sahip, cihaz kimliğinden türetilmiş bir GUID taşıyan bir monitör
-   eklemesini ister; böylece Windows yerleşimi ve ölçeklemeyi her cihaz için ayrı ayrı hatırlar. *Yansıtma*
+   eklemesini ister; böylece Windows yerleşimi ve ölçeklemeyi her cihaz için ayrı ayrı hatırlar. Sürücünün
+   aygıtı yalnızca kullanılırken vardır: ilk monitör onu yazılım aygıtı olarak oluşturur, sonuncusu gittikten
+   15 sn sonra (program kapanırsa hemen) kaldırılır. *Yansıtma*
    modunda ise bunun yerine var olan bir monitör yakalanır.
 2. **Yakalama.** DXGI Desktop Duplication; görüntü GPU belleğinde kalır. İmleç ayrıca bildirilir ve
    `CursorShape` / `CursorPos` mesajlarıyla gönderilir; imleci cihaz çizer, bu yüzden fareyi oynatmak hiç video
@@ -155,7 +157,10 @@ Uygulama API 36'yı hedefler ama API 16'da da çalışır: AndroidX yok, Java 8 
 `driver/`, SudoVDA tabanlı, kullanıcı modunda (UMDF 2) çalışan bir IddCx (Indirect Display) sürücüsüdür.
 Windows uygulaması onunla üç IOCTL üzerinden konuşur (`driver/src/ekranvd-ioctl.h`): monitör ekle, monitör
 kaldır, ping. Uygulama 3 saniye boyunca ping göndermezse sürücü tüm monitörlerini kaldırır; böylece bir çökme
-asla geride görünmez bir ekran bırakmaz. EDID, cihazın fiziksel boyutunu taşır; böylece Windows makul bir
+asla geride görünmez bir ekran bırakmaz. Aygıtın kendisi, yayını yapan programın oluşturduğu bir yazılım
+aygıtıdır (`SwDeviceCreate`, donanım kimliği `EkranLinkVD`); oluşturmak yönetici yetkisi istediği için
+*İkinci ekran* ve *Tek ekran* hizmet modunda çalışır (ajan SYSTEM'dir). Program kapanır ya da çökerse Windows
+aygıtı ve monitörlerini kaldırır, Aygıt Yöneticisi'nde de görünmez olur. EDID, cihazın fiziksel boyutunu taşır; böylece Windows makul bir
 ölçekleme önerir. Dağıtım için Windows'un güvendiği bir kod imzası gerekir; o zamana kadar `driver/kur.ps1`
 sürücüyü derleme makinesinde yerel, tek kullanımlık bir sertifikayla imzalar.
 

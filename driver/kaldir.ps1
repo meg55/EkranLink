@@ -18,10 +18,10 @@ if (-not $yonetici) {
     exit $p.ExitCode
 }
 
-# 1) Aygıt
+# 1) Aygıt kayıtları (eski kalıcı kök aygıt dahil) ve sürücü paketleri
 if (Test-Path $Arac) { & $Arac kaldir }
 
-# 2) Sürücü paketi (oemNN.inf)
+# 2) Kalan sürücü paketi (oemNN.inf; araç yoksa ya da silemediyse)
 $paketler = (pnputil /enum-drivers) -join "`n" -split "`n`n" | Where-Object { $_ -match 'ekranlinkvd\.inf' }
 foreach ($p in $paketler) {
     if ($p -match '(oem\d+\.inf)') {

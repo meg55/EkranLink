@@ -3,6 +3,8 @@
 #include <setupapi.h>
 
 #include <algorithm>
+#include <chrono>
+#include <condition_variable>
 #include <cstring>
 #include <mutex>
 #include <vector>
@@ -14,6 +16,162 @@
 namespace ekran {
 
 namespace {
+
+HANDLE openDevice();
+
+// ---- Yazılım aygıtı: sürücü yalnızca kullanılırken bir aygıta bağlıdır ----
+// SwDeviceCreate (Windows 8+, cfgmgr32.dll). MinGW'de swdevice.h olmadığı için tanımlar burada.
+struct SwCreateInfo {
+    ULONG cbSize;
+    PCWSTR pszInstanceId;
+    PCWSTR pszzHardwareIds;
+    PCWSTR pszzCompatibleIds;
+    const GUID* pContainerId;
+    ULONG CapabilityFlags;
+    PCWSTR pszDeviceDescription;
+    PCWSTR pszDeviceLocation;
+    const SECURITY_DESCRIPTOR* pSecurityDescriptor;
+};
+using HSwDevice = HANDLE;
+using SwCallback = void(WINAPI*)(HSwDevice, HRESULT, PVOID, PCWSTR);
+using SwCreateFn = HRESULT(WINAPI*)(PCWSTR, PCWSTR, const SwCreateInfo*, ULONG, const void*, SwCallback, PVOID,
+                                    HSwDevice*);
+using SwCloseFn = void(WINAPI*)(HSwDevice);
+constexpr ULONG kSwSilentInstall = 0x2, kSwDriverRequired = 0x8;
+// Son monitör gidince aygıt bu kadar bekler: ayar değişikliği ya da yeniden bağlanma aygıtı yeniden kurdurmasın
+constexpr uint64_t kLingerMs = 15000;
+
+struct SwCreateResult {
+    HANDLE done = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    HRESULT hr = E_FAIL;
+};
+
+void WINAPI onSwCreated(HSwDevice, HRESULT hr, PVOID ctx, PCWSTR) {
+    auto* r = static_cast<SwCreateResult*>(ctx);
+    r->hr = hr;
+    SetEvent(r->done);
+}
+
+// Aygıtı kullanan monitör sayısını tutar: ilk gelen oluşturur, son giden (bekleme süresinden sonra) kaldırır. Aygıtın
+// ömrü tanıtıcıya bağlıdır: program kapanır ya da çökerse Windows aygıtı kendisi kaldırır.
+class SoftwareDevice {
+public:
+    static SoftwareDevice& get() {
+        static auto* d = new SoftwareDevice;  // bilerek silinmez: arkadaki kapatıcı iş parçacığı kullanabilir
+        return *d;
+    }
+
+    bool acquire() {
+        std::unique_lock<std::mutex> lock(m_);
+        closeAt_ = 0;
+        cv_.notify_all();
+        if (!h_ && !create()) return false;
+        users_++;
+        return true;
+    }
+
+    void release() {
+        std::lock_guard<std::mutex> lock(m_);
+        if (users_ > 0 && --users_ == 0 && h_) {
+            closeAt_ = GetTickCount64() + kLingerMs;
+            if (!closerRunning_) {
+                closerRunning_ = true;
+                std::thread([this] { closer(); }).detach();
+            }
+            cv_.notify_all();
+        }
+    }
+
+    // Program kapanırken: kullanan yoksa beklemeden kaldır
+    void closeIdle() {
+        std::lock_guard<std::mutex> lock(m_);
+        if (users_ == 0) closeLocked();
+    }
+
+private:
+    std::mutex m_;
+    std::condition_variable cv_;
+    HSwDevice h_ = nullptr;
+    int users_ = 0;
+    uint64_t closeAt_ = 0;  // 0: kapatma beklenmiyor
+    bool closerRunning_ = false;
+    SwCreateFn create_ = nullptr;
+    SwCloseFn close_ = nullptr;
+
+    bool create() {
+        if (!create_) {
+            HMODULE cfg = LoadLibraryExW(L"cfgmgr32.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+            create_ = cfg ? reinterpret_cast<SwCreateFn>(reinterpret_cast<void*>(GetProcAddress(cfg, "SwDeviceCreate"))) : nullptr;
+            close_ = cfg ? reinterpret_cast<SwCloseFn>(reinterpret_cast<void*>(GetProcAddress(cfg, "SwDeviceClose"))) : nullptr;
+            if (!create_ || !close_) {
+                create_ = nullptr;
+                return false;
+            }
+        }
+        static const wchar_t kIds[] = EKRANVD_HARDWARE_ID L"\0";
+        SwCreateInfo info{};
+        info.cbSize = sizeof info;
+        info.pszInstanceId = EKRANVD_INSTANCE_ID;
+        info.pszzHardwareIds = kIds;
+        info.pszzCompatibleIds = kIds;
+        info.CapabilityFlags = kSwSilentInstall | kSwDriverRequired;
+        info.pszDeviceDescription = L"EkranLink Sanal Ekran";
+        // Geri çağrı zaman aşımından sonra da gelebilir: sonuç yığında değil, o durumda bilerek sızdırılır
+        auto* result = new SwCreateResult;
+        const uint64_t start = GetTickCount64();
+        HSwDevice h = nullptr;
+        HRESULT hr = create_(EKRANVD_ENUMERATOR, L"HTREE\\ROOT\\0", &info, 0, nullptr, onSwCreated, result, &h);
+        if (SUCCEEDED(hr)) {
+            if (WaitForSingleObject(result->done, 15000) == WAIT_OBJECT_0) {
+                hr = result->hr;
+                CloseHandle(result->done);
+                delete result;
+            } else {
+                hr = HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+            }
+        }
+        if (FAILED(hr)) {
+            logf("Sanal ekran aygıtı oluşturulamadı (0x%08lx)", (unsigned long)hr);
+            if (h) close_(h);
+            return false;
+        }
+        // Sürücü başlayıp arayüzünü açınca kullanılabilir
+        while (GetTickCount64() - start < 15000) {
+            HANDLE dev = openDevice();
+            if (dev != INVALID_HANDLE_VALUE) {
+                CloseHandle(dev);
+                h_ = h;
+                logf("Sanal ekran aygıtı oluşturuldu (%llu ms)", (unsigned long long)(GetTickCount64() - start));
+                return true;
+            }
+            Sleep(100);
+        }
+        logf("Sanal ekran aygıtı oluştu ama sürücü başlamadı; kaldırılıyor");
+        close_(h);
+        return false;
+    }
+
+    void closeLocked() {
+        if (!h_) return;
+        close_(h_);
+        h_ = nullptr;
+        closeAt_ = 0;
+        logf("Sanal ekran aygıtı kaldırıldı");
+    }
+
+    void closer() {
+        std::unique_lock<std::mutex> lock(m_);
+        while (closeAt_ && h_) {
+            const uint64_t now = GetTickCount64();
+            if (now >= closeAt_) {
+                closeLocked();
+                break;
+            }
+            cv_.wait_for(lock, std::chrono::milliseconds(closeAt_ - now));
+        }
+        closerRunning_ = false;
+    }
+};
 
 HANDLE openDevice() {
     HDEVINFO set = SetupDiGetClassDevsW(&EKRANVD::EKRANVD_INTERFACE_GUID, nullptr, nullptr,
@@ -67,12 +225,32 @@ void copyField(char (&dst)[14], const std::string& s) {
 
 }  // namespace
 
-bool VirtualDisplay::driverAvailable() {
-    HANDLE h = openDevice();
-    if (h == INVALID_HANDLE_VALUE) return false;
-    CloseHandle(h);
-    return true;
+bool VirtualDisplay::driverInstalled() {
+    // Kurulum aracı sürücü deposundaki adını yazar (oemNN.inf); paket sonradan silindiyse dosya da yoktur
+    wchar_t inf[64];
+    DWORD size = sizeof inf;
+    if (RegGetValueW(HKEY_LOCAL_MACHINE, EKRANVD_SETTINGS_KEY, L"Inf", RRF_RT_REG_SZ, nullptr, inf, &size) != 0)
+        return false;
+    if (wcspbrk(inf, L"\\/:")) return false;
+    wchar_t win[MAX_PATH];
+    if (!GetWindowsDirectoryW(win, MAX_PATH)) return false;
+    return GetFileAttributesW((std::wstring(win) + L"\\INF\\" + inf).c_str()) != INVALID_FILE_ATTRIBUTES;
 }
+
+bool VirtualDisplay::canCreateDevice() {
+    static const bool elevated = [] {
+        HANDLE tok = nullptr;
+        TOKEN_ELEVATION e{};
+        DWORD n = 0;
+        const bool ok = OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &tok) &&
+                        GetTokenInformation(tok, TokenElevation, &e, sizeof e, &n) && e.TokenIsElevated;
+        if (tok) CloseHandle(tok);
+        return ok;
+    }();
+    return elevated;
+}
+
+void VirtualDisplay::closeIdleDevice() { SoftwareDevice::get().closeIdle(); }
 
 GUID VirtualDisplay::guidFor(const std::string& deviceId) {
     const std::string seed = "EKRAN monitor " + deviceId;
@@ -86,9 +264,12 @@ GUID VirtualDisplay::guidFor(const std::string& deviceId) {
 
 bool VirtualDisplay::add(const VirtualDisplaySpec& spec, std::wstring& gdiName, int timeoutMs) {
     remove();
+    if (!SoftwareDevice::get().acquire()) return false;
+    holdsDevice_ = true;
     dev_ = openDevice();
     if (dev_ == INVALID_HANDLE_VALUE) {
         logf("Sanal ekran: sürücü bulunamadı");
+        remove();
         return false;
     }
 
@@ -161,6 +342,10 @@ void VirtualDisplay::remove() {
     }
     added_ = false;
     gdiName_.clear();
+    if (holdsDevice_) {
+        holdsDevice_ = false;
+        SoftwareDevice::get().release();
+    }
 }
 
 namespace {

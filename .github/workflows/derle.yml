@@ -140,9 +140,10 @@ jobs:
 
       - name: Derle
         shell: pwsh
-        run: .\driver\build.ps1
+        run: .\driver\build.ps1 -Katalog
 
-      # İmzasız: yalnızca derlemenin sağlamlığı için; dağıtım için imza gerekir (driver/README.md)
+      # İmzasız: yalnızca derlemenin sağlamlığı için; dağıtım için imza gerekir (driver/README.md).
+      # İmza gelince sıra: DLL'i imzala, kataloğu yeniden üret (Inf2Cat), kataloğu imzala.
       - name: Kaydet
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
