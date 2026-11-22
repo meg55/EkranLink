@@ -2,7 +2,7 @@
 
 **English** · [Türkçe](#türkçe)
 
-*Effective date: 13 October 2026.* This policy covers the EkranLink Windows app, its virtual display driver and
+*Effective date: 22 November 2026.* This policy covers the EkranLink Windows app, its virtual display driver and
 the EkranLink Android app.
 
 ## Summary
@@ -25,7 +25,7 @@ devices, and only when you connect them.
 ## Finding devices on your network
 
 To find devices over Wi-Fi, the PC sends a small query (UDP, port 27183) to the local network it is
-connected to, and to the addresses of devices it connected to before. The Android app answers only while it
+connected to, and to the addresses of devices it connected to before; the query carries the PC's name and a random PC identifier. The Android app answers only while it
 is open, with its name and identifier. These packets do not leave your local network.
 
 ## What is stored, and where
@@ -70,7 +70,7 @@ or [GitHub issues](https://github.com/meg55/EkranLink/issues).
 
 ## Türkçe
 
-*Yürürlük tarihi: 13 Ekim 2026.* Bu politika EkranLink Windows uygulamasını, sanal ekran sürücüsünü ve EkranLink
+*Yürürlük tarihi: 22 Kasım 2026.* Bu politika EkranLink Windows uygulamasını, sanal ekran sürücüsünü ve EkranLink
 Android uygulamasını kapsar.
 
 ### Özet
@@ -91,7 +91,7 @@ yalnızca kendi bilgisayarınızla kendi Android cihazlarınız arasında ve yal
 ### Ağda cihaz bulma
 
 Wi-Fi'de cihaz bulmak için PC bağlı olduğu yerel ağa ve daha önce bağlandığı cihazların adreslerine küçük bir
-soru (UDP, port 27183) gönderir. Android uygulaması yalnızca açıkken, adı ve kimliğiyle yanıt verir. Bu paketler
+soru (UDP, port 27183) gönderir; soruda PC'nin adı ve rastgele bir PC kimliği bulunur. Android uygulaması yalnızca açıkken, adı ve kimliğiyle yanıt verir. Bu paketler
 yerel ağınızın dışına çıkmaz.
 
 ### Ne, nerede saklanır

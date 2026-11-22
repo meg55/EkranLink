@@ -8,6 +8,7 @@
 #include <cstring>
 
 #include "com.h"
+#include "pairing.h"
 #include "protocol.h"
 
 namespace ekran {
@@ -64,6 +65,20 @@ std::vector<FoundDevice> discoverDevices(int timeoutMs, const std::vector<std::s
     proto::Writer q;
     q.bytes("EKRN?", 5);
     q.u16(proto::kVersion);
+    // 0.5.3+: PC kimliği ve adı. Cihaz, onu henüz tanımıyorsa "bilgisayar sizi buldu, orada Bağlan'a tıklayın"
+    // der (eski cihazlar ilk 5 bayta bakar, gerisini yok sayar)
+    const auto pcId = pairing::pcId();
+    if (pcId != std::array<uint8_t, 16>{}) {
+        std::string name = proto::cleanName(pairing::pcName());
+        if (name.size() > 48) {  // paket küçük kalsın; UTF-8 harfi bölünmesin
+            size_t n = 48;
+            while (n > 0 && (static_cast<unsigned char>(name[n]) & 0xC0) == 0x80) n--;
+            name.resize(n);
+        }
+        q.bytes(pcId.data(), 16);
+        q.u16(uint16_t(name.size()));
+        q.bytes(name.data(), name.size());
+    }
 
     // Her arayüze bağlı bir soket: yayın o karttan çıkar (bağlanmamış soketle Windows yalnızca yönlendirme
     // tablosunun seçtiği karttan gönderir). Doğrudan sorular bağlanmamış soketten (yönlendirme seçsin).

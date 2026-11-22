@@ -11,7 +11,7 @@ Tüm sayılar aksi belirtilmedikçe **big-endian**. `str` = `u16 uzunluk` + UTF-
 
 PC, her ağ arayüzünün yayın adresine (ör. 192.168.1.255, USB internet paylaşımında 192.168.42.255) sorar:
 
-- Soru (P→T): `"EKRN?"` + `u16 sürüm`
+- Soru (P→T): `"EKRN?"` + `u16 sürüm` + (0.5.3+) `16 pcKimlik, str pcAdı` — cihaz bunları yalnızca o PC ile henüz eşleşmemişse "*PC adı* bu cihazı buldu, orada Bağlan'a tıklayın" demek için kullanır; eski cihazlar yalnızca ilk 5 bayta bakar
 - Cevap (T→P, soranın adresine): `"EKRN!"` + `u16 sürüm, u16 tcpPort, str ad, str kimlik`
 
 Tablet boştayken hiçbir paket göndermez; yalnızca soru gelince cevap verir.

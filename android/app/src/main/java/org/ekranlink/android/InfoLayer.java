@@ -111,10 +111,11 @@ final class InfoLayer extends ViewGroup {
         col.addView(statusRow, margins(0, 0, 0, size(24, 12)));
 
         col.addView(divider(ctx), new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 1));
-        col.addView(step(ctx, "USB", text(ctx, res.getString(R.string.welcome_usb_step), font(15, 14), TEXT, false)),
-                wide(0, size(20, 12), 0, 0));
+        // Önce Wi-Fi: cihazda hiçbir ayar gerektirmez. USB isteğe bağlı (hata ayıklama ister).
         wifiText = text(ctx, "", font(15, 14), TEXT, false);
-        col.addView(step(ctx, "Wi-Fi", wifiText), wide(0, size(16, 10), 0, 0));
+        col.addView(step(ctx, "Wi-Fi", wifiText), wide(0, size(20, 12), 0, 0));
+        col.addView(step(ctx, "USB", text(ctx, res.getString(R.string.welcome_usb_step), font(15, 14), TEXT, false)),
+                wide(0, size(16, 10), 0, 0));
 
         // Bilgisayara takılınca otomatik aç (PC'nin "Otomatik bağlan" ayarıyla birlikte)
         LinearLayout autoRow = row(ctx);
@@ -326,15 +327,20 @@ final class InfoLayer extends ViewGroup {
         return welcome.getVisibility() == VISIBLE;
     }
 
-    /** addresses: tabletin IPv4 adresleri (yoksa null). */
-    void update(Stats.Snapshot s, String addresses) {
+    /**
+     * addresses: tabletin IPv4 adresleri (yoksa null). nearbyPc: bu cihazı az önce arayan, henüz eşleşmemiş PC'nin
+     * adı (yoksa null): kullanıcıya orada ne yapacağı söylenir.
+     */
+    void update(Stats.Snapshot s, String addresses, String nearbyPc) {
         int color = s.state == Stats.CONNECTED ? GREEN : s.state == Stats.ERROR ? RED
                 : s.state == Stats.CONNECTING ? ACCENT : AMBER;
         if (welcomeVisible()) {
             setDotColor(welcomeDot, color);
             welcomeStatus.setText(s.status);
-            wifiText.setText(addresses != null
-                    ? res.getString(R.string.welcome_wifi_found, addresses)
+            boolean hint = nearbyPc != null && s.state != Stats.CONNECTING && s.state != Stats.CONNECTED;
+            wifiText.setTextColor(hint ? ACCENT : TEXT);
+            wifiText.setText(hint ? res.getString(R.string.welcome_wifi_pc_found, nearbyPc)
+                    : addresses != null ? res.getString(R.string.welcome_wifi_found, addresses)
                     : res.getString(R.string.welcome_wifi_none));
             if (!forgetArmed) {
                 forget.setVisibility(actions.pairCount() > 0 ? VISIBLE : GONE);

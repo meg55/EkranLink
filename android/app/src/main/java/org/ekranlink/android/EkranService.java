@@ -66,6 +66,18 @@ public final class EkranService extends Service implements Session.Host {
         return instance;
     }
 
+    /**
+     * Son 10 sn'de bu cihazı arayan ve henüz eşleşmediğimiz bir PC varsa adı (yoksa null). Karşılama ekranı
+     * "bilgisayar sizi buldu, orada Bağlan'a tıklayın" der: ağdaki cihaza PC kendiliğinden bağlanmaz.
+     */
+    String unpairedPcNearby() {
+        DiscoveryResponder.Asker a = discovery != null ? discovery.lastAsker() : null;
+        if (a == null || a.pcName.isEmpty() || android.os.SystemClock.elapsedRealtime() - a.atMs > 10000) {
+            return null;
+        }
+        return pairStore.load(a.pcId) == null ? a.pcName : null;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();

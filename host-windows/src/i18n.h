@@ -10,8 +10,10 @@ namespace ekran::i18n {
 #define EKRAN_STRINGS(X)                                                                                            \
     X(Waiting, L"Cihaz bekleniyor", L"Waiting for a device")                                                        \
     X(Connected, L"Bağlı", L"Connected")                                                                            \
-    X(WaitingHint, L"Tablette ya da telefonda EkranLink'i açın; USB ile takın ya da aynı Wi-Fi ağına bağlayın.",        \
-      L"Open EkranLink on the tablet or phone, then plug it in over USB or join the same Wi-Fi network.")              \
+    X(WaitingHint, L"Tablette ya da telefonda EkranLink'i açın ve cihazı bu bilgisayarla aynı Wi-Fi ağına bağlayın "  \
+      L"(ya da USB ile takın).",                                                                                    \
+      L"Open EkranLink on the tablet or phone and join it to the same Wi-Fi network as this computer (or plug it " \
+      L"in over USB).")                                                                                             \
     X(NotifyConnected, L"Cihaz bağlandı", L"Device connected")                                                      \
     X(NotifyDisconnected, L"Cihaz ayrıldı", L"Device disconnected")                                                 \
     X(ModeExtendShort, L"ikinci ekran", L"extended display")                                                        \
@@ -33,14 +35,14 @@ namespace ekran::i18n {
     X(StepsTitle, L"Bağlanmak için", L"To connect")                                                                 \
     X(StepApp, L"1.  Cihaza EkranLink'in Android uygulamasını (APK) kurun ve açın.",                                    \
       L"1.  Install the EkranLink Android app (APK) on the device and open it.")                                       \
-    X(StepUsb, L"2.  USB: cihazda Geliştirici seçenekleri > USB hata ayıklama'yı açıp kabloyla takın. (Geliştirici "  \
-      L"seçenekleri görünmüyorsa: Ayarlar > Telefon/Tablet hakkında > Yapı numarası'na 7 kez dokunun.)",           \
-      L"2.  USB: turn on Developer options > USB debugging on the device, then plug in the cable. (No Developer "  \
-      L"options? Tap Settings > About phone/tablet > Build number 7 times.)")                                      \
-    X(StepWifi, L"     Wi-Fi: cihazı bu bilgisayarla aynı ağa bağlayın. Listede görününce Bağlan'a basın ve iki "  \
-      L"ekranda aynı kodu onaylayın (yalnızca ilk seferde).",                                                       \
-      L"     Wi-Fi: join the same network as this computer. When it appears in the list, click Connect and "        \
-      L"confirm the same code on both screens (first time only).")                                                  \
+    X(StepWifi, L"2.  Cihazı bu bilgisayarla aynı Wi-Fi ağına bağlayın. Listede görününce Bağlan'a tıklayın ve iki " \
+      L"ekranda aynı kodu onaylayın (yalnızca ilk seferde; sonra kendiliğinden bağlanır).",                         \
+      L"2.  Join the device to the same Wi-Fi network as this computer. When it appears in the list, click "       \
+      L"Connect and confirm the same code on both screens (first time only; after that it connects by itself).")    \
+    X(StepUsb, L"3.  İsteğe bağlı, en düşük gecikme için USB kablosu: cihazda Geliştirici seçenekleri > USB hata "    \
+      L"ayıklama açık olmalı (görünmüyorsa Ayarlar > Telefon/Tablet hakkında > Yapı numarası'na 7 kez dokunun).",   \
+      L"3.  Optional, for the lowest delay, a USB cable: the device needs Developer options > USB debugging "       \
+      L"(not shown? Tap Settings > About phone/tablet > Build number 7 times).")                                    \
     X(DownloadApp, L"Android uygulamasını indir", L"Download the Android app")                                      \
     X(SecConnection, L"Bağlantı", L"Connection")                                                                    \
     X(LinkType, L"Bağlantı türü", L"Connection type")                                                               \

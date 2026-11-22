@@ -77,13 +77,13 @@ The plan and measurements are in [docs/ROADMAP.md](docs/ROADMAP.md); tested devi
    device, or copy it over USB and open it with a file manager). Android asks you to allow installing apps from
    that browser or file manager, and Play Protect may warn about an unknown app: allow it and choose *Install
    anyway*. The PC never installs apps on the device.
-   For USB, turn on *Developer options > USB debugging* on the device (no *Developer options*? Tap
-   *Settings > About phone/tablet > Build number* 7 times) and tap *Allow* when the device asks *Allow USB
-   debugging?*.
-3. **Connect:** open EkranLink on the device. Plug in the USB cable, or join the same Wi-Fi network as the PC.
-   The PC finds the device by itself (USB first). The first time, confirm the 6-digit code on both
-   screens. A new device on Wi-Fi shows up in the window and as a notification: click *Connect* (or the
-   notification).
+3. **Connect over Wi-Fi** (nothing to set up on the device): open EkranLink on the device and join it to the
+   same Wi-Fi network as the PC. The device shows up in the PC's window and as a notification: click *Connect*
+   (or the notification) and confirm the same 6-digit code on both screens. This is needed only once; after
+   that the device connects by itself whenever EkranLink is open on it.
+4. **Optional, USB cable** (lowest delay): turn on *Developer options > USB debugging* on the device (no
+   *Developer options*? Tap *Settings > About phone/tablet > Build number* 7 times), plug in the cable and tap
+   *Allow* when the device asks *Allow USB debugging?*. When a device is on both, USB is used.
 
 > **For now EkranLink mirrors.** *Extend* and *Only this* need the virtual display driver, which ships once it
 > is code-signed (see [Code signing policy](#code-signing-policy)).
@@ -289,13 +289,14 @@ Plan ve ölçümler: [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md) · Test edilen cih
    ya da USB ile kopyalayıp dosya yöneticisinden açın). Android o tarayıcıdan ya da dosya yöneticisinden
    uygulama yüklemeye izin vermenizi ister, Play Protect de bilinmeyen uygulama uyarısı gösterebilir: izin
    verip *Yine de yükle*'yi seçin. Bilgisayar cihaza uygulama kurmaz.
-   USB için cihazda *Geliştirici seçenekleri > USB hata ayıklama*'yı açın (*Geliştirici seçenekleri* yoksa:
-   *Ayarlar > Telefon/Tablet hakkında > Yapı numarası*'na 7 kez dokunun) ve cihaz *USB hata ayıklamaya izin
-   verilsin mi?* diye sorunca *İzin ver*'e dokunun.
-3. **Bağlanın:** cihazda EkranLink'i açın. USB kablosunu takın ya da bilgisayarla aynı Wi-Fi ağına bağlanın.
-   Bilgisayar cihazı kendiliğinden bulur (önce USB). İlk seferde iki ekranda görünen 6 haneli kodu
-   onaylayın. Wi-Fi'deki yeni bir cihaz pencerede ve bildirim olarak görünür: *Bağlan*'a (ya da bildirime)
-   tıklayın.
+3. **Wi-Fi ile bağlanın** (cihazda hiçbir ayar gerekmez): cihazda EkranLink'i açın ve cihazı bilgisayarla aynı
+   Wi-Fi ağına bağlayın. Cihaz bilgisayardaki pencerede ve bildirim olarak görünür: *Bağlan*'a (ya da
+   bildirime) tıklayın ve iki ekranda aynı 6 haneli kodu onaylayın. Bu yalnızca bir kez gerekir; sonra cihazda
+   EkranLink her açıldığında kendiliğinden bağlanır.
+4. **İsteğe bağlı, USB kablosu** (en düşük gecikme): cihazda *Geliştirici seçenekleri > USB hata ayıklama*'yı
+   açın (*Geliştirici seçenekleri* yoksa: *Ayarlar > Telefon/Tablet hakkında > Yapı numarası*'na 7 kez
+   dokunun), kabloyu takın ve cihaz *USB hata ayıklamaya izin verilsin mi?* diye sorunca *İzin ver*'e dokunun.
+   Cihaz ikisinde de varsa USB kullanılır.
 
 > **Şimdilik EkranLink yansıtır.** *İkinci ekran* ve *Tek ekran* için sanal ekran sürücüsü gerekir; sürücü kod
 > imzası tamamlanınca gelecek (bkz. [Kod imzalama politikası](#kod-imzalama-politikası-code-signing-policy)).

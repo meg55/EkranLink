@@ -689,7 +689,7 @@ void Window::statusPage() {
     if (!m.connected) {
         card([&] {
             y_ += drawText(W(i18n::StepsTitle), fSection_.get(), x_, y_, w_, t.text) + 8;
-            for (i18n::Str s : {i18n::StepApp, i18n::StepUsb, i18n::StepWifi})
+            for (i18n::Str s : {i18n::StepApp, i18n::StepWifi, i18n::StepUsb})
                 y_ += drawText(W(s), fBody_.get(), x_, y_, w_, t.text) + 6;
             y_ += 6;
             button(x_, y_, {W(i18n::DownloadApp), false, true, [this] { host_->act(Act::DownloadApp, 0); }});

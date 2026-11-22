@@ -2,8 +2,9 @@
 <resources>
     <!-- Karşılama ekranı -->
     <string name="welcome_tagline">Bu cihaz bilgisayarınızın ekranı olmaya hazır.</string>
-    <string name="welcome_usb_step">Kabloyu takın. Bilgisayarda EkranLink açık, bu cihazda USB hata ayıklama açık olmalı (Ayarlar › Geliştirici seçenekleri; Geliştirici seçenekleri görünmüyorsa Ayarlar › Telefon hakkında › Yapı numarası\'na 7 kez dokunun).</string>
-    <string name="welcome_wifi_found">Aynı ağda bu cihaz bilgisayardaki EkranLink\'te görünür. İlk seferde orada Bağlan\'a basın ve iki ekranda aynı kodu onaylayın.\nBu cihazın adresi: %1$s</string>
+    <string name="welcome_usb_step">İsteğe bağlı, en düşük gecikme için: kabloyu takın. Bunun için bu cihazda USB hata ayıklama açık olmalı (Ayarlar › Geliştirici seçenekleri; Geliştirici seçenekleri görünmüyorsa Ayarlar › Telefon hakkında › Yapı numarası\'na 7 kez dokunun).</string>
+    <string name="welcome_wifi_found">Bilgisayarla aynı Wi-Fi ağına bağlanın: bu cihaz oradaki EkranLink\'te görünür. İlk seferde bilgisayarda Bağlan\'a tıklayın ve iki ekranda aynı kodu onaylayın.\nBu cihazın adresi: %1$s</string>
+    <string name="welcome_wifi_pc_found">%1$s bu cihazı buldu. Bilgisayarda Bağlan\'a (ya da \"Yeni cihaz bulundu\" bildirimine) tıklayın, sonra iki ekranda aynı kodu onaylayın.</string>
     <string name="welcome_wifi_none">Cihaz bir Wi-Fi ağına bağlı değil. USB ile bağlanabilirsiniz.</string>
     <string name="auto_open_title">Bilgisayara takılınca otomatik aç</string>
     <string name="auto_open_hint">Bilgisayardaki EkranLink\'te de \"otomatik bağlan\" açık olmalı</string>

@@ -12,7 +12,7 @@ Direction markers: `P` = PC, `T` = tablet/phone (the Android device); `P→T` = 
 
 The PC asks on the broadcast address of every network interface (e.g. 192.168.1.255, or 192.168.42.255 with USB tethering):
 
-- Query (P→T): `"EKRN?"` + `u16 version`
+- Query (P→T): `"EKRN?"` + `u16 version` + (0.5.3+) `16 pcId, str pcName` — the device only uses these to show "*PC name* found this device, click Connect there" when it is not paired with that PC yet; older devices read only the first 5 bytes
 - Reply (T→P, to the sender's address): `"EKRN!"` + `u16 version, u16 tcpPort, str name, str id`
 
 While idle, the tablet sends no packets at all; it only replies when a query arrives.

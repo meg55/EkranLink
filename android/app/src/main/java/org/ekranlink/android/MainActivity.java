@@ -63,7 +63,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
             EkranService s = service;
             if (s != null && (welcome || card)) {
                 Stats.Snapshot snap = s.stats.snapshot();
-                info.update(snap, welcome ? localAddresses() : null);
+                info.update(snap, welcome ? localAddresses() : null, welcome ? s.unpairedPcNearby() : null);
                 if (card) {
                     Log.i("EkranStats", snap.logLine());
                 }

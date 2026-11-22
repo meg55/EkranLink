@@ -1,5 +1,6 @@
 package org.ekranlink.android;
 
+import android.os.SystemClock;
 import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
@@ -15,16 +16,35 @@ import java.net.SocketException;
  * Sadece soru gelince çalışır; boşta hiçbir paket göndermez (pil ve ağ dostu). PC hem ağ yayınıyla hem
  * (daha önce bağlandıysa) doğrudan bu tabletin adresine sorar.
  *
- * Soru:  "EKRN?" + u16 sürüm
+ * Soru:  "EKRN?" + u16 sürüm [+ 16 pcKimlik + str pcAdı (0.5.3+)]
  * Cevap: "EKRN!" + u16 sürüm + u16 tcpPort + str ad + str kimlik
  */
 final class DiscoveryResponder extends Thread {
     private static final String TAG = "EkranDiscovery";
 
+    /** Soran PC (0.5.3+ soruda adını ve kimliğini gönderir). */
+    static final class Asker {
+        final byte[] pcId;
+        final String pcName;
+        final long atMs; // SystemClock.elapsedRealtime
+
+        Asker(byte[] pcId, String pcName, long atMs) {
+            this.pcId = pcId;
+            this.pcName = pcName;
+            this.atMs = atMs;
+        }
+    }
+
     private final String name;
     private final String id;
     private volatile boolean stopped;
     private volatile DatagramSocket socket;
+    private volatile Asker lastAsker;
+
+    /** Son soran PC (yoksa null). */
+    Asker lastAsker() {
+        return lastAsker;
+    }
 
     DiscoveryResponder(String name, String id) {
         super("ekran-discovery");
@@ -64,15 +84,26 @@ final class DiscoveryResponder extends Thread {
             return;
         }
         byte[] reply = buildReply();
-        byte[] buf = new byte[64];
+        byte[] buf = new byte[256];
         DatagramPacket in = new DatagramPacket(buf, buf.length);
         while (!stopped) {
             try {
                 in.setLength(buf.length);
                 socket.receive(in);
-                if (in.getLength() >= 5 && buf[0] == 'E' && buf[1] == 'K' && buf[2] == 'R' && buf[3] == 'N'
+                int n = in.getLength();
+                if (n >= 5 && buf[0] == 'E' && buf[1] == 'K' && buf[2] == 'R' && buf[3] == 'N'
                         && buf[4] == '?') {
                     socket.send(new DatagramPacket(reply, reply.length, in.getSocketAddress()));
+                    // Yalnızca ekranda bir ipucu için: ad temizlenir, kimlik yalnızca eşleşme kaydıyla karşılaştırılır
+                    if (n >= 7 + 16 + 2) {
+                        int nameLen = ((buf[23] & 0xFF) << 8) | (buf[24] & 0xFF);
+                        if (nameLen <= n - 25) {
+                            byte[] pcId = new byte[16];
+                            System.arraycopy(buf, 7, pcId, 0, 16);
+                            String pcName = Session.cleanName(new String(buf, 25, nameLen, "UTF-8"));
+                            lastAsker = new Asker(pcId, pcName, SystemClock.elapsedRealtime());
+                        }
+                    }
                 }
             } catch (IOException e) {
                 if (!stopped) {
