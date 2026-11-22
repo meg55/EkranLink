@@ -1,0 +1,3 @@
+• Three-finger tap opens a menu: connection details, Rotate (turn the screen yourself), Disconnect. Android's navigation buttons appear while it is open; Back closes it.
+• The menu turns with the picture.
+• A hint shows how to open the menu during the first connections.

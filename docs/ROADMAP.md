@@ -246,6 +246,18 @@ MSVC + WDK and signed with a local certificate.
       paired device answers only its paired PCs (and refuses pairing from unknown PCs over the network) unless
       *Add a new computer* was tapped in the last 5 minutes. Verified on the Android 16 emulator: hidden from an
       unknown PC with the hint shown, visible after *Add a new computer* (countdown, PC found it at once).
+- [x] 0.5.4: the virtual display exists only while it is used. The driver is bound to a software device
+      (`SwDeviceCreate`, hardware ID `EkranLinkVD`) that the streaming agent (SYSTEM) creates for the first monitor;
+      Windows removes it 15 s after the last one, or at once if the program exits or crashes, so it is not listed in
+      Device Manager while unused. *Extend* / *Only this* therefore need the service. Driver fixes: device access
+      limited to SYSTEM and administrators, runs from the driver store, thread-safe monitor list and watchdog,
+      monitor contexts cleaned up. Verified on the RTX 2060 PC: device created in 0.4 s, removed after use and
+      within ~1 s when the process was killed.
+- [x] 0.5.4: new pairing window on the PC (same look as the settings window, large code, *Decline* default).
+      Three-finger menu on the device: measurements, *Rotate* / *Auto*, *Disconnect*; Android's navigation
+      buttons show while it is open and *Back* closes it. The menu turns with the picture (`ContentRotation`,
+      message 25). How to open it: a hint at the bottom during the first connections and a line on the welcome
+      screen. Verified on the Android 16 emulator connected to the PC, and the welcome screen on Android 4.2.
 - [ ] Distribution signing (SignPath Foundation or EV + Microsoft) — for now the driver can only be installed on the PC it was built on
 
 Measurement (S6000, USB, Extend 1280×752): PC→drawn on tablet ~27 ms, PC CPU 0.3% with a static screen.

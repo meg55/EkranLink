@@ -1,0 +1,3 @@
+• Üç parmakla dokununca menü açılır: bağlantı bilgileri, Döndür (ekranı elle çevirme), Bağlantıyı kes. Açıkken Android'in gezinme tuşları görünür; Geri kapatır.
+• Menü görüntüyle birlikte döner.
+• İlk bağlantılarda menünün nasıl açılacağını gösteren bir ipucu çıkar.

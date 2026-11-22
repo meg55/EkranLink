@@ -245,6 +245,18 @@ MSVC + WDK ile derlenip yerel sertifikayla imzalanıyor.
       son 5 dakikada *Yeni bilgisayar ekle*'ye dokunulduysa herkese açıktır. Android 16 öykünücüsünde doğrulandı:
       tanımadığı PC'den gizli ve ipucu görünüyor, *Yeni bilgisayar ekle*'den sonra görünür (geri sayım, PC hemen
       buldu).
+- [x] 0.5.4: sanal ekran yalnızca kullanılırken var. Sürücü, yayını yapan ajanın (SYSTEM) ilk monitörde
+      oluşturduğu bir yazılım aygıtına bağlanır (`SwDeviceCreate`, donanım kimliği `EkranLinkVD`); son monitörden
+      15 sn sonra, program kapanır ya da çökerse hemen Windows kaldırır, kullanılmazken Aygıt Yöneticisi'nde
+      görünmez. Bu yüzden *İkinci ekran* / *Tek ekran* hizmet ister. Sürücü düzeltmeleri: aygıta yalnızca SYSTEM ve
+      yöneticiler erişir, sürücü deposundan çalışır, monitör listesi ve bekçi köpeği iş parçacıklarına karşı
+      korunur, monitör bağlamları temizlenir. RTX 2060'lı PC'de doğrulandı: aygıt 0,4 sn'de oluştu, iş bitince ve
+      süreç öldürülünce ~1 sn'de kalktı.
+- [x] 0.5.4: PC'de yeni eşleştirme penceresi (ayar penceresiyle aynı görünüm, büyük kod, varsayılan *Reddet*).
+      Cihazda üç parmak menüsü: ölçümler, *Döndür* / *Otomatik*, *Bağlantıyı kes*; açıkken Android'in gezinme
+      tuşları görünür, *Geri* kapatır. Menü görüntüyle birlikte döner (`ContentRotation`, 25 numaralı mesaj). Nasıl
+      açılacağı: ilk bağlantılarda alt ortada ipucu, karşılama ekranında satır. PC'ye bağlı Android 16
+      öykünücüsünde, karşılama ekranı Android 4.2'de doğrulandı.
 - [ ] Dağıtım imzası (SignPath Foundation veya EV + Microsoft) — şu an sürücü yalnızca derlendiği bilgisayarda kurulabiliyor
 
 Ölçüm (S6000, USB, ikinci ekran 1280×752): PC→tablette çizim ~27 ms, ekran sabitken PC CPU %0,3.
