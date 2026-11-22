@@ -17,7 +17,7 @@ the release notes if they wish.
 
 We are especially interested in:
 
-- Wi-Fi pairing and encryption (ECDH P-256 + ChaCha20-Poly1305, [docs/PROTOCOL.md](docs/PROTOCOL.md)): an
+- Pairing (USB and Wi-Fi) and encryption (ECDH P-256 + ChaCha20-Poly1305, [docs/PROTOCOL.md](docs/PROTOCOL.md)): an
   unpaired device receiving the picture or sending input
 - Privilege escalation through the communication between the service and the user session (registry)
 - Commands sent to the virtual display driver (`driver/`)
@@ -60,7 +60,7 @@ bildirene, isterse sürüm notlarında teşekkür edilir.
 
 Özellikle ilgilendiklerimiz:
 
-- Wi-Fi eşleştirme ve şifreleme (ECDH P-256 + ChaCha20-Poly1305, [docs/PROTOCOL.tr.md](docs/PROTOCOL.tr.md)):
+- Eşleştirme (USB ve Wi-Fi) ve şifreleme (ECDH P-256 + ChaCha20-Poly1305, [docs/PROTOCOL.tr.md](docs/PROTOCOL.tr.md)):
   eşleşmemiş bir cihazın görüntü alması ya da girdi göndermesi
 - Hizmet ile kullanıcı oturumu arasındaki iletişim (kayıt defteri) üzerinden yetki yükseltme
 - Sanal ekran sürücüsüne gönderilen komutlar (`driver/`)

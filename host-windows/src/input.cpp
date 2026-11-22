@@ -134,11 +134,7 @@ void TouchInjector::cancelOwnLocked() {
         if (h.slots[i].owner == this) h.injectLocked(i, kCancel);
 }
 
-void TouchInjector::setMode(Mode mode) {
-    std::lock_guard<std::mutex> lock(hub().m);
-    if (mode == Mode::Touch && !touchInjectionReady()) mode = Mode::Mouse;
-    if (mode == mode_) return;
-    // Yarım kalan dokunma ya da basılı sol tuş Windows'ta takılı kalmasın
+void TouchInjector::releaseLocked() {
     cancelOwnLocked();
     if (mouseDown_) {
         INPUT in{};
@@ -147,13 +143,20 @@ void TouchInjector::setMode(Mode mode) {
         SendInput(1, &in, sizeof in);
         mouseDown_ = false;
     }
+}
+
+void TouchInjector::setMode(Mode mode) {
+    std::lock_guard<std::mutex> lock(hub().m);
+    if (mode == Mode::Touch && !touchInjectionReady()) mode = Mode::Mouse;
+    if (mode == mode_) return;
+    releaseLocked();  // yarım kalan dokunma ya da basılı sol tuş Windows'ta takılı kalmasın
     mode_ = mode;
     logf("Dokunma: %s", mode_ == Mode::Touch ? "dokunmatik ekran" : "fare");
 }
 
 TouchInjector::~TouchInjector() {
     std::lock_guard<std::mutex> lock(hub().m);
-    cancelOwnLocked();  // yarım kalan dokunma Windows'ta takılı kalmasın
+    releaseLocked();  // bağlantı sürükleme sırasında koptu: dokunma / sol tuş Windows'ta takılı kalmasın
 }
 
 void TouchInjector::setMapping(RECT desktop, RECT content, int imageW, int imageH, Orientation orient) {

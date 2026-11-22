@@ -70,15 +70,25 @@ The plan and measurements are in [docs/ROADMAP.md](docs/ROADMAP.md); tested devi
 
 1. **PC:** download `EkranLink-<version>-windows-setup.exe` from [Releases](https://github.com/meg55/EkranLink/releases)
    and install it. To try it without installing, unzip `EkranLink-<version>-windows.zip` and run `EkranLink.exe`.
-   A settings window opens and an icon appears next to the clock.
+   A settings window opens and the EkranLink icon appears in the notification area (on Windows 11 it may be
+   hidden under the **^** arrow). Releases are not code-signed yet, so Windows may show *Windows protected your
+   PC*: click *More info > Run anyway*.
 2. **Device:** install `EkranLink-<version>-android.apk` on the tablet or phone (open the download on the
-   device, or copy it over USB and open it with a file manager). The PC never installs apps on the device.
-   For USB, turn on *Developer options > USB debugging* on the device.
+   device, or copy it over USB and open it with a file manager). Android asks you to allow installing apps from
+   that browser or file manager, and Play Protect may warn about an unknown app: allow it and choose *Install
+   anyway*. The PC never installs apps on the device.
+   For USB, turn on *Developer options > USB debugging* on the device (no *Developer options*? Tap
+   *Settings > About phone/tablet > Build number* 7 times) and tap *Allow* when the device asks *Allow USB
+   debugging?*.
 3. **Connect:** open EkranLink on the device. Plug in the USB cable, or join the same Wi-Fi network as the PC.
    The PC finds the device by itself (USB first). The first time, confirm the 6-digit code on both
-   screens; a new device on Wi-Fi is connected with *Connect* in the window.
+   screens. A new device on Wi-Fi shows up in the window and as a notification: click *Connect* (or the
+   notification).
 
-Three-finger tap on the device shows or hides the performance overlay.
+> **For now EkranLink mirrors.** *Extend* and *Only this* need the virtual display driver, which ships once it
+> is code-signed (see [Code signing policy](#code-signing-policy)).
+
+Three-finger tap on the device shows or hides the performance overlay and its *Disconnect* button.
 
 ## Using EkranLink
 
@@ -87,7 +97,8 @@ connected and come back when it leaves) and *Mirror*. When Windows turns the scr
 screen goes dark too.
 
 **Orientation and resolution** (*Display* page): with *Automatic*, turning the device upright turns the
-Windows monitor portrait (auto-rotate must be on on the device). The resolution list is the same as in
+Windows monitor portrait. This needs *Auto-rotate* on the device; then the device's own screen turns too.
+With *Auto-rotate* off, the device stays landscape, like a monitor. The resolution list is the same as in
 Windows Settings > Display, with the device's own resolution marked *(Recommended)*. Changes made in
 either place show up in the other and are remembered per device.
 
@@ -270,16 +281,26 @@ Plan ve ölçümler: [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md) · Test edilen cih
 
 1. **Bilgisayar:** [Sürümler](https://github.com/meg55/EkranLink/releases) sayfasından
    `EkranLink-<sürüm>-windows-setup.exe`'yi indirip kurun. Kurmadan denemek için
-   `EkranLink-<sürüm>-windows.zip`'i açıp `EkranLink.exe`'yi çalıştırın. Ayar penceresi açılır ve saatin
-   yanında bir simge belirir.
+   `EkranLink-<sürüm>-windows.zip`'i açıp `EkranLink.exe`'yi çalıştırın. Ayar penceresi açılır ve EkranLink
+   simgesi bildirim alanında belirir (Windows 11'de **^** okunun altında gizli olabilir). Sürümler henüz kod
+   imzalı olmadığından Windows *Windows bilgisayarınızı korudu* diyebilir: *Ek bilgi > Yine de çalıştır*'a
+   tıklayın.
 2. **Cihaz:** `EkranLink-<sürüm>-android.apk` dosyasını tablete ya da telefona kurun (cihazda indirip açın
-   ya da USB ile kopyalayıp dosya yöneticisinden açın). Bilgisayar cihaza uygulama kurmaz. USB için
-   cihazda *Geliştirici seçenekleri > USB hata ayıklama* açık olmalı.
+   ya da USB ile kopyalayıp dosya yöneticisinden açın). Android o tarayıcıdan ya da dosya yöneticisinden
+   uygulama yüklemeye izin vermenizi ister, Play Protect de bilinmeyen uygulama uyarısı gösterebilir: izin
+   verip *Yine de yükle*'yi seçin. Bilgisayar cihaza uygulama kurmaz.
+   USB için cihazda *Geliştirici seçenekleri > USB hata ayıklama*'yı açın (*Geliştirici seçenekleri* yoksa:
+   *Ayarlar > Telefon/Tablet hakkında > Yapı numarası*'na 7 kez dokunun) ve cihaz *USB hata ayıklamaya izin
+   verilsin mi?* diye sorunca *İzin ver*'e dokunun.
 3. **Bağlanın:** cihazda EkranLink'i açın. USB kablosunu takın ya da bilgisayarla aynı Wi-Fi ağına bağlanın.
    Bilgisayar cihazı kendiliğinden bulur (önce USB). İlk seferde iki ekranda görünen 6 haneli kodu
-   onaylayın; Wi-Fi'deki yeni bir cihaza pencereden *Bağlan* ile bağlanılır.
+   onaylayın. Wi-Fi'deki yeni bir cihaz pencerede ve bildirim olarak görünür: *Bağlan*'a (ya da bildirime)
+   tıklayın.
 
-Cihazda üç parmakla dokunmak ölçüm kartını gösterir ya da gizler.
+> **Şimdilik EkranLink yansıtır.** *İkinci ekran* ve *Tek ekran* için sanal ekran sürücüsü gerekir; sürücü kod
+> imzası tamamlanınca gelecek (bkz. [Kod imzalama politikası](#kod-imzalama-politikası-code-signing-policy)).
+
+Cihazda üç parmakla dokunmak ölçüm kartını ve *Bağlantıyı kes* düğmesini gösterir ya da gizler.
 
 ## Kullanım
 
@@ -287,7 +308,8 @@ Cihazda üç parmakla dokunmak ölçüm kartını gösterir ya da gizler.
 kapanır, cihaz ayrılınca geri gelir) ve *Yansıtma*. Windows ekranı kapatınca cihazın ekranı da kararır.
 
 **Yön ve çözünürlük** (*Görüntü* sayfası): *Otomatik*te cihazı dik çevirmek Windows'taki monitörü de dikey
-yapar (cihazda *Otomatik döndür* açık olmalı). Çözünürlük listesi Windows Ayarlar > Ekran'daki listenin
+yapar. Bunun için cihazda *Otomatik döndür* açık olmalı; o zaman cihazın kendi ekranı da döner. *Otomatik
+döndür* kapalıyken cihaz monitör gibi yatay kalır. Çözünürlük listesi Windows Ayarlar > Ekran'daki listenin
 aynısıdır; cihazın kendi çözünürlüğü *(Önerilen)* diye işaretlidir. İki yerden birinde yapılan değişiklik
 diğerinde de görünür ve cihaz başına hatırlanır.
 
@@ -374,8 +396,7 @@ Visual Studio gerekmez (sürücü: MSVC + WDK, bkz. [driver/README.tr.md](driver
 .\host-windows\build\ekranlink-test.exe     # şifreleme test vektörleri (RFC 8439)
 ```
 
-Her yükleme [GitHub Actions](.github/workflows/derle.yml) ile derlenir. Tanı için ham akış testi:
-`.\tools\faz0.ps1` (ffmpeg gerekir).
+Her yükleme [GitHub Actions](.github/workflows/derle.yml) ile derlenir.
 
 ## Depo yapısı
 

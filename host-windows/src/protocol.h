@@ -39,7 +39,13 @@ enum Msg : uint8_t {
 
 enum PcHelloFlags : uint8_t {
     kWantPlain = 1,  // USB: PC→cihaz görüntüsü şifresiz olsun (cihaz yalnızca yerel bağlantıda kabul eder)
+    // PC oturum boyunca (cihaz uygulaması arka plandayken de) en az 2 sn'de bir Ping gönderir; cihaz 15 sn hiçbir
+    // şey alamazsa bağlantıyı kapatabilir (PC uyudu / ağdan düştü). Eski PC'ler göndermez, cihaz beklemez.
+    kPingsAlways = 2,
 };
+
+// PC bu kadar süre cihazdan hiçbir şey (Pong dahil) alamazsa bağlantıyı kapatır
+constexpr int kSilenceTimeoutMs = 15000;
 
 // Cihazdan gelen ad: denetim karakterleri (sekme, satır sonu, NUL) atılır, en çok 64 bayt (UTF-8 harfi bölmeden).
 // Ad soruda, günlükte ve kayıt defterindeki cihaz listesinde (sekmeyle ayrılmış) görünür.

@@ -51,8 +51,8 @@ cd android; .\gradlew.bat assembleDebug    # Android only (needs JDK 17+; Androi
 
 There are no other automated tests. Behaviour is verified on real hardware: run
 `host-windows\build\ekranlink-host.exe` (console, per-second latency / bitrate / fps), use `adb shell input
-tap x y` to check touch mapping, `tools/sayac.html` for latency, and `tools/faz0.ps1` for a raw-stream test.
-Test devices so far: Lenovo S6000 (Android 4.2.2, MediaTek decoder) and the Android 16 emulator. A change that
+tap x y` to check touch mapping, `tools/sayac.html` for latency.
+Test devices so far: Lenovo S6000 (Android 4.2.2, MediaTek decoder), realme RMX3910 (Android 15 phone) and the Android 16 and 4.2 emulators. A change that
 compiles is not a change that works: say what you verified and what you could not.
 
 ## Hard rules
@@ -104,14 +104,12 @@ compiles is not a change that works: say what you verified and what you could no
 | arka plan (`--arka-plan`) | background (start without opening the window) |
 | ayarlar, `Ayarlar` | settings (registry key in service mode) |
 | bağlan / bağlantıyı kes | connect / disconnect |
-| BENIOKU | README (text file in the zip) |
 | cihaz, `Cihazlar` | device, device list (registry value) |
 | çözücü / kodlayıcı | decoder / encoder |
 | çözünürlük | resolution |
 | derle, derleme | build |
 | durum, `Durum` | status (registry key written by the agent) |
 | eşleşme, eşleştirme | pairing |
-| faz0 | phase 0 (raw H.264 stream test) |
 | `Gizli` | secret (registry key, SYSTEM only) |
 | günlük | log |
 | hizmet (`--hizmet`) | Windows service |

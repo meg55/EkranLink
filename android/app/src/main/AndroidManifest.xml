@@ -24,9 +24,10 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard|navigation"
             android:exported="true"
             android:launchMode="singleTask"
-            android:screenOrientation="user">
-            <!-- Pencere cihazla birlikte döner; dikey pencerede görüntü çevrilir (MainActivity.onWindowShape).
-                 Android 6.0 öncesinde çözücü çeviremez: orada MainActivity yatay kilitler. -->
+            android:screenOrientation="sensorLandscape">
+            <!-- Otomatik döndürme açıksa (Android 6.0+) MainActivity pencereyi cihazla birlikte döndürür; dikey
+                 pencerede görüntü çevrilir (onWindowShape). Kapalıysa monitör gibi yatay kalır. Android 16+ büyük
+                 ekranlarda bu kilit yok sayılabilir; dikey pencere yine doğru çizilir. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

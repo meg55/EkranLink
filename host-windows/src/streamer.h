@@ -44,7 +44,14 @@ struct Options {
 enum class DisplayMode { Extend = 0, Only = 1, Mirror = 2 };
 
 // Kullanıcının bir şey yapması gereken durumlar (metni arayüz kendi dilinde yazar, i18n.h)
-enum class Notice { AppMissing = 1, TabletOutdated = 2, PcOutdated = 3, Repair = 4 /* arg: cihaz adı */ };
+enum class Notice {
+    AppMissing = 1,
+    TabletOutdated = 2,
+    PcOutdated = 3,
+    Repair = 4,        // arg: cihaz adı
+    PairDeclined = 5,  // cihazda onaylanmadı ya da süresi doldu; arg: cihaz adı
+    NewDevice = 6,     // ağda eşleşmemiş yeni cihaz; arg: "anahtar\tad" (bildirime tıklayınca bağlanılır)
+};
 
 enum class DeviceState {
     Found = 0,       // bağlanılabilir
@@ -52,6 +59,7 @@ enum class DeviceState {
     Connected = 2,
     WaitingApp = 3,  // USB: cihazdaki "otomatik aç" kapalı ya da kullanıcı cihazdan kesti; cihazda açılması bekleniyor
     AppMissing = 4,  // USB: cihazda EkranLink yok
+    Unauthorized = 5,  // USB: cihazda "USB hata ayıklamaya izin verilsin mi?" sorusu onaylanmadı
 };
 
 struct DeviceInfo {
@@ -64,6 +72,7 @@ struct DeviceInfo {
     DisplayMode mode = DisplayMode::Extend;
     int width = 0, height = 0;  // cihazın ekranı (akış boyutu) = önerilen çözünürlük
     std::wstring gdiName;       // ikinci ekranda sanal monitörün Windows adı (\\.\DISPLAYn), yansıtmada boş
+    bool paused = false;        // cihazda uygulama arka planda: görüntü duraklatıldı
     bool operator==(const DeviceInfo&) const = default;
 };
 
@@ -141,6 +150,7 @@ private:
     std::map<std::string, int64_t> resume_;
     std::set<std::string> held_;             // kullanıcı bağlantısını kesti: otomatik bağlanma
     std::map<std::string, unsigned> usbPorts_;      // USB seri → PC'deki yerel port (adb forward)
+    std::set<std::string> announced_;               // "yeni cihaz bulundu" bildirimi gösterilen Wi-Fi cihazları
     std::vector<DeviceInfo> published_;
     int64_t nextUsbPollUs_ = 0, usbBurstUntilUs_ = 0, nextWifiUs_ = 0;
     int64_t pairQuietUntilUs_ = 0;  // ret sonrası: kendiliğinden eşleştirme sorusu açılmaz

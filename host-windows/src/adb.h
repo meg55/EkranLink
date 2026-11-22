@@ -19,7 +19,8 @@ bool run(const std::wstring& adbPath, const std::wstring& args, std::string* out
 
 // USB'de hata ayıklaması açık (yetkili) cihazların seri numaraları (sessiz; tek adb çağrısı).
 // Sonraki komutlar seri numarasıyla o cihaza gider; [A-Za-z0-9._:-] dışında karakter içerenler atlanır.
-std::vector<std::string> devices(const std::wstring& adbPath);
+// unauthorized: cihazda "USB hata ayıklamaya izin verilsin mi?" sorusu henüz onaylanmamış olanlar.
+std::vector<std::string> devices(const std::wstring& adbPath, std::vector<std::string>* unauthorized = nullptr);
 
 // Cihazda EkranLink uygulaması kurulu mu. PC uygulama kurmaz: APK ayrıca indirilip cihaza kurulur.
 enum class App { Installed, Missing, Unknown };

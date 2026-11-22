@@ -190,7 +190,8 @@ void writeDevices(const std::vector<DeviceInfo>& list) {
     auto dword = [&](const wchar_t* name, DWORD v) {
         RegSetValueExW(k, name, 0, REG_DWORD, reinterpret_cast<const BYTE*>(&v), sizeof v);
     };
-    // Satır: anahtar, durum, ad, bağlantı, kimlik, görüntü modu, genişlik, yükseklik, GDI adı (sekmeyle ayrılır)
+    // Satır: anahtar, durum, ad, bağlantı, kimlik, görüntü modu, genişlik, yükseklik, GDI adı, duraklatıldı
+    // (sekmeyle ayrılır)
     std::vector<std::wstring> lines;
     DWORD connected = 0;
     const DeviceInfo* first = nullptr;
@@ -198,7 +199,8 @@ void writeDevices(const std::vector<DeviceInfo>& list) {
         wchar_t nums[64];
         swprintf(nums, 64, L"%d\t%d\t%d", int(d.mode), d.width, d.height);
         lines.push_back(widen(d.key) + L"\t" + std::to_wstring(int(d.state)) + L"\t" + widen(d.name) + L"\t" +
-                        widen(d.link) + L"\t" + widen(d.deviceId) + L"\t" + nums + L"\t" + d.gdiName);
+                        widen(d.link) + L"\t" + widen(d.deviceId) + L"\t" + nums + L"\t" + d.gdiName + L"\t" +
+                        (d.paused ? L"1" : L"0"));
         if (d.state == DeviceState::Connected) {
             connected++;
             if (!first) first = &d;
@@ -239,6 +241,7 @@ bool readDevices(std::vector<DeviceInfo>& list) {
         d.width = _wtoi(f[6].c_str());
         d.height = _wtoi(f[7].c_str());
         d.gdiName = f[8];
+        d.paused = f.size() > 9 && f[9] == L"1";
         list.push_back(std::move(d));
     }
     return true;

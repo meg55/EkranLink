@@ -34,7 +34,7 @@ UINT64 pack(UINT32 hi, UINT32 lo) { return (UINT64(hi) << 32) | lo; }
 
 bool Encoder::init(ID3D11Device* device, unsigned vendorId, int width, int height, int fps, int kbps,
                    OutputFn onOutput) {
-    fps_ = fps;
+    fps_ = std::max(1, fps);
     onOutput_ = std::move(onOutput);
     wake_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
 
@@ -183,8 +183,11 @@ bool Encoder::submit(ID3D11Texture2D* nv12, int64_t ptsUs, bool forceKey) {
         codecApi_->SetValue(&CODECAPI_AVEncVideoForceKeyFrame, &v);
     }
 
+    // Hak yalnızca kare kabul edilince düşer: reddedilen karede kodlayıcı yeni istek göndermez, sayaç sıfırda
+    // kalsaydı görüntü kalıcı olarak donardı
+    if (!check(mft_->ProcessInput(inId_, sample.get(), 0), "ProcessInput")) return false;
     needInput_--;
-    return check(mft_->ProcessInput(inId_, sample.get(), 0), "ProcessInput");
+    return true;
 }
 
 void Encoder::eventLoop() {
@@ -252,16 +255,17 @@ void Encoder::drainOutput() {
 }
 
 void Encoder::shutdown() {
-    if (!mft_) return;
-    running_ = false;
-    ComPtr<IMFShutdown> sd;
-    if (SUCCEEDED(mft_.as(sd))) sd->Shutdown();  // GetEvent'i MF_E_SHUTDOWN ile uyandırır
-    if (thread_.joinable()) thread_.join();
-    events_.reset();
-    codecApi_.reset();
-    mft_.reset();
-    devManager_.reset();
-    if (wake_) {
+    if (mft_) {
+        running_ = false;
+        ComPtr<IMFShutdown> sd;
+        if (SUCCEEDED(mft_.as(sd))) sd->Shutdown();  // GetEvent'i MF_E_SHUTDOWN ile uyandırır
+        if (thread_.joinable()) thread_.join();
+        events_.reset();
+        codecApi_.reset();
+        mft_.reset();
+        devManager_.reset();
+    }
+    if (wake_) {  // kurulum yarıda kaldıysa da (mft_ yokken) olay kapatılır
         CloseHandle(wake_);
         wake_ = nullptr;
     }

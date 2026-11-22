@@ -578,6 +578,7 @@ void Window::deviceCard(int index) {
         drawText(d.name, fSection_.get(), x_ + 20, ty, w_ - 20 - bw - 12, t.text);
         button(x_ + w_ - bw, top, {btn, false, true, [this, index] { host_->act(Act::Disconnect, index); }});
         y_ = std::max(ty + th, top + kControlH) + 12;
+        if (d.paused) y_ += drawText(W(i18n::StatePaused), fHint_.get(), x_, y_, w_, t.warn) + 10;
         std::wstring link = d.link;
         if (link.rfind(L"Wi-Fi", 0) == 0) link += std::wstring(L", ") + W(i18n::Encrypted);
         keyValue(W(i18n::RowLink), link);
@@ -605,19 +606,25 @@ void Window::deviceCard(int index) {
 void Window::foundRow(int index) {
     const Theme& t = theme_;
     const DeviceView& d = model_.devices[size_t(index)];
-    const std::wstring btn = W(i18n::Connect);
     const bool missing = d.state == DeviceState::AppMissing;
-    const float bw = missing ? 0 : buttonWidth(btn);
+    const bool unauthorized = d.state == DeviceState::Unauthorized;
+    // Uygulama yoksa düğme indirme sayfasını açar; USB izni bekleniyorsa düğme yok (izin cihazda verilir)
+    const std::wstring btn = W(missing ? i18n::DownloadApp : i18n::Connect);
+    const float bw = unauthorized ? 0 : buttonWidth(btn);
     const float tw = w_ - bw - 16, top = y_;
     float h = drawText(d.name, fLabel_.get(), x_, y_, tw, t.text);
     const wchar_t* state = W(d.state == DeviceState::Connecting   ? i18n::StateConnecting
                              : d.state == DeviceState::WaitingApp ? i18n::StateWaitingApp
                              : missing                            ? i18n::StateAppMissing
+                             : unauthorized                       ? i18n::StateUnauthorized
                                                                   : i18n::StateFound);
     h += 2 + drawText(d.link + L" · " + state, fHint_.get(), x_, y_ + h + 2, tw,
-                      missing || d.state == DeviceState::WaitingApp ? t.warn : t.sub);
+                      missing || unauthorized || d.state == DeviceState::WaitingApp ? t.warn : t.sub);
     const float rowH = std::max(h, kControlH);
-    if (!missing)
+    if (missing)
+        button(x_ + w_ - bw, top + (rowH - kControlH) / 2,
+               {btn, false, true, [this] { host_->act(Act::DownloadApp, 0); }});
+    else if (!unauthorized)
         button(x_ + w_ - bw, top + (rowH - kControlH) / 2,
                {btn, true, d.state != DeviceState::Connecting, [this, index] { host_->act(Act::Connect, index); }});
     y_ = top + rowH + kRowGap;
@@ -658,17 +665,23 @@ void Window::statusPage() {
         card(
             [&] {
                 const bool missing = m.notice == Notice::AppMissing, tabletOld = m.notice == Notice::TabletOutdated,
-                           repair = m.notice == Notice::Repair;
+                           repair = m.notice == Notice::Repair, declined = m.notice == Notice::PairDeclined;
                 y_ += drawText(W(missing     ? i18n::NoticeAppMissingTitle
                                  : tabletOld ? i18n::NoticeTabletOldTitle
                                  : repair    ? i18n::NoticeRepairTitle
+                                 : declined  ? i18n::NoticePairDeclinedTitle
                                              : i18n::NoticePcOldTitle),
                                fSection_.get(), x_, y_, w_, t.warn) + 4;
                 const std::wstring body = missing     ? W(i18n::NoticeAppMissing)
                                           : tabletOld ? W(i18n::NoticeTabletOld)
                                           : repair    ? i18n::F(i18n::NoticeRepair, m.noticeArg.c_str())
+                                          : declined  ? i18n::F(i18n::NoticePairDeclined, m.noticeArg.c_str())
                                                       : i18n::F(i18n::NoticePcOld, m.noticeArg.c_str());
                 y_ += drawText(body, fBody_.get(), x_, y_, w_, t.text) + kRowGap;
+                if (missing || tabletOld) {
+                    button(x_, y_ - kRowGap + 10, {W(i18n::DownloadApp), true, true, [this] { host_->act(Act::DownloadApp, 0); }});
+                    y_ += kControlH + 10;
+                }
             },
             true);
     }
@@ -678,7 +691,9 @@ void Window::statusPage() {
             y_ += drawText(W(i18n::StepsTitle), fSection_.get(), x_, y_, w_, t.text) + 8;
             for (i18n::Str s : {i18n::StepApp, i18n::StepUsb, i18n::StepWifi})
                 y_ += drawText(W(s), fBody_.get(), x_, y_, w_, t.text) + 6;
-            y_ += kRowGap - 6;
+            y_ += 6;
+            button(x_, y_, {W(i18n::DownloadApp), false, true, [this] { host_->act(Act::DownloadApp, 0); }});
+            y_ += kControlH + kRowGap;
         });
     } else {
         std::vector<Button> list;

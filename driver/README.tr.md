@@ -42,7 +42,7 @@ Gerekenler: Visual Studio Build Tools (MSVC x64) + WDK 10.0.26100. MSBuild'in s�
 ```powershell
 .\build.ps1      # out\EkranLinkVD.dll + ekranlinkvd.inf
 .\kur.ps1        # yönetici: imzala + güven + kök aygıtı oluştur (host-windows\build\ekranlink-surucu.exe gerekir)
-.\kaldir.ps1     # yönetici: aygıt, sürücü paketi, sertifika ve ayarları tamamen kaldırır
+.\kaldir.ps1     # yönetici: aygıtı, sürücü paketini, sertifikayı ve sürücü ayarlarını kaldırır (eşleşmeler kalır)
 ```
 
 **İmza:** UMDF sürücüsü olduğu için Windows test modu gerekmez. `kur.ps1` her seferinde yeni bir kod

@@ -53,6 +53,11 @@ Tablet PC'nin sürümünü desteklemiyorsa `TabletKey` yerine `Incompatible` (24
 `u16 tabletinSürümü, str uygulamaSürümü` (şifresiz çerçeve) ve bağlantıyı kapatır. İki taraf da
 kullanıcıya hangi uygulamanın güncelleneceğini söyler (PC tablete uygulama kurmaz; ikisi ayrı indirilir).
 
+- `bayrak` (PcHello): bit0 = PC görüntüyü şifresiz göndermek istiyor (yalnızca yerel USB bağlantısında kabul
+  edilir); bit1 = PC oturum boyunca, tablet uygulaması arka plandayken de en geç 2 sn'de bir `Ping` gönderir
+  (0.5.3+). bit1 varsa tablet PC'den 15 sn hiçbir çerçeve gelmezse bağlantıyı kapatır (PC uyudu ya da ağdan
+  düştü). PC de tabletten 15 sn hiçbir çerçeve (`Pong` dahil) gelmezse bağlantıyı kapatır; her tablet `Ping`'e
+  cevap verdiğinden bu, tabletin sürümünden bağımsızdır.
 - `ecdh*`: geçici ECDH P-256 açık anahtarı (`04 || X || Y`), her bağlantıda yenisi üretilir.
   Tablet gelen noktanın eğri üzerinde olduğunu doğrular; Windows CNG içe aktarırken doğrular.
 - `taahhüt` = SHA-256(nonceP). PC rastgele değerini önce taahhüt eder, `Mode`'da açıklar; tablet tutmazsa
@@ -94,19 +99,19 @@ kalır. Tablet, yerel olmayan bir bağlantıdan gelen `şifresizGörüntü = 1` 
 | 1 | Hello | T→P | `u16 sürüm, u16 yüzeyGen, u16 yüzeyYük, u16 ekranGen, u16 ekranYük, u16 dpi, u16 sdk, str model, str çözücü` |
 | 2 | Config | P→T | `u16 akışGen, u16 akışYük, u8 codec(1=H.264), u16 kaynakGen, u16 kaynakYük, u16 içerikX, u16 içerikY, u16 içerikGen, u16 içerikYük` |
 | 3 | Video | P→T | `u64 pts(µs, PC saati), u8 bayrak(bit0 anahtar kare, bit1 itici kare), ... tek karenin Annex-B verisi` |
-| 4 | Ping | P→T | `u64 zaman` |
+| 4 | Ping | P→T | `u64 zaman` — saniyede bir (aynı zamanda canlılık denetimi, bkz. `bayrak` bit1) |
 | 5 | Pong | T→P | `u64 zaman` (Ping'deki değer aynen) |
 | 6 | FrameAck | T→P | `u64 pts, u32 çözmeSüresi(µs), u16 adet` — son çizilen kare; `adet` bu onayın kapsadığı kare sayısı (hareket sürerken 3'te bir, çözücü boşalınca hemen gönderilir; yoksa 1) |
 | 7 | CursorShape | P→T | `u16 gen, u16 yük, u16 sıcakX, u16 sıcakY, gen×yük adet u32 ARGB` |
 | 8 | CursorPos | P→T | `s16 x, s16 y, u8 görünür` — imlecin sol üstü, kaynak görüntü pikseli |
 | 10 | Touch | T→P | `u8 eylem(0 bas,1 kaydır,2 bırak,3 iptal), u8 parmak, u16 x, u16 y, u16 basınç(0–1024)` — akış pikseli; her parmak ayrı `parmak` kimliğiyle, `iptal` tüm parmakları iptal eder |
-| 11 | Orientation | T→P | `u16 derece` (0, 90, 270) — tabletin tutuluş yönü, yatay ekrana göre saat yönünde. Yalnızca tabletin otomatik döndürmesi açıkken, bağlanınca ve yön değişince gönderilir |
+| 11 | Orientation | T→P | `u16 derece` (0, 90, 270) — tabletin tutuluş yönü, yatay ekrana göre saat yönünde. Bağlanınca ve yön değişince gönderilir: tabletin otomatik döndürmesi açıksa algılayıcıdan, kapalıysa yalnızca pencerenin kendisi dikeyse (Android'in yatay kilidi yok saydığı büyük ekranlar) |
 | 12 | DisplayPower | P→T | `u8 açık` — Windows ekranları kapattı (0) / açtı (1). Tablet kararır ve ekranının kendi zaman aşımıyla kapanmasına izin verir; bağlantı sürer. Açılınca tablet ekranını yakar |
 | 13 | KeyRequest | T→P | (boş) — tablet çözücüsünü yeniden kurdu (yüzeyi yok olup geri geldi); PC anahtar kare gönderir ve onay sayacını sıfırlar |
 | 14 | VideoVisible | T→P | `u8 önde` — tablet uygulaması arka plana alındı (0) / öne geldi (1). Arkadayken PC yakalama ve kodlamayı durdurur, bağlantı sürer; öne gelince tablet `KeyRequest` gönderir. Arkadayken PC tablet ekranını kapatmaz |
 | 20–24 | PcHello, TabletKey, Mode, PairResult, Incompatible | | yukarıda |
 
-Tablet ilk 4 bayt `"EKRN"` değilse akışı ham H.264 Annex-B kabul eder (tanı modu, `tools/faz0.ps1`).
+Tablet ilk 4 bayt `"EKRN"` değilse akışı ham H.264 Annex-B kabul eder (tanı modu: ör. `adb forward tcp:27183 tcp:27183`, sonra ffmpeg ile `-f h264 tcp://127.0.0.1:27183`).
 
 ### İçerik dikdörtgeni
 

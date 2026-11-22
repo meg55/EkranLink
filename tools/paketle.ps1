@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     Windows paketi: EkranLink.exe (bildirim alanı), ekranlink-host.exe (konsol), adb\ (Android SDK platform-tools'tan),
-    BENIOKU.txt. Zip kurulum gerektirmez; zip'i açıp EkranLink.exe'yi çalıştırın. Kurulum programı Inno Setup 6 ile
+    README.txt (iki dilli). Zip kurulum gerektirmez; zip'i açıp EkranLink.exe'yi çalıştırın. Kurulum programı Inno Setup 6 ile
     derlenir (host-windows\installer\EkranLink.iss); Inno Setup yoksa atlanır (CI'da hata).
     Tablet uygulaması pakette yok: PC tablete uygulama kurmaz, APK ayrıca indirilip tablete kurulur.
 
@@ -74,49 +74,76 @@ foreach ($f in 'adb.exe', 'AdbWinApi.dll', 'AdbWinUsbApi.dll', 'NOTICE.txt') {
 Copy-Item (Join-Path $kok 'LICENSE') $hedef
 
 @"
-EkranLink $versionName — Android tablet ve telefonunuzu bilgisayar ekranı yapın
-===========================================================
+EkranLink $versionName - your Android tablet or phone as a PC display
+=====================================================================
+English first, Türkçesi aşağıda.
 
-Kurulum gerekmez. EkranLink.exe'yi çalıştırın: ayar penceresi açılır (soldaki menü: Durum, Bağlantı,
-Görüntü, Dokunma ve performans, Genel), saatin yanında bir monitör simgesi belirir. Pencereyi kapatmak EkranLink'i kapatmaz; simgeye tıklayınca yeniden açılır (sağ tık: menü, çıkış).
-Dil: pencerede Genel > Dil (Sistem / Türkçe / English). Tablet ve telefon cihazın dilini kullanır.
+ENGLISH
 
-TABLET UYGULAMASI (ayrı indirilir)
-  Tablete EkranLink-$versionName-android.apk dosyasını kurun: tabletin tarayıcısıyla indirip açın ya da
-  USB ile tablete kopyalayıp dosya yöneticisinden açın. Tablet "bilinmeyen kaynaklardan yükleme"
-  izni isteyebilir. İki uygulamanın sürümü uyuşmazsa ikisi de hangisinin güncelleneceğini söyler.
-  USB ile bağlanmak için tablette Geliştirici seçenekleri > USB hata ayıklama açık olmalı.
+No installation needed. Run EkranLink.exe: the settings window opens and the EkranLink icon appears in the
+notification area (on Windows 11 it may be under the ^ arrow). Closing the window does not quit EkranLink;
+click the icon to open it again (right-click: menu, Exit). Language: General > Language.
 
-KULLANIM
-  Tablette EkranLink açıkken bilgisayar tableti kendiliğinden bulur (önce USB, yoksa Wi-Fi).
-  Wi-Fi ile ilk bağlantıda iki cihazda aynı 6 haneli kod görünür; ikisinde de onaylayın.
-  Tablet Windows'a çoklu dokunmatik ekran olarak bağlanır. Üç parmakla dokunmak ölçümleri gösterir.
+DEVICE APP (separate download)
+  Install EkranLink-$versionName-android.apk on the tablet or phone: https://github.com/meg55/EkranLink/releases
+  Android asks to allow installing apps from your browser or file manager; allow it.
+  For USB: on the device turn on Developer options > USB debugging (no Developer options? tap
+  Settings > About phone/tablet > Build number 7 times), then tap Allow on "Allow USB debugging?".
 
-GÖRÜNTÜ MODLARI (pencerede Görüntü)
-  İkinci ekran  Tablet ayrı bir monitör olur.
-  Tek ekran     Tablet bağlıyken diğer monitörler kapanır; tablet ayrılınca geri gelir.
-  Yansıtma      Seçili PC ekranının kopyası.
-  İkinci ekran ve tek ekran için EkranLink sanal ekran sürücüsü gerekir. Şimdilik yalnızca kaynak koddan
-  derlenip kurulabiliyor (driver\README.md); sürücü yoksa EkranLink yansıtır.
-  Windows ekranı kapatınca tablet de kapanır, açınca birlikte uyanır.
-  Monitör yönü: Otomatik'te tableti dik çevirmek monitörü de dikey yapar (tablette "Otomatik döndür"
-  açık olmalı). Yatay / Dikey / ters seçilebilir. Seçim ve Windows ekran ayarlarından yapılan
-  değişiklik hatırlanır.
-  Ekran çözünürlüğü: Windows Ayarlar > Ekran'daki listenin aynısı; cihazın kendi çözünürlüğü
-  "(Önerilen)". Seçim cihaz başına hatırlanır; Windows'tan yapılan değişiklik de.
-  Ayarlar bağlantıyı koparmadan uygulanır; tablet bağlı kalır.
+CONNECTING
+  Open EkranLink on the device. Over USB the PC finds it by itself. Over Wi-Fi (same network) the device
+  appears in the window: click Connect. The first time, confirm the same 6-digit code on both screens.
+  Three-finger tap on the device: measurements and Disconnect.
 
-EKRANSIZ MINI PC (oturum açma ekranı)
-  Pencerede Genel > "Oturum açılmadan önce başlat" (bir kez yönetici izni ister). EkranLink Windows hizmeti olarak
-  C:\Program Files\EkranLink'e kurulur ve açılışta başlar; kilit ve şifre ekranı tablette görünür.
-  Kilit perdesini tablette yukarı kaydırın. Windows kilit ekranını yalnızca ana monitörde gösterir.
+DISPLAY MODES (Display page)
+  Mirror works now. Extend and Only this need the EkranLink virtual display driver, which ships once it is
+  code-signed; until then EkranLink mirrors.
+  Turning the device upright turns the Windows monitor portrait when the device's Auto-rotate is on.
+  Settings apply without dropping the connection.
+
+HEADLESS MINI PC
+  General > "Start before sign-in" (asks for administrator permission once): the lock and sign-in screens
+  appear on the device too.
+
+TROUBLESHOOTING
+  General > "Open log" (%LOCALAPPDATA%\EkranLink\ekranlink.log). Console version with measurements:
+  ekranlink-host.exe
+
+TÜRKÇE
+
+Kurulum gerekmez. EkranLink.exe'yi çalıştırın: ayar penceresi açılır, EkranLink simgesi bildirim alanında
+belirir (Windows 11'de ^ okunun altında olabilir). Pencereyi kapatmak EkranLink'i kapatmaz; simgeye
+tıklayınca yeniden açılır (sağ tık: menü, Çıkış). Dil: Genel > Dil.
+
+CİHAZ UYGULAMASI (ayrı indirilir)
+  Tablete ya da telefona EkranLink-$versionName-android.apk dosyasını kurun:
+  https://github.com/meg55/EkranLink/releases
+  Android tarayıcıdan ya da dosya yöneticisinden uygulama yüklemeye izin istemenizi ister; izin verin.
+  USB için: cihazda Geliştirici seçenekleri > USB hata ayıklama'yı açın (Geliştirici seçenekleri yoksa
+  Ayarlar > Telefon/Tablet hakkında > Yapı numarası'na 7 kez dokunun), sonra "USB hata ayıklamaya izin
+  verilsin mi?" sorusunda İzin ver'e dokunun.
+
+BAĞLANMA
+  Cihazda EkranLink'i açın. USB'de bilgisayar cihazı kendiliğinden bulur. Wi-Fi'de (aynı ağ) cihaz
+  pencerede görünür: Bağlan'a tıklayın. İlk seferde iki ekranda aynı 6 haneli kodu onaylayın.
+  Cihazda üç parmakla dokunmak: ölçümler ve Bağlantıyı kes.
+
+GÖRÜNTÜ MODLARI (Görüntü sayfası)
+  Yansıtma şimdi çalışır. İkinci ekran ve Tek ekran için EkranLink sanal ekran sürücüsü gerekir; sürücü kod
+  imzası tamamlanınca gelecek, o zamana kadar EkranLink yansıtır.
+  Cihazda Otomatik döndür açıkken cihazı dik çevirmek Windows'taki monitörü de dikey yapar.
+  Ayarlar bağlantıyı koparmadan uygulanır.
+
+EKRANSIZ MİNİ PC
+  Genel > "Oturum açılmadan önce başlat" (bir kez yönetici izni ister): kilit ve oturum açma ekranları da
+  cihazda görünür.
 
 SORUN OLURSA
-  Pencerede Genel > "Günlüğü aç" (%LOCALAPPDATA%\EkranLink\ekranlink.log)
-  Ayrıntılı ölçümler için konsol sürümü: ekranlink-host.exe
+  Genel > "Günlüğü aç" (%LOCALAPPDATA%\EkranLink\ekranlink.log). Ölçümlü konsol sürümü: ekranlink-host.exe
 
-Kaynak kodu ve lisans: GPL-3.0 (LICENSE). adb, Android SDK platform-tools'tandır (adb\NOTICE.txt).
-"@ | Set-Content (Join-Path $hedef 'BENIOKU.txt') -Encoding utf8
+License / Lisans: GPL-3.0 (LICENSE). adb comes from the Android SDK platform-tools / adb, Android SDK
+platform-tools'tandır (adb\NOTICE.txt).
+"@ | Set-Content (Join-Path $hedef 'README.txt') -Encoding utf8
 
 $zip = Join-Path $dist "$ad.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }

@@ -98,10 +98,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
-        if (Build.VERSION.SDK_INT < 23) {
-            // Dikey pencerede görüntüyü çözücü çevirir (KEY_ROTATION, 6.0+); öncesinde pencere yatay kalır
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-        }
+        applyWindowOrientation(OrientationWatcher.autoRotate(this));
         // Monitör gibi davran: açılınca ekranı uyandır, kilit ekranının üstünde görün.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN
                 | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
@@ -194,6 +191,11 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
             public void onOrientation(int degrees) {
                 applyOrientation();
             }
+
+            @Override
+            public void onAutoRotate(boolean on) {
+                applyWindowOrientation(on);
+            }
         });
 
         // Android 13+: izin yoksa bağlıyken gösterilen bildirim (ve "Bağlantıyı kes") hiç görünmez.
@@ -219,6 +221,19 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
             getWindow().setDecorFitsSystemWindows(false); // pencere çubukların altına da yayılır, boyutu değişmez
         }
         hideSystemBars();
+    }
+
+    /**
+     * Otomatik döndürme açıksa pencere cihazla birlikte döner (dikeyde sistem çubukları ve bildirimler de dik).
+     * Kapalıysa monitör gibi yatay kalır: telefon yatay bir standdayken dönme kilidi dikeyde olsa da görüntü yan
+     * durmasın. Android 6.0 öncesinde dikey pencere çizilemez (KEY_ROTATION yok): hep yatay.
+     */
+    private void applyWindowOrientation(boolean autoRotate) {
+        int want = Build.VERSION.SDK_INT >= 23 && autoRotate ? ActivityInfo.SCREEN_ORIENTATION_USER
+                : ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE;
+        if (getRequestedOrientation() != want) {
+            setRequestedOrientation(want);
+        }
     }
 
     /**
@@ -717,6 +732,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
                 if (active) {
                     sentOrientation = -1;
                     applyOrientation(); // yeni sanal monitör yatay başlar
+                    showThreeFingerTipOnce();
                 }
                 // Bağlıyken yalnızca görüntü; ölçüm kartı üç parmakla açılır
                 info.setConnected(active);
@@ -729,6 +745,16 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ek
                 handler.post(tick);
             }
         });
+    }
+
+    /** İlk bağlantıda bir kez: ölçüm kartı ve "Bağlantıyı kes" üç parmakla açılır (başka yerde görünmüyor). */
+    private void showThreeFingerTipOnce() {
+        android.content.SharedPreferences p = getSharedPreferences("ekran_ipucu", MODE_PRIVATE);
+        if (p.getBoolean("uc_parmak", false)) {
+            return;
+        }
+        p.edit().putBoolean("uc_parmak", true).apply();
+        android.widget.Toast.makeText(this, R.string.tip_three_fingers, android.widget.Toast.LENGTH_LONG).show();
     }
 
     /** Tabletin IPv4 adresleri ("192.168.1.23, 192.168.42.129"); ağ yoksa null. */

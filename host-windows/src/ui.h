@@ -21,6 +21,7 @@ struct DeviceView {
     std::wstring name, link;
     DeviceState state = DeviceState::Found;
     DisplayMode mode = DisplayMode::Extend;
+    bool paused = false;  // cihazda uygulama arka planda
     // Bağlıyken: ölçümler (saniyede bir; boşsa henüz yok), monitörün şimdiki çözünürlüğü ve yönü
     std::wstring latency, data, fps;
     Resolution current;
@@ -41,7 +42,7 @@ struct Model {
     std::wstring noticeArg;
     bool driver = false;        // sanal ekran sürücüsü kurulu (ikinci ekran / tek ekran)
     bool serviceMode = false;   // hizmet kurulu
-    bool serviceStale = false;  // kurulu hizmet bu sürümden farklı
+    bool serviceStale = false;  // kurulu hizmet bu sürümden eski
     bool autostart = false;
     int language = 0;           // 0 sistem, 1 Türkçe, 2 İngilizce
     std::vector<std::wstring> outputs;
@@ -67,6 +68,7 @@ enum class Act {
     Forget,
     OpenLog,
     OpenDisplaySettings,
+    DownloadApp,    // telefon / tablet uygulamasının indirme sayfası
 };
 
 class Host {

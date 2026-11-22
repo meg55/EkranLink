@@ -32,6 +32,7 @@ public:
 private:
     POINT toScreen(int x, int y) const;
     void cancelOwnLocked();
+    void releaseLocked();  // kendi dokunmalarını iptal et, basılı sol tuşu bırak
     void mouse(uint8_t action, uint8_t pointerId, POINT pt);
 
     Mode mode_;

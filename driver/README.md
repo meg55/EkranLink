@@ -42,7 +42,7 @@ Requirements: Visual Studio Build Tools (MSVC x64) + WDK 10.0.26100. The MSBuild
 ```powershell
 .\build.ps1      # out\EkranLinkVD.dll + ekranlinkvd.inf
 .\kur.ps1        # administrator: sign + trust + create the root device (needs host-windows\build\ekranlink-surucu.exe)
-.\kaldir.ps1     # administrator: removes the device, driver package, certificate and settings completely
+.\kaldir.ps1     # administrator: removes the device, driver package, certificate and driver settings (pairings stay)
 ```
 
 **Signing:** as a UMDF driver it does not need Windows test mode. `kur.ps1` creates a new code-signing

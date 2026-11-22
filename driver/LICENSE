@@ -24,6 +24,11 @@ Because portions of this source come from the Microsoft sample, the source in
 this directory as a whole is distributed under the MS-PL (section 3(D)). All
 copyright notices present in the files are retained (section 3(C)).
 
+Exception: src/ekranvd-ioctl.h (the I/O control codes and structures shared
+by the driver and the EkranLink application) contains no code from the
+Microsoft sample. It is derived from SudoVDA's MIT-licensed interface and is
+licensed under the MIT License below, so the GPL-3.0 application can include it.
+
 
 -------------------------------------------------------------------------------
 The Microsoft Public License (MS-PL)

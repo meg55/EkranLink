@@ -4,6 +4,7 @@
 
 #include <winsock2.h>
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -29,7 +30,7 @@ struct PairingHooks {
 
 class Connection {
 public:
-    ~Connection() { close(); }
+    ~Connection();
 
     bool connect(const std::string& host, uint16_t port, int timeoutMs);
     // Anahtar değişimi + eşleştirme + tabletin Hello mesajı. localLink: USB kablosu (adb forward); görüntü
@@ -41,11 +42,15 @@ public:
     // Okuma iş parçacığından çağrılır; bağlantı koparsa veya doğrulama başarısızsa false.
     bool readMessage(uint8_t& type, std::vector<uint8_t>& payload);
 
+    // Her iş parçacığından çağrılabilir: bekleyen okuma / yazma hemen döner. Soket yıkıcıda kapanır (tanıtıcı
+    // başka bir bağlantıya verilip yanlış cihaza yazılmasın).
     void close();
-    bool alive() const { return sock_ != INVALID_SOCKET && !broken_; }
+    bool alive() const { return sock_ != INVALID_SOCKET && !broken_ && !closed_; }
     bool encrypted() const { return tx_ != nullptr; }
     const std::string& deviceId() const { return deviceId_; }
     bool pairingRejected() const { return pairingRejected_; }
+    // Eşleştirme cihazda onaylanmadı (reddedildi ya da süresi doldu); PC'de "Hayır" denmedi
+    bool declinedOnDevice() const { return declinedOnDevice_; }
     // Cihaz eşleşmemiş (ya da eşleşmeyi unutmuş) ve soru açmaya izin yoktu: kullanıcı "Bağlan" demeli
     bool needsPairing() const { return needsPairing_; }
     // Eşleşmiş sanılan cihaz doğrulanamadı (anahtarlar uyuşmuyor ya da bağlantı el sıkışmada koptu)
@@ -62,12 +67,14 @@ private:
 
     SOCKET sock_ = INVALID_SOCKET;
     std::mutex sendMutex_;
-    volatile bool broken_ = false;
+    std::atomic<bool> broken_{false};
+    std::atomic<bool> closed_{false};
     std::unique_ptr<crypto::DirectionKey> tx_, rx_;
     uint64_t txSeq_ = 0, rxSeq_ = 0;
     std::vector<uint8_t> txBuf_;
     std::string deviceId_;
     bool pairingRejected_ = false;
+    bool declinedOnDevice_ = false;
     bool needsPairing_ = false;
     bool authFailed_ = false;
     uint16_t peerVersion_ = 0;

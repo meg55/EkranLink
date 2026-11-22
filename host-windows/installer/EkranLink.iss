@@ -77,8 +77,9 @@ Name: "{autodesktop}\EkranLink"; Filename: "{app}\EkranLink.exe"; Tasks: desktop
 [Run]
 ; Hizmet kuruluydu: yeni sürümle yeniden kur (sürüm kaydı) ve başlat
 Filename: "{app}\EkranLink.exe"; Parameters: "--hizmet-kur"; StatusMsg: "{cm:ServiceUpdate}"; Flags: runhidden waituntilterminated; Check: HizmetVardi
-; Otomatik başlatma kullanıcının kendi kaydına (HKCU) yazılır: kurulumu başlatan kullanıcı adına
-Filename: "{app}\EkranLink.exe"; Parameters: "--windows-ile-baslat"; Flags: runasoriginaluser runhidden waituntilterminated; Tasks: autostart
+; Otomatik başlatma kullanıcının kendi kaydına (HKCU) yazılır: kurulumu başlatan kullanıcı adına. Sessiz
+; güncellemede (winget vb.) kullanıcının uygulamadan kapattığı otomatik başlatma yeniden açılmaz.
+Filename: "{app}\EkranLink.exe"; Parameters: "--windows-ile-baslat"; Flags: runasoriginaluser runhidden waituntilterminated; Tasks: autostart; Check: OtomatikBaslatIstenir
 ; Sessiz güncelleme (winget vb.): önceden çalışıyorduysa arka planda yeniden başlat
 Filename: "{app}\EkranLink.exe"; Parameters: "--arka-plan"; Flags: runasoriginaluser nowait; Check: SessizVeCalisiyordu
 Filename: "{app}\EkranLink.exe"; Description: "{cm:LaunchProgram,EkranLink}"; Flags: runasoriginaluser nowait postinstall skipifsilent
@@ -101,21 +102,36 @@ const
 var
   ServiceWasInstalled: Boolean;
   TrayWasRunning: Boolean;
+  WasInstalled: Boolean;
+  AutostartWasOn: Boolean;
+  TasksShown: Boolean;
 
 function FindWindowEx(Parent, ChildAfter: HWND; ClassName, WindowName: String): HWND;
   external 'FindWindowExW@user32.dll stdcall';
 
-// Tepsi uygulaması mesaj penceresi (tray.cpp: sınıf EkranLinkTray, ad EkranLink). WM_CLOSE ile düzgünce kapanır.
+// Tepsi uygulamasının gizli penceresi (tray.cpp: sınıf EkranLinkTray, ad EkranLink; 0.5.2 ve öncesinde ileti
+// penceresi). WM_CLOSE ile düzgünce kapanır.
+function FindTray: HWND;
+var
+  MessageOnly: HWND;
+begin
+  Result := FindWindowByClassName('EkranLinkTray');
+  if Result = 0 then
+  begin
+    MessageOnly := -3;  // HWND_MESSAGE
+    Result := FindWindowEx(MessageOnly, 0, 'EkranLinkTray', 'EkranLink');
+  end;
+end;
+
 function CloseTray: Boolean;
 var
-  MessageOnly, W: HWND;
+  W: HWND;
   I: Integer;
 begin
   Result := False;
-  MessageOnly := -3;  // HWND_MESSAGE
   for I := 1 to 100 do
   begin
-    W := FindWindowEx(MessageOnly, 0, 'EkranLinkTray', 'EkranLink');
+    W := FindTray;
     if W = 0 then Break;
     Result := True;
     if (I mod 20) = 1 then PostMessage(W, WM_CLOSE, 0, 0);
@@ -147,6 +163,29 @@ end;
 function SessizVeCalisiyordu: Boolean;
 begin
   Result := WizardSilent and TrayWasRunning;
+end;
+
+function OtomatikBaslatIstenir: Boolean;
+begin
+  Result := not (WizardSilent and WasInstalled and not AutostartWasOn);
+end;
+
+function InitializeSetup: Boolean;
+begin
+  WasInstalled := FileExists(ExpandConstant('{autopf}\EkranLink\EkranLink.exe'));
+  AutostartWasOn := RegValueExists(HKCU, RunKey, 'EkranLink');
+  Result := True;
+end;
+
+// Güncellemede seçenek, uygulamadaki "Windows ile başlat" ayarının şimdiki hâliyle açılır
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if (CurPageID = wpSelectTasks) and WasInstalled and not TasksShown then
+  begin
+    TasksShown := True;  // kullanıcı geri dönüp değiştirdiyse ezilmesin
+    if AutostartWasOn then WizardSelectTasks('autostart')
+    else WizardSelectTasks('!autostart');
+  end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

@@ -15,9 +15,9 @@ or Windows' only screen (Only this); over USB or Wi-Fi.
 | Android client | Java, minSdk 16 (4.1), no AndroidX | MediaCodec arrived in 4.1; current AndroidX/NDK don't support 4.x |
 | iOS client | Swift, VideoToolbox | A native app is wanted; very old iOS versions via the web client |
 | Web client | Framework-free JavaScript | Old browsers |
-| Target PCs | Windows 10 1809+ / 11; headless mini PCs and desktops | The "Only this screen" scenario is a first-class citizen |
+| Target PCs | Windows 10 1809+ / 11 (virtual display driver: Windows 10 2004+); headless mini PCs and desktops | The "Only this screen" scenario is a first-class citizen |
 | Virtual display | [Virtual Display Driver](https://github.com/VirtualDrivers/Virtual-Display-Driver) (MIT, signed) at first, then our own IddCx driver | Make progress early without driver-signing headaches |
-| Encryption | Ephemeral ECDH P-256 + ChaCha20-Poly1305, 6-digit pairing code on the first Wi-Fi connection ([PROTOCOL.md](PROTOCOL.md)) | Android 4.x's TLS stack is outdated; ChaCha20 is fast on CPUs without hardware AES |
+| Encryption | Ephemeral ECDH P-256 + ChaCha20-Poly1305, 6-digit pairing code on the first connection (USB and Wi-Fi) ([PROTOCOL.md](PROTOCOL.md)) | Android 4.x's TLS stack is outdated; ChaCha20 is fast on CPUs without hardware AES |
 
 ## Known limitations
 
@@ -58,7 +58,7 @@ Findings:
    first for this device.
 5. The tablet's kernel supports `f_accessory` (AOA) and `f_rndis` (USB tethering): both USB paths are open.
 
-Tryout: `tools/faz0.ps1` (sends from the PC), `tools/sayac.html` (for measuring end-to-end latency by photo).
+Tryout: `tools/sayac.html` (for measuring end-to-end latency by photo).
 
 ## Phase 1 – First release: Mirror ✅ (0.1.0)
 
@@ -217,6 +217,30 @@ MSVC + WDK and signed with a local certificate.
       so the monitor is a little narrower instead of losing pixels under the notch. Verified on the Android 16
       phone emulator (all four orientations, emulated cutout: 2400×1080 → 2274×1080, taskbar visible) and the
       Android 4.2 emulator (still landscape, no errors); not yet on the phone itself
+- [x] Whole-project review (0.5.3). Fixed:
+      - Liveness: the PC pings every second also while the device app is in the background and closes the
+        connection after 15 s of silence (the virtual monitor and *Only this* layout are restored); the device
+        closes it after 15 s without a frame from a 0.5.3+ PC (`PcHello` flag bit1, older PCs unaffected). Measured
+        on the Android 16 emulator: frozen emulator → PC closed at 15 s and reconnected after; suspended PC process
+        → device closed at 15 s and reconnected after.
+      - Picture recovery: capture is rebuilt from a new GPU device after 2 s of failures (GPU reset, Win+P) instead
+        of retrying the same one forever; while it cannot be built, *Only this* gives the PC monitors back. A virtual
+        monitor Windows did not activate within 8 s is removed. The encoder no longer freezes after a rejected
+        frame, and a stuck encoder is rebuilt.
+      - adb timeouts now work (a hung `adb` no longer blocks discovery); the mouse button is released if the
+        connection drops mid-drag in mouse mode; tray commands to the service are no longer lost; the tray icon
+        comes back after Explorer restarts; an older copy no longer offers to "update" a newer service.
+      - Android: with auto-rotate off the window stays landscape again (0.5.2 regression: a phone with rotation
+        lock in a landscape stand showed a portrait desktop); turning the device no longer blocks the UI while the
+        decoder restarts.
+      - First run: USB devices waiting for *Allow USB debugging* are listed with that instruction; how to enable
+        Developer options is explained on both sides; a new Wi-Fi device raises a notification that connects on
+        click; a declined pairing is reported on both screens; a paused device (app in the background) is shown;
+        *Download the Android app* button; the driver note explains why *Extend* is unavailable; installer warnings
+        in the README; the zip's readme is bilingual; a silent update no longer turns autostart back on.
+      Verified on the Android 16 phone emulator (pairing declined / accepted, both silence timeouts, orientation
+      with auto-rotate on and off) and the Android 4.2 emulator (connects, no errors). The settings window changes
+      and the USB permission state still need a check on real hardware.
 - [ ] Distribution signing (SignPath Foundation or EV + Microsoft) — for now the driver can only be installed on the PC it was built on
 
 Measurement (S6000, USB, Extend 1280×752): PC→drawn on tablet ~27 ms, PC CPU 0.3% with a static screen.

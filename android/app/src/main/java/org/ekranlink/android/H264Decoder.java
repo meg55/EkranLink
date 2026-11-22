@@ -38,6 +38,7 @@ final class H264Decoder {
     private Surface surface;
     private boolean suspended; // ekran kapalı: kare gelirse düşür
     private int rotation;      // yüzeye çizerken saat yönünde çevirme (pencere dikeyken 90/270)
+    private volatile int wantRotation; // arayüzün istediği; ağ iş parçacığı sıradaki karede uygular
     private final Stats stats;
     private final FrameListener listener;
 
@@ -68,6 +69,7 @@ final class H264Decoder {
 
     /** Protokol: tek karenin Annex-B verisi. */
     synchronized void onAccessUnit(byte[] b, int off, int len, long pts) throws IOException {
+        applyRotation();
         // Kısa yol: karelerin çoğu SPS/PPS içermeyen tek dilimli P-karesi. Çözücü hazırsa bayt bayt
         // taramadan ve ara belleğe kopyalamadan olduğu gibi ver (tabletin işlemcisi için).
         int sc = len > 4 && b[off] == 0 && b[off + 1] == 0
@@ -101,6 +103,7 @@ final class H264Decoder {
 
     /** Ham akış: tek NAL (başlangıç kodu olmadan). */
     synchronized void onNal(byte[] nal) throws IOException {
+        applyRotation();
         onNal(nal, 0, nal.length);
     }
 
@@ -209,18 +212,23 @@ final class H264Decoder {
 
     /**
      * Pencere dikeyken yatay görüntü yüzeye çevrilerek çizilir (ekran kartı yapar, ek yük yok). Değişince çözücü
-     * yeniden kurulur; true: yeni çözücü için anahtar kare gerekiyor.
+     * ağ iş parçacığında, sıradaki karede yeniden kurulur: arayüz (dönen pencere) çözücünün kapanmasını beklemez.
+     * true: yeni çözücü için anahtar kare gerekiyor.
      */
-    synchronized boolean setRotation(int degrees) {
-        if (degrees == rotation) {
+    boolean setRotation(int degrees) {
+        if (degrees == wantRotation) {
             return false;
         }
-        rotation = degrees;
-        if (codec == null) {
-            return false;
-        }
-        release(); // bir sonraki anahtar karede yeni açıyla kurulur
+        wantRotation = degrees;
         return true;
+    }
+
+    private void applyRotation() {
+        int want = wantRotation;
+        if (want != rotation) {
+            rotation = want;
+            release(); // bir sonraki anahtar karede yeni açıyla kurulur
+        }
     }
 
     private void ensureCodec() throws IOException {

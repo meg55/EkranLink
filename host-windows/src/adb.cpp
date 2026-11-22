@@ -4,9 +4,12 @@
 
 #include <windows.h>
 
+#include <algorithm>
 #include <atomic>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <vector>
 
 namespace ekran::adb {
 
@@ -78,41 +81,74 @@ bool run(const std::wstring& adbPath, const std::wstring& args, std::string* out
     if (!CreatePipe(&rd, &wr, &sa, 0)) return false;
     SetHandleInformation(rd, HANDLE_FLAG_INHERIT, 0);
 
-    STARTUPINFOW si{};
-    si.cb = sizeof si;
-    si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdOutput = wr;
-    si.hStdError = wr;
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    // Alt sürece yalnızca bu borunun yazma ucu geçer: başka iş parçacıklarının aynı anda açtığı borular
+    // kalıtılıp onların bitişini geciktirmesin
+    SIZE_T attrSize = 0;
+    InitializeProcThreadAttributeList(nullptr, 1, 0, &attrSize);
+    std::vector<uint8_t> attrBuf(attrSize);
+    auto* attrs = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attrBuf.data());
+    const bool handleList = attrSize && InitializeProcThreadAttributeList(attrs, 1, 0, &attrSize);
+    if (handleList)
+        UpdateProcThreadAttribute(attrs, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, &wr, sizeof wr, nullptr, nullptr);
+
+    STARTUPINFOEXW si{};
+    si.StartupInfo.cb = sizeof si;
+    si.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    si.StartupInfo.hStdOutput = wr;
+    si.StartupInfo.hStdError = wr;
+    si.lpAttributeList = handleList ? attrs : nullptr;
     PROCESS_INFORMATION pi{};
     std::wstring cmd = L"\"" + adbPath + L"\" " + args;
-    BOOL ok = CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+    const DWORD flags = CREATE_NO_WINDOW | (handleList ? EXTENDED_STARTUPINFO_PRESENT : 0);
+    BOOL ok = CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, TRUE, flags, nullptr, nullptr, &si.StartupInfo, &pi);
+    if (handleList) DeleteProcThreadAttributeList(attrs);
     CloseHandle(wr);
     if (!ok) {
         CloseHandle(rd);
         return false;
     }
 
+    // Süre sınırı gerçekten işlesin: adb takılırsa (cihaz yarı bağlı) çağıran sonsuza dek beklemez. Süreç bitince
+    // kalan çıktı okunur; adb'nin başlattığı sunucu boruyu kalıtmış olsa da onun kapanması beklenmez.
     std::string out;
     char buf[4096];
-    DWORD n = 0;
-    while (ReadFile(rd, buf, sizeof buf, &n, nullptr) && n > 0) out.append(buf, n);
+    const DWORD start = GetTickCount();
+    bool exited = false;
+    for (;;) {
+        DWORD avail = 0;
+        while (PeekNamedPipe(rd, nullptr, 0, nullptr, &avail, nullptr) && avail > 0) {
+            DWORD n = 0;
+            if (!ReadFile(rd, buf, std::min<DWORD>(avail, sizeof buf), &n, nullptr) || n == 0) break;
+            out.append(buf, n);
+        }
+        if (exited) break;
+        if (WaitForSingleObject(pi.hProcess, 20) == WAIT_OBJECT_0) {
+            exited = true;  // son çıktıyı da oku
+            continue;
+        }
+        if (int(GetTickCount() - start) >= timeoutMs) break;
+    }
     CloseHandle(rd);
 
     DWORD code = 1;
-    if (WaitForSingleObject(pi.hProcess, DWORD(timeoutMs)) == WAIT_OBJECT_0) GetExitCodeProcess(pi.hProcess, &code);
-    else TerminateProcess(pi.hProcess, 1);
+    if (exited) {
+        GetExitCodeProcess(pi.hProcess, &code);
+    } else {
+        TerminateProcess(pi.hProcess, 1);
+        logf("adb %d sn'de yanıt vermedi, durduruldu", timeoutMs / 1000);
+    }
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
     if (output) *output = std::move(out);
     return code == 0;
 }
 
-std::vector<std::string> devices(const std::wstring& adbPath) {
-    // "adb devices": "SERİ<TAB>device" satırları (yetkisiz / çevrimdışı cihazlar atlanır)
+std::vector<std::string> devices(const std::wstring& adbPath, std::vector<std::string>* unauthorized) {
+    // "adb devices": "SERİ<TAB>device" satırları; "unauthorized" ayrıca bildirilir, çevrimdışı cihazlar atlanır.
+    // İlk çağrı adb sunucusunu başlatır (birkaç saniye sürebilir).
     std::string out;
     std::vector<std::string> list;
-    if (!run(adbPath, L"devices", &out, 3000)) return list;
+    if (!run(adbPath, L"devices", &out)) return list;
     size_t p = 0;
     while (p < out.size()) {
         size_t e = out.find('\n', p);
@@ -121,7 +157,9 @@ std::vector<std::string> devices(const std::wstring& adbPath) {
         p = e + 1;
         while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
         const size_t tab = line.find('\t');
-        if (tab == std::string::npos || line.compare(tab + 1, std::string::npos, "device") != 0) continue;
+        if (tab == std::string::npos) continue;
+        const bool authorized = line.compare(tab + 1, std::string::npos, "device") == 0;
+        if (!authorized && line.compare(tab + 1, std::string::npos, "unauthorized") != 0) continue;
         std::string serial = line.substr(0, tab);
         if (!validSerial(serial)) {
             static std::atomic<bool> warned{false};
@@ -132,7 +170,8 @@ std::vector<std::string> devices(const std::wstring& adbPath) {
             }
             continue;
         }
-        list.push_back(std::move(serial));
+        if (authorized) list.push_back(std::move(serial));
+        else if (unauthorized) unauthorized->push_back(std::move(serial));
     }
     return list;
 }

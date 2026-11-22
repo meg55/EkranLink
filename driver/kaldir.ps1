@@ -1,6 +1,7 @@
 ﻿<#
 .SYNOPSIS
-    EkranLink sanal ekran sürücüsünü tamamen kaldırır: aygıt, sürücü paketi, sertifika, ayarlar. Yönetici olarak çalışır.
+    EkranLink sanal ekran sürücüsünü tamamen kaldırır: aygıt, sürücü paketi, sertifika, sürücü ayarları. Yönetici
+    olarak çalışır. EkranLink'in kendi ayarlarına ve eşleşmelerine dokunmaz.
 #>
 param(
     [string] $Arac = (Join-Path $PSScriptRoot '..\host-windows\build\ekranlink-surucu.exe')
@@ -37,7 +38,7 @@ foreach ($depo in 'Cert:\LocalMachine\Root', 'Cert:\LocalMachine\TrustedPublishe
     }
 }
 
-# 4) Ayarlar
-Remove-Item 'HKLM:\SOFTWARE\EkranLink' -Recurse -ErrorAction SilentlyContinue
+# 4) Yalnızca sürücünün ayarları (EkranLink'in kendi ayarları, eşleşmeleri ve hizmet kaydı yerinde kalır)
+Remove-Item 'HKLM:\SOFTWARE\EkranLink\VirtualDisplay' -Recurse -ErrorAction SilentlyContinue
 
 Write-Host 'EkranLink sanal ekran sürücüsü kaldırıldı.' -ForegroundColor Green

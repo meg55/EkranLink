@@ -80,7 +80,7 @@ bool Connection::handshake(bool localLink, const PairingHooks& hooks, proto::Hel
     const auto pcPub = ecdh.publicKey();
     {
         proto::Writer w;
-        w.u8(localLink ? proto::kWantPlain : 0);
+        w.u8(uint8_t((localLink ? proto::kWantPlain : 0) | proto::kPingsAlways));
         w.bytes(pcId.data(), 16);
         w.bytes(pcPub.data(), 65);
         w.bytes(commit.data(), 32);
@@ -191,8 +191,9 @@ bool Connection::handshake(bool localLink, const PairingHooks& hooks, proto::Hel
                 }
             }
         });
-        const bool accepted = hooks.confirm && hooks.confirm(deviceName, code, cancel) &&
-                              WaitForSingleObject(cancel, 0) != WAIT_OBJECT_0;
+        const bool confirmed = hooks.confirm && hooks.confirm(deviceName, code, cancel);
+        const bool deviceClosed = WaitForSingleObject(cancel, 0) == WAIT_OBJECT_0;
+        const bool accepted = confirmed && !deviceClosed;
         asking = false;
         watcher.join();
         CloseHandle(cancel);
@@ -205,6 +206,8 @@ bool Connection::handshake(bool localLink, const PairingHooks& hooks, proto::Hel
         if (!accepted || !tabletAccepted) {
             logf("Eşleştirme reddedildi (%s)", deviceName.c_str());
             pairingRejected_ = true;
+            // PC'de "Hayır" denmediyse cihazda reddedildi ya da süresi doldu: kullanıcıya söylenir
+            declinedOnDevice_ = deviceClosed || (accepted && !tabletAccepted);
             return false;
         }
         pairing::save(deviceId_, crypto::derive(prk, "ekran pair"));
@@ -217,6 +220,9 @@ bool Connection::handshake(bool localLink, const PairingHooks& hooks, proto::Hel
     const bool ok = readMessage(type, payload) && type == proto::kHello;
     timeout = 0;
     setsockopt(sock_, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof timeout);
+    // Yazma sonsuza dek takılmasın (cihaz ağdan düştü, TCP penceresi dolu): bağlantı kopmuş sayılır
+    DWORD sendTimeout = 10000;
+    setsockopt(sock_, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&sendTimeout), sizeof sendTimeout);
     if (!ok) {
         // Eşleşme kaydı silinmez: doğrulanmamış bir karşı taraf eşleşmeyi sildiremesin. Cihaz eşleşmeyi
         // gerçekten unuttuysa bir dahaki bağlantıda "tanımıyorum" der, kullanıcı yeniden eşleştirir.
@@ -304,7 +310,7 @@ bool Connection::readMessage(uint8_t& type, std::vector<uint8_t>& payload) {
 }
 
 bool Connection::sendAll(WSABUF* bufs, DWORD count) {
-    if (sock_ == INVALID_SOCKET || broken_) return false;
+    if (!alive()) return false;
     while (count > 0) {
         DWORD sent = 0;
         if (WSASend(sock_, bufs, count, &sent, 0, nullptr, nullptr) != 0) {
@@ -339,11 +345,12 @@ bool Connection::recvAll(void* p, size_t n) {
 }
 
 void Connection::close() {
-    if (sock_ != INVALID_SOCKET) {
-        shutdown(sock_, SD_BOTH);
-        closesocket(sock_);
-        sock_ = INVALID_SOCKET;
-    }
+    if (sock_ != INVALID_SOCKET && !closed_.exchange(true)) shutdown(sock_, SD_BOTH);
+}
+
+Connection::~Connection() {
+    close();
+    if (sock_ != INVALID_SOCKET) closesocket(sock_);
 }
 
 }  // namespace ekran

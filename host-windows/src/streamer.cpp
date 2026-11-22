@@ -255,17 +255,23 @@ void Streamer::scanUsb(const std::wstring& adbPath, bool usbWatchOk) {
     const int64_t now = nowUs();
     if (now < nextUsbPollUs_) return;
     nextUsbPollUs_ = now + (now < usbBurstUntilUs_ ? kSecond : usbWatchOk ? 30 * kSecond : 3 * kSecond);
-    std::vector<std::string> serials = adb::devices(adbPath);
-    if (!opt_.serial.empty())
-        serials.erase(std::remove_if(serials.begin(), serials.end(), [&](const std::string& s) { return s != opt_.serial; }),
-                      serials.end());
+    std::vector<std::string> unauthorized;
+    std::vector<std::string> serials = adb::devices(adbPath, &unauthorized);
+    if (!opt_.serial.empty()) {
+        auto other = [&](const std::string& s) { return s != opt_.serial; };
+        serials.erase(std::remove_if(serials.begin(), serials.end(), other), serials.end());
+        unauthorized.erase(std::remove_if(unauthorized.begin(), unauthorized.end(), other), unauthorized.end());
+    }
+    auto listed = [](const std::vector<std::string>& v, const std::string& s) {
+        return std::find(v.begin(), v.end(), s) != v.end();
+    };
 
     std::vector<Dev*> toProbe;
     {
         std::lock_guard<std::mutex> lock(m_);
         for (auto& [k, d] : devs_)
-            if (d->usb && std::find(serials.begin(), serials.end(), d->serial) == serials.end()) d->present = false;
-        for (const auto& s : serials) {
+            if (d->usb && !listed(serials, d->serial) && !listed(unauthorized, d->serial)) d->present = false;
+        auto slotFor = [&](const std::string& s) -> Dev& {
             const std::string key = "usb:" + s;
             auto& slot = devs_[key];
             if (!slot) {
@@ -278,8 +284,21 @@ void Streamer::scanUsb(const std::wstring& adbPath, bool usbWatchOk) {
             }
             slot->present = true;
             slot->lastSeenUs = now;
+            return *slot;
+        };
+        // Cihazda "USB hata ayıklamaya izin verilsin mi?" bekleniyor: listede ne yapılacağı yazar; izin verilince
+        // 2 sn içinde fark edilir
+        for (const auto& s : unauthorized) {
+            Dev& d = slotFor(s);
+            if (!d.busy) d.info.state = DeviceState::Unauthorized;
+            d.probed = false;
+        }
+        if (!unauthorized.empty()) nextUsbPollUs_ = std::min(nextUsbPollUs_, now + 2 * kSecond);
+        for (const auto& s : serials) {
+            Dev* slot = &slotFor(s);
+            if (slot->info.state == DeviceState::Unauthorized) slot->info.state = DeviceState::Found;
             if (!slot->busy && (!slot->probed || (slot->info.state == DeviceState::AppMissing && now >= slot->probeAtUs)))
-                toProbe.push_back(slot.get());
+                toProbe.push_back(slot);
         }
     }
     // Cihazı tanı (uygulamayı açmadan): kimlik ve ad; uygulama yoksa 10 sn'de bir yeniden sorulur
@@ -320,6 +339,7 @@ void Streamer::scanWifi() {
     const std::vector<FoundDevice> found = discoverDevices(1000, known);
     const int64_t after = nowUs();
     bool anyConnected = false;
+    std::vector<std::string> fresh;  // ilk kez görülen eşleşmemiş cihazlar: "anahtar\tad"
     {
         std::lock_guard<std::mutex> lock(m_);
         size_t wifiCount = 0;
@@ -349,7 +369,15 @@ void Streamer::scanWifi() {
             if (!d->usb && d->present && after - d->lastSeenUs > kGoneUs) d->present = false;
             anyConnected |= d->busy;
         }
+        // Eşleşmemiş cihaza kendiliğinden bağlanılmaz: kullanıcıya bir kez haber ver (bildirime tıklayınca bağlanır)
+        for (auto& [k, d] : devs_) {
+            if (d->usb || !d->present || d->busy || announced_.count(k)) continue;
+            if (!linkAllowed(*d) || suppressedLocked(*d) || pairing::known(d->info.deviceId)) continue;
+            announced_.insert(k);
+            fresh.push_back(k + "\t" + d->info.name);
+        }
     }
+    for (const auto& f : fresh) notice(Notice::NewDevice, f, "Ağda yeni cihaz bulundu (eşleşmemiş): Bağlan bekleniyor");
     // Bağlıyken ve pencere kapalıyken yeni cihaz için daha seyrek bak (keşif çok hafif ama gereksiz)
     nextWifiUs_ = after + (anyConnected && !watching_ ? 10 : 3) * kSecond;
 }
@@ -384,7 +412,9 @@ void Streamer::startSessions(const std::wstring& adbPath) {
     const bool autoC = autoConnect_;
     for (auto& [k, dp] : devs_) {
         Dev& d = *dp;
-        if (!d.present || d.busy || now < d.retryAtUs || d.info.state == DeviceState::AppMissing) continue;
+        if (!d.present || d.busy || now < d.retryAtUs || d.info.state == DeviceState::AppMissing ||
+            d.info.state == DeviceState::Unauthorized)
+            continue;
         if (!linkAllowed(d) || suppressedLocked(d)) continue;
         if (d.usb && adbPath.empty()) continue;
         if (!((autoC && !held_.count(k)) || wanted_.count(k) || resume_.count(k))) continue;
@@ -593,6 +623,14 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
             if (conn.needsPairing()) d.retryAtUs = nowUs() + 60 * kSecond;  // "Bağlan" beklenir
             if (conn.peerVersion()) d.retryAtUs = nowUs() + 30 * kSecond;
         }
+        if (conn.declinedOnDevice()) {
+            std::string name;
+            {
+                std::lock_guard<std::mutex> lock(m_);
+                name = d.info.name;
+            }
+            notice(Notice::PairDeclined, name, "Eşleştirme cihazda onaylanmadı");
+        }
         if (conn.authFailed()) {
             // Anahtarlar uyuşmuyor: kayıt silinmez; bir sonraki denemede (USB takılıysa ya da kullanıcı "Bağlan"
             // derse) iki ekranda kod onayıyla yeniden eşleştirilir
@@ -629,6 +667,7 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
     auto detach = [&] {
         std::lock_guard<std::mutex> lock(m_);
         d.conn = nullptr;
+        d.info.paused = false;
     };
 
     logf("Cihaz: %s, Android API %u, yüzey %ux%u, %u dpi, çözücü %s (%s, %s)", hello.model.c_str(), hello.sdk,
@@ -654,6 +693,7 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
     std::atomic<int> wantRotation{-1};  // cihazın bildirdiği yön (-1: bildirmedi, dönüş kilitli)
     std::atomic<bool> keyRequested{false};  // cihaz çözücüsünü yeniden kurdu (ekranı kapanıp açıldı)
     std::atomic<bool> tabletVisible{true};  // cihaz uygulaması arka plandaysa görüntü üretilmez
+    std::atomic<int64_t> lastRxUs{nowUs()};  // cihazdan son mesaj (Pong dahil): sessizlik = bağlantı ölü
 
     // Zaman damgası: gerçek kareler çift, itici kareler tek sayı (ayrı liste tutmadan ayırt etmek için).
     auto isPusher = [](int64_t pts) { return (pts & 1) != 0; };
@@ -663,6 +703,7 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
         uint8_t type;
         std::vector<uint8_t> payload;
         while (conn.readMessage(type, payload)) {
+            lastRxUs = nowUs();
             proto::Reader r(payload.data(), payload.size());
             if (type == proto::kFrameAck) {
                 const int64_t pts = int64_t(r.u64());
@@ -689,9 +730,15 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
                 keyRequested = true;
             } else if (type == proto::kVideoVisible) {
                 const bool v = r.u8() != 0;
-                if (r.ok() && v != tabletVisible.exchange(v))
+                if (r.ok() && v != tabletVisible.exchange(v)) {
                     logf(v ? "%s: uygulama öne geldi" : "%s: uygulama arka planda, görüntü duraklatıldı",
                          hello.model.c_str());
+                    {
+                        std::lock_guard<std::mutex> lock(m_);
+                        d.info.paused = !v;  // listede "duraklatıldı" görünsün
+                    }
+                    publish();
+                }
             } else if (type == proto::kOrientation) {
                 const int deg = r.u16();
                 if (r.ok() && deg % 90 == 0 && deg < 360) wantRotation = deg;
@@ -725,6 +772,42 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
     bool started = false;
     DisplayMode mode = DisplayMode::Extend;
 
+    // Canlılık: saniyede bir Ping (cihaz arka plandayken ve görüntü toparlanırken de). Cihaz 15 sn hiçbir şey
+    // göndermezse (pili bitti, ağdan düştü) bağlantı kapanır; monitör kaldırılır, düzen geri gelir.
+    int64_t nextPingUs = 0;
+    auto keepAlive = [&] {
+        const int64_t now = nowUs();
+        if (now - lastRxUs > int64_t(proto::kSilenceTimeoutMs) * 1000) {
+            logf("%s: %d sn yanıt yok, bağlantı kapatılıyor", hello.model.c_str(), proto::kSilenceTimeoutMs / 1000);
+            conn.close();
+            return;
+        }
+        if (now >= nextPingUs) {
+            proto::Writer w;
+            w.u64(uint64_t(now));
+            conn.send(proto::kPing, w.buf);
+            nextPingUs = now + kSecond;
+        }
+    };
+    // Tek ekran: diğer monitörleri kapat / aç. Görüntü kurulamıyorken bir süre kapatılmaz (kullanıcı ekransız
+    // kalmasın); kapatma başarısızsa her turda yeniden denenmez.
+    int64_t isolateAfterUs = 0;
+    auto applyOnly = [&](bool wantOnly) {
+        if (wantOnly == only) return false;
+        if (wantOnly) {
+            if (nowUs() < isolateAfterUs) return false;
+            if (!vdisp.isolate()) {
+                isolateAfterUs = nowUs() + 10 * kSecond;
+                return false;
+            }
+        } else {
+            vdisp.restoreLayout();
+        }
+        only = wantOnly;
+        return true;
+    };
+    int setupFails = 0;  // görüntü boru hattı art arda kurulamadı
+
     while (!stop_ && conn.alive()) {
         // --- Monitör: istenen moda göre ekle / kaldır / tek ekran ---
         const DisplayMode want = DisplayMode(display_.load());
@@ -753,11 +836,8 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
             target.clear();
         }
         if (!vdisp.added()) only = false;
-        if (vdisp.added() && (want == DisplayMode::Only) != only) {
-            if (want == DisplayMode::Only) vdisp.isolate();
-            else vdisp.restoreLayout();
-            only = want == DisplayMode::Only;
-        }
+        // Görüntü kurulamıyorken tek ekrana geçilmez: kurulunca iç döngü geçirir (monitörler gidip gelmesin)
+        if (vdisp.added() && (setupFails == 0 || want != DisplayMode::Only)) applyOnly(want == DisplayMode::Only);
         mode = target.empty() ? DisplayMode::Mirror : only ? DisplayMode::Only : DisplayMode::Extend;
         logMemory("el sıkışma sonrası");
 
@@ -799,7 +879,26 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
             }
             return true;
         };
-        if (W <= 0 || H <= 0 || !gpuOk || !initScaler() || !makeNv12Pool(gpu.device.get(), W, H, pool)) break;
+        // Görüntü kurulamadı (ekran kartı sıfırlandı, Win+P ile monitör kapandı, güvenli masaüstü...): bağlantı
+        // kopmadan, giderek seyrelen aralıkla yeniden denenir. Tek ekrandaysa PC monitörleri geri açılır.
+        auto setupFailed = [&](const char* what) {
+            if (setupFails++ == 0) logf("Görüntü kurulamadı (%s); yeniden deneniyor", what);
+            if (only) {
+                logf("PC monitörleri geri açılıyor (görüntü yokken ekransız kalınmasın)");
+                applyOnly(false);
+                isolateAfterUs = nowUs() + 10 * kSecond;
+            }
+            const DWORD waitMs = DWORD(std::min(5000, 500 * setupFails));
+            for (DWORD waited = 0; waited < waitMs && !stop_ && conn.alive(); waited += 250) {
+                keepAlive();
+                WaitForSingleObject(stopEvent_, 250);
+            }
+        };
+        if (W <= 0 || H <= 0) break;
+        if (!gpuOk || !initScaler() || !makeNv12Pool(gpu.device.get(), W, H, pool)) {
+            setupFailed("yakalama");
+            continue;
+        }
 
         logMemory("yakalama + ölçekleyici");
         RECT content = scaler.content();
@@ -826,7 +925,13 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
             stats.bytes += int64_t(p.data.size());
             conn.sendVideo(p.ptsUs, flags, p.data.data(), p.data.size());
         };
-        if (!enc.init(gpu.device.get(), gpu.vendorId, W, H, opt_.fps, opt_.kbps, onPacket)) break;
+        if (!enc.init(gpu.device.get(), gpu.vendorId, W, H, opt_.fps, opt_.kbps, onPacket)) {
+            enc.shutdown();
+            setupFailed("kodlayıcı");
+            continue;
+        }
+        if (setupFails) logf("Görüntü yeniden kuruldu");
+        setupFails = 0;
         logMemory("kodlayıcı");
         logf("Kodlayıcı: %s | akış %dx%d, içerik %ldx%ld, %d kbps", enc.name().c_str(), W, H,
              content.right - content.left, content.bottom - content.top, opt_.kbps);
@@ -842,6 +947,8 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
         int pushersLeft = 0, slot = 0, lastSlot = 0;
         int64_t nextPusherUs = 0, lastPts = 0, nextStatsUs = nowUs() + 1000000;
         int64_t lastRealUs = 0;
+        int submitFails = 0;
+        int64_t encStallSinceUs = 0;
         inFlight = 0;
 
         while (!stop_ && conn.alive()) {
@@ -857,10 +964,7 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
             if (!target.empty()) {
                 // İkinci ekran ↔ tek ekran: monitör yerinde kalır, yalnızca diğerleri kapanır / açılır
                 const bool wantOnly = DisplayMode(display_.load()) == DisplayMode::Only;
-                if (wantOnly != only) {
-                    if (wantOnly) vdisp.isolate();
-                    else vdisp.restoreLayout();
-                    only = wantOnly;
+                if (applyOnly(wantOnly)) {
                     mode = only ? DisplayMode::Only : DisplayMode::Extend;
                     report(mode, target);
                 }
@@ -930,6 +1034,7 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
             // Cihaz uygulaması arka planda: yakalama ve kodlama durur (iki cihaz da boşta); öne gelince
             // cihaz anahtar kare ister ve görüntü kaldığı yerden sürer.
             if (!tabletVisible) {
+                keepAlive();
                 WaitForSingleObject(ackEvent, 200);
                 continue;
             }
@@ -941,13 +1046,24 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
                 // UAC / kilit ekranı / çözünürlük, yön ya da yerleşim değişimi: yakalamayı yeniden kur.
                 // Akış boyutu aynı kalır; yalnızca yerleşim ve eşleme tazelenir, bağlantı kopmaz.
                 const int w0 = srcW, h0 = srcH, r0 = sent.rotation;
-                // Ajan: kilit ekranı / UAC / oturum açma ayrı masaüstü; yakalama oraya geçerek sürer
-                while (!stop_ && conn.alive()) {
+                // Ajan: kilit ekranı / UAC / oturum açma ayrı masaüstü; yakalama oraya geçerek sürer.
+                // 2 sn'de olmazsa ekran kartı sıfırlanmış ya da monitör kapanmış olabilir: aygıttan başlayarak
+                // yeniden kurulur (aynı aygıtla sonsuza dek denemek görüntüyü dondurur).
+                bool recovered = false;
+                for (int tries = 0; tries < 8 && !stop_ && conn.alive(); tries++) {
                     followInputDesktop();
-                    if (cap.init(gpu)) break;
+                    if (cap.init(gpu)) {
+                        recovered = true;
+                        break;
+                    }
+                    keepAlive();
                     Sleep(250);
                 }
                 if (stop_ || !conn.alive()) break;
+                if (!recovered) {
+                    rebuild = true;
+                    break;
+                }
                 if (!initScaler()) break;
                 content = scaler.content();
                 if (srcW != w0 || srcH != h0) sendConfig();
@@ -1031,6 +1147,16 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
                 forceKey = true;
             }
 
+            // Kodlayıcı 2 sn yeni kare istemezse takıldı (sürücü hatası): baştan kur
+            if (!dirty || enc.canAccept()) {
+                encStallSinceUs = 0;
+            } else if (!encStallSinceUs) {
+                encStallSinceUs = now;
+            } else if (now - encStallSinceUs > 2 * kSecond) {
+                logf("Kodlayıcı yanıt vermiyor; görüntü yeniden kuruluyor");
+                rebuild = true;
+                break;
+            }
             const bool room = enc.canAccept() && inFlight < opt_.maxInFlight;
             const bool rateLimited = dirty && now - lastRealUs < minFrameUs;
             // Düşük gecikmede, kare sınırı yüzünden beklerken araya itici kare girer (çözücü sırası hızlı akar)
@@ -1048,6 +1174,14 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
                     dirty = false;
                     pushersLeft = opt_.pushers;
                     nextPusherUs = now + firstPusherUs;
+                    submitFails = 0;
+                } else if (++submitFails >= 20) {
+                    // Ölçekleyici ya da kodlayıcı sürekli reddediyor (ör. ekran kartı sıfırlandı): baştan kur
+                    logf("Kare kodlanamıyor; görüntü yeniden kuruluyor");
+                    rebuild = true;
+                    break;
+                } else {
+                    Sleep(10);  // hata döngüsü işlemciyi yormasın
                 }
             } else if (pusherDue && room) {
                 // Değişmemiş görüntüyü tekrar kodla: kodlayıcı "atla" blokları üretir, neredeyse sıfır bayt.
@@ -1074,12 +1208,9 @@ Streamer::Result Streamer::runSession(Dev& d, const std::string& host, unsigned 
                 waiter.waitUs(nextPusherUs - nowUs());
             }
 
+            keepAlive();
             now = nowUs();
             if (now >= nextStatsUs) {
-                proto::Writer w;
-                w.u64(uint64_t(now));
-                conn.send(proto::kPing, w.buf);
-
                 const int acks = stats.acks.exchange(0);
                 const int64_t e2e = stats.e2eSumUs.exchange(0), dec = stats.decodeSumUs.exchange(0);
                 char line[256];

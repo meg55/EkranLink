@@ -33,6 +33,7 @@ final class StreamServer extends Thread {
     private final Session.Host host;
     private volatile boolean stopped;
     private boolean incompatible; // son bağlantı sürüm uyuşmazlığıyla bitti (yalnızca sunucu iş parçacığı)
+    private boolean declined;     // son bağlantıda eşleştirme onaylanmadı (yalnızca sunucu iş parçacığı)
     private volatile ServerSocket serverSocket;
     private Socket client;
     private volatile Session session;
@@ -102,7 +103,7 @@ final class StreamServer extends Thread {
         }
 
         while (!stopped) {
-            if (!incompatible) {
+            if (!incompatible && !declined) {
                 stats.setStatus(Stats.WAITING, R.string.status_waiting);
             }
             Socket s;
@@ -128,6 +129,7 @@ final class StreamServer extends Thread {
     private void handle(Socket s) {
         String peer = String.valueOf(s.getRemoteSocketAddress());
         stats.resetSession();
+        declined = false;
         if (!incompatible) {
             stats.setStatus(Stats.CONNECTING, R.string.status_connecting);
         }
@@ -153,8 +155,13 @@ final class StreamServer extends Thread {
                 session = ses;
                 ses.setVideoRotation(rotation); // session atandıktan sonra: arada gelen değişiklik kaçmaz
                 Surface now = surface;
-                if (now != sf && now != null) {
-                    ses.resumeVideo(now); // bu arada ekran açıldı
+                if (now != sf) {
+                    // Bu arada ekran açıldı ya da kapandı: kapanmış yüzeyle çözücü kurulmasın
+                    if (now == null) {
+                        ses.suspendVideo();
+                    } else {
+                        ses.resumeVideo(now);
+                    }
                 }
                 incompatible = false;
                 ses.run();
@@ -168,6 +175,11 @@ final class StreamServer extends Thread {
             // PC birkaç saniyede bir yeniden dener: uyarı ekranda kalsın
             incompatible = true;
             stats.setStatus(Stats.ERROR, e.messageRes);
+        } catch (Session.PairingDeclinedException e) {
+            // Kullanıcı ne olduğunu görsün: bir sonraki bağlantıya kadar "bekleniyor" ile ezilmez
+            incompatible = false;
+            declined = true;
+            stats.setStatus(Stats.ERROR, R.string.status_pair_declined);
         } catch (Exception e) {
             incompatible = false;
             if (!stopped) {

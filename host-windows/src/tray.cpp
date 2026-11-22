@@ -41,12 +41,16 @@ constexpr UINT WM_NOTICE = WM_APP + 4;    // wParam: Notice, lParam: std::string
 constexpr UINT WM_OPEN_UI = WM_APP + 5;   // ikinci kez çalıştırıldı: pencereyi aç
 constexpr UINT WM_SETTINGS = WM_APP + 6;  // yön / çözünürlük Windows ayarlarından değişip kaydedildi
 constexpr UINT kTrayId = 1;
+constexpr UINT_PTR kTrayRetryTimer = 1;  // oturum açılırken görev çubuğu hazır değilse simge yeniden eklenir
+// Telefon / tablet uygulamasının indirildiği yer (PC uygulamayı cihaza kendisi kurmaz)
+constexpr const wchar_t* kDownloadUrl = L"https://github.com/meg55/EkranLink/releases/latest";
 
 enum MenuId : UINT {
     kMenuOpen = 100,
     kMenuLog,
     kMenuExit,
     kMenuDisconnectAll,
+    kMenuDownload,
     kMenuDisconnect = 200,  // + cihaz sırası
     kMenuConnect = 300,     // + cihaz sırası
 };
@@ -70,6 +74,7 @@ std::vector<std::string> g_viewKeys;     // pencereye ve menüye verilen sıra (
 std::vector<ui::Resolution> g_modes;     // o cihazın monitörünün Windows'taki modları
 Notice g_notice = Notice(0);             // çözülene kadar pencerede kalan uyarı
 std::wstring g_noticeArg;
+std::string g_balloonConnect;            // son bildirim "yeni cihaz bulundu" ise o cihaz: tıklayınca bağlanılır
 std::wstring g_logPath;
 // Hizmet kuruluysa yayını hizmet (ajan) yapar; tepsi yalnızca arayüzdür: ayarları HKLM'e yazar,
 // durumu oradan okur. Değilse yayını tepsi kendisi yapar (ayarlar HKCU).
@@ -172,6 +177,7 @@ void updateTray() {
 }
 
 void notify(const std::wstring& title, const std::wstring& text, DWORD icon = NIIF_INFO) {
+    g_balloonConnect.clear();
     NOTIFYICONDATAW n = g_nid;
     n.uFlags = NIF_INFO;
     wcsncpy(n.szInfoTitle, title.c_str(), ARRAYSIZE(n.szInfoTitle) - 1);
@@ -194,7 +200,38 @@ void showNotice(Notice code, const std::string& arg) {
         case Notice::Repair:
             notify(W(i18n::NoticeRepairTitle), i18n::F(i18n::NoticeRepair, widen(arg).c_str()), NIIF_WARNING);
             break;
+        case Notice::PairDeclined:
+            notify(W(i18n::NoticePairDeclinedTitle), i18n::F(i18n::NoticePairDeclined, widen(arg).c_str()),
+                   NIIF_WARNING);
+            break;
+        case Notice::NewDevice: {
+            const size_t tab = arg.find('\t');
+            if (tab == std::string::npos) break;
+            notify(W(i18n::NoticeNewDeviceTitle), i18n::F(i18n::NoticeNewDevice, widen(arg.substr(tab + 1)).c_str()));
+            g_balloonConnect = arg.substr(0, tab);
+            break;
+        }
     }
+}
+
+// Bildirim alanı simgesi. Oturum açılırken görev çubuğu henüz hazır olmayabilir: olmazsa birkaç saniyede bir
+// yeniden denenir. Gezgin yeniden başlayınca ("TaskbarCreated") yeniden eklenir.
+void addTrayIcon() {
+    if (Shell_NotifyIconW(NIM_ADD, &g_nid) || Shell_NotifyIconW(NIM_MODIFY, &g_nid)) {
+        KillTimer(g_wnd, kTrayRetryTimer);
+        return;
+    }
+    SetTimer(g_wnd, kTrayRetryTimer, 3000, nullptr);
+}
+
+void openDownloadPage() { ShellExecuteW(nullptr, L"open", kDownloadUrl, nullptr, nullptr, SW_SHOWNORMAL); }
+
+// Bu exe'den daha eski mi ("0.5.2" < "0.5.10"): eski bir kopya, kurulu yeni hizmeti "güncellemesin"
+bool olderVersion(const std::wstring& a, const std::wstring& b) {
+    int x[3] = {}, y[3] = {};
+    swscanf(a.c_str(), L"%d.%d.%d", &x[0], &x[1], &x[2]);
+    swscanf(b.c_str(), L"%d.%d.%d", &y[0], &y[1], &y[2]);
+    return std::lexicographical_compare(x, x + 3, y, y + 3);
 }
 
 // Hizmet modunda: ajanın yazdığı durumu izle (kayıt defteri bildirimi; yoklama yok)
@@ -378,7 +415,7 @@ void reloadCaches() {
     g_opt = config::loadOptions();
     g_outputs = listOutputs();
     g_driver = VirtualDisplay::driverAvailable();
-    g_serviceStale = g_serviceMode && service::installedVersion() != config::kVersion;
+    g_serviceStale = g_serviceMode && olderVersion(service::installedVersion(), config::kVersion);
 }
 
 void installOrRemoveService(bool update) {
@@ -421,6 +458,7 @@ public:
             v.link = widen(d.link);
             v.state = d.state;
             v.mode = d.mode;
+            v.paused = d.paused;
             v.width = d.width;
             v.height = d.height;
             if (d.state == DeviceState::Connected) {
@@ -462,6 +500,9 @@ public:
                 return;
             case ui::Act::OpenDisplaySettings:
                 ShellExecuteW(nullptr, L"open", L"ms-settings:display", nullptr, nullptr, SW_SHOWNORMAL);
+                break;
+            case ui::Act::DownloadApp:
+                openDownloadPage();
                 break;
             case ui::Act::Link:
                 g_opt.mode = LinkMode(v);
@@ -584,7 +625,7 @@ void showMenu() {
     bool any = false;
     for (size_t i = 0; i < g_devices.size() && i < 100; i++) {
         const DeviceInfo& d = g_devices[i];
-        if (d.state == DeviceState::AppMissing) continue;
+        if (d.state == DeviceState::AppMissing || d.state == DeviceState::Unauthorized) continue;
         if (!any) AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
         any = true;
         const bool on = d.state == DeviceState::Connected;
@@ -594,6 +635,7 @@ void showMenu() {
     }
     if (n > 1) AppendMenuW(m, MF_STRING, kMenuDisconnectAll, W(i18n::DisconnectAll));
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(m, MF_STRING, kMenuDownload, W(i18n::DownloadApp));
     AppendMenuW(m, MF_STRING, kMenuLog, W(i18n::OpenLog));
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(m, MF_STRING, kMenuExit, W(i18n::MenuExit));
@@ -624,6 +666,9 @@ void onCommand(UINT id) {
             break;
         case kMenuLog:
             g_host.act(ui::Act::OpenLog, 0);
+            break;
+        case kMenuDownload:
+            openDownloadPage();
             break;
         case kMenuExit:
             ui::close();
@@ -682,8 +727,25 @@ LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     static UINT taskbarCreated = RegisterWindowMessageW(L"TaskbarCreated");
     switch (msg) {
         case WM_TRAY:
-            if (LOWORD(l) == WM_LBUTTONUP) openUi();
-            else if (LOWORD(l) == WM_RBUTTONUP) showMenu();
+            if (LOWORD(l) == WM_LBUTTONUP) {
+                openUi();
+            } else if (LOWORD(l) == WM_RBUTTONUP) {
+                showMenu();
+            } else if (LOWORD(l) == NIN_BALLOONUSERCLICK) {
+                // "Yeni cihaz bulundu" bildirimi: tek tıkla bağlan (iki ekranda kod onayı istenir)
+                if (!g_balloonConnect.empty()) connectDevice(g_balloonConnect);
+                g_balloonConnect.clear();
+                openUi();
+            } else if (LOWORD(l) == NIN_BALLOONTIMEOUT) {
+                g_balloonConnect.clear();
+            }
+            return 0;
+        case WM_TIMER:
+            if (w == kTrayRetryTimer) addTrayIcon();
+            return 0;
+        case WM_ENDSESSION:
+            // Oturum kapanıyor: sanal monitörler kaldırılsın, tek ekranda kapatılan monitörler geri gelsin
+            if (w) stopStreamer();
             return 0;
         case WM_OPEN_UI:
             openUi();
@@ -698,9 +760,12 @@ LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         }
         case WM_NOTICE: {
             std::unique_ptr<std::string> arg(reinterpret_cast<std::string*>(l));
-            g_notice = Notice(w);
-            g_noticeArg = widen(*arg);
-            showNotice(g_notice, *arg);
+            // "Yeni cihaz" yalnızca bildirimdir: cihaz zaten listede, pencerede kalıcı uyarı gerekmez
+            if (Notice(w) != Notice::NewDevice) {
+                g_notice = Notice(w);
+                g_noticeArg = widen(*arg);
+            }
+            showNotice(Notice(w), *arg);
             updateTray();
             return 0;
         }
@@ -722,7 +787,7 @@ LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             PostQuitMessage(0);
             return 0;
         default:
-            if (msg == taskbarCreated) Shell_NotifyIconW(NIM_ADD, &g_nid);  // Gezgin yeniden başladı
+            if (msg == taskbarCreated) addTrayIcon();  // Gezgin yeniden başladı
             return DefWindowProcW(h, msg, w, l);
     }
 }
@@ -753,8 +818,10 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
 
     HANDLE single = CreateMutexW(nullptr, TRUE, L"EkranLink-tepsi");
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
-        // Zaten çalışıyor: onun penceresini aç
-        if (HWND other = FindWindowExW(HWND_MESSAGE, nullptr, L"EkranLinkTray", nullptr)) {
+        // Zaten çalışıyor: onun penceresini aç (0.5.2 ve öncesi yalnızca ileti penceresiydi)
+        HWND other = FindWindowW(L"EkranLinkTray", nullptr);
+        if (!other) other = FindWindowExW(HWND_MESSAGE, nullptr, L"EkranLinkTray", nullptr);
+        if (other) {
             DWORD pid = 0;
             GetWindowThreadProcessId(other, &pid);
             AllowSetForegroundWindow(pid);
@@ -783,7 +850,10 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
     wc.hInstance = inst;
     wc.lpszClassName = L"EkranLinkTray";
     RegisterClassW(&wc);
-    g_wnd = CreateWindowW(wc.lpszClassName, L"EkranLink", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, inst, nullptr);
+    // Gizli üst düzey pencere (ileti penceresi değil): yalnızca üst düzey pencereler "TaskbarCreated" ve oturum
+    // kapanışı (WM_ENDSESSION) yayınlarını alır. Hiç gösterilmez; görev çubuğunda da görünmez.
+    g_wnd = CreateWindowExW(WS_EX_TOOLWINDOW, wc.lpszClassName, L"EkranLink", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr,
+                            inst, nullptr);
 
     g_iconIdle = loadIcon(2, GetSystemMetrics(SM_CXSMICON));
     g_iconOn = loadIcon(1, GetSystemMetrics(SM_CXSMICON));
@@ -794,7 +864,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
     g_nid.uCallbackMessage = WM_TRAY;
     g_nid.hIcon = g_iconIdle;
     wcsncpy(g_nid.szTip, (std::wstring(L"EkranLink — ") + W(i18n::Waiting)).c_str(), ARRAYSIZE(g_nid.szTip) - 1);
-    Shell_NotifyIconW(NIM_ADD, &g_nid);
+    addTrayIcon();
 
     // Önceki tepsi pencere açıkken kapanmış (çökmüş) olabilir: ajan boşuna ölçüm yazmasın
     if (g_serviceMode && config::get(L"Izle", 0)) config::set(L"Izle", 0);

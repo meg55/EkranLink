@@ -471,8 +471,10 @@ int runAgent() {
             CoUninitialize();
         });
 
+        // Bildirim değerler okunmadan önce yeniden kurulur: okuma sırasında gelen yazma (ör. komutun ikinci
+        // değeri) kaçmaz, bir sonraki turda yeniden uyandırır
+        if (settings) RegNotifyChangeKeyValue(settings, FALSE, REG_NOTIFY_CHANGE_LAST_SET, regEv, TRUE);
         for (;;) {
-            if (settings) RegNotifyChangeKeyValue(settings, FALSE, REG_NOTIFY_CHANGE_LAST_SET, regEv, TRUE);
             HANDLE hs[2] = {regEv, stopEv};
             const DWORD w = WaitForMultipleObjects(stopEv ? 2 : 1, hs, FALSE, settings ? INFINITE : 5000);
             if (w == WAIT_OBJECT_0 + 1) {
@@ -480,6 +482,7 @@ int runAgent() {
                 break;
             }
             if (w != WAIT_OBJECT_0) continue;
+            if (settings) RegNotifyChangeKeyValue(settings, FALSE, REG_NOTIFY_CHANGE_LAST_SET, regEv, TRUE);
             if (handleForget()) continue;
             // Tepsiden komut: bağlan / kes (kullanıcı HKLM'e yalnızca ayar anahtarına yazabilir)
             const DWORD cmdId = config::commandId();
@@ -600,8 +603,10 @@ int install() {
 
     // 4) Hizmet: açılışta, oturum açılmadan başlar
     const std::wstring bin = L"\"" + dir + L"\\EkranLink.exe\" --hizmet";
+    // Hizmetler listesindeki ad ve açıklama kuran kullanıcının dilinde
+    i18n::setLanguage(int(config::get(L"Language", 0)));
     if (!svc) {
-        svc = CreateServiceW(scm, kName, L"EkranLink tablet ekranı", SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
+        svc = CreateServiceW(scm, kName, i18n::W(i18n::ServiceDisplayName), SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
                              SERVICE_AUTO_START, SERVICE_ERROR_NORMAL, bin.c_str(), nullptr, nullptr, nullptr,
                              nullptr, nullptr);
         if (!svc) {
@@ -612,15 +617,14 @@ int install() {
         }
     } else {
         ChangeServiceConfigW(svc, SERVICE_NO_CHANGE, SERVICE_AUTO_START, SERVICE_NO_CHANGE, bin.c_str(), nullptr,
-                             nullptr, nullptr, nullptr, nullptr, nullptr);
+                             nullptr, nullptr, nullptr, nullptr, i18n::W(i18n::ServiceDisplayName));
     }
     // Eşleşmeler artık gizli bölümde: kullanıcının okuyabildiği kopyalar (anahtarlar, PC kimliği) kalmasın.
     // Hizmet kurulduktan sonra: kurulum yarıda kalsaydı tepsi eşleşmeleri HKCU'da arardı.
     if (pairsMoved) RegDeleteTreeW(HKEY_CURRENT_USER, userPairs.c_str());
     if (RegGetValueW(HKEY_LOCAL_MACHINE, config::kSecretKey, L"PcId", RRF_RT_ANY, nullptr, nullptr, nullptr) == 0)
         deleteValue(HKEY_CURRENT_USER, config::kUserKey, L"PcId");
-    SERVICE_DESCRIPTIONW desc{const_cast<wchar_t*>(
-        L"Android tablet ve telefonları bu bilgisayarın ekranı yapar; oturum açma ekranı ve UAC dahil.")};
+    SERVICE_DESCRIPTIONW desc{const_cast<wchar_t*>(i18n::W(i18n::ServiceDescription))};
     ChangeServiceConfig2W(svc, SERVICE_CONFIG_DESCRIPTION, &desc);
     SC_ACTION actions[3] = {{SC_ACTION_RESTART, 5000}, {SC_ACTION_RESTART, 5000}, {SC_ACTION_RESTART, 30000}};
     SERVICE_FAILURE_ACTIONSW fa{};

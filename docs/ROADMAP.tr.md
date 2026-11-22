@@ -15,9 +15,9 @@ ve Windows'un tek ekranı olarak; USB veya Wi-Fi ile.
 | Android istemci | Java, minSdk 16 (4.1), AndroidX yok | MediaCodec 4.1'de geldi; güncel AndroidX/NDK 4.x'i desteklemiyor |
 | iOS istemci | Swift, VideoToolbox | Yerel uygulama isteniyor; çok eski iOS sürümleri web istemcisiyle |
 | Web istemcisi | Framework'süz JavaScript | Eski tarayıcılar |
-| Hedef PC'ler | Windows 10 1809+ / 11; ekransız mini PC ve masaüstü | "Tek ekran" senaryosu birinci sınıf vatandaş |
+| Hedef PC'ler | Windows 10 1809+ / 11 (sanal ekran sürücüsü: Windows 10 2004+); ekransız mini PC ve masaüstü | "Tek ekran" senaryosu birinci sınıf vatandaş |
 | Sanal ekran | Başta [Virtual Display Driver](https://github.com/VirtualDrivers/Virtual-Display-Driver) (MIT, imzalı), sonra kendi IddCx sürücümüz | Erken aşamada sürücü imzası derdi olmadan ilerlemek |
-| Şifreleme | Geçici ECDH P-256 + ChaCha20-Poly1305, ilk Wi-Fi bağlantısında 6 haneli eşleştirme kodu ([PROTOCOL.tr.md](PROTOCOL.tr.md)) | Android 4.x'in TLS yığını eski; ChaCha20 donanım AES'i olmayan işlemcilerde hızlı |
+| Şifreleme | Geçici ECDH P-256 + ChaCha20-Poly1305, ilk bağlantıda (USB ve Wi-Fi) 6 haneli eşleştirme kodu ([PROTOCOL.tr.md](PROTOCOL.tr.md)) | Android 4.x'in TLS yığını eski; ChaCha20 donanım AES'i olmayan işlemcilerde hızlı |
 
 ## Bilinen sınırlar
 
@@ -58,7 +58,7 @@ Bulgular:
    için USB öncelikli.
 5. Tablette `f_accessory` (AOA) ve `f_rndis` (USB internet paylaşımı) çekirdek desteği var: iki USB yolu da açık.
 
-Deneme: `tools/faz0.ps1` (PC'den gönderir), `tools/sayac.html` (uçtan uca gecikmeyi fotoğrafla ölçmek için).
+Deneme: `tools/sayac.html` (uçtan uca gecikmeyi fotoğrafla ölçmek için).
 
 ## Faz 1 – İlk sürüm: yansıtma ✅ (0.1.0)
 
@@ -216,6 +216,29 @@ MSVC + WDK ile derlenip yerel sertifikayla imzalanıyor.
       kaybolmaz, monitör biraz daralır. Android 16 telefon öykünücüsünde (dört yön, öykünülen çentik: 2400×1080 →
       2274×1080, görev çubuğu görünüyor) ve Android 4.2 öykünücüsünde (yine yatay, hata yok) doğrulandı; telefonun
       kendisinde henüz değil
+- [x] Tüm projenin gözden geçirilmesi (0.5.3). Düzeltilenler:
+      - Canlılık: PC, cihaz uygulaması arka plandayken de saniyede bir Ping gönderir ve 15 sn ses gelmezse
+        bağlantıyı kapatır (sanal monitör ve *Tek ekran* düzeni geri gelir); cihaz da 0.5.3+ PC'den 15 sn çerçeve
+        gelmezse kapatır (`PcHello` bayrağı bit1; eski PC'ler etkilenmez). Android 16 öykünücüsünde ölçüldü:
+        dondurulan öykünücü → PC 15 sn'de kapattı, sonra yeniden bağlandı; askıya alınan PC süreci → cihaz 15
+        sn'de kapattı, sonra yeniden bağlandı.
+      - Görüntünün toparlanması: yakalama 2 sn başarısız olursa aynı aygıtla sonsuza dek denenmez, yeni bir GPU
+        aygıtıyla baştan kurulur (ekran kartı sıfırlandı, Win+P); kurulamadığı sürece *Tek ekran* PC monitörlerini
+        geri açar. Windows'un 8 sn'de etkinleştirmediği sanal monitör kaldırılır. Kodlayıcı reddedilen bir kareden
+        sonra donmaz; takılan kodlayıcı yeniden kurulur.
+      - adb zaman aşımları artık işliyor (takılan `adb` cihaz aramayı durdurmaz); fare modunda sürüklerken bağlantı
+        koparsa sol tuş bırakılır; tepsiden hizmete giden komutlar kaybolmaz; Gezgin yeniden başlayınca simge geri
+        gelir; eski bir kopya yeni hizmeti "güncellemeyi" önermez.
+      - Android: otomatik döndürme kapalıyken pencere yine yatay kalır (0.5.2 gerilemesi: dönme kilidi açık, yatay
+        standdaki telefon masaüstünü dikey gösteriyordu); cihaz dönerken çözücü yeniden kurulurken arayüz donmaz.
+      - İlk kullanım: "USB hata ayıklamaya izin ver" bekleyen USB cihazı bu yönergeyle listelenir; Geliştirici
+        seçeneklerinin nasıl açılacağı iki tarafta da yazar; ağdaki yeni cihaz için tıklayınca bağlanan bildirim;
+        reddedilen eşleştirme iki ekranda da söylenir; duraklatılan cihaz (uygulama arka planda) gösterilir;
+        *Android uygulamasını indir* düğmesi; sürücü notu *İkinci ekran*ın neden kullanılamadığını açıklar;
+        README'de kurulum uyarıları; zip'teki açıklama iki dilli; sessiz güncelleme otomatik başlatmayı yeniden açmaz.
+      Android 16 telefon öykünücüsünde (eşleştirme reddi / onayı, iki yönde sessizlik zaman aşımı, otomatik
+      döndürme açık ve kapalıyken yön) ve Android 4.2 öykünücüsünde (bağlanıyor, hata yok) doğrulandı. Ayar
+      penceresindeki değişiklikler ve USB izin durumu gerçek donanımda henüz denenmedi.
 - [ ] Dağıtım imzası (SignPath Foundation veya EV + Microsoft) — şu an sürücü yalnızca derlendiği bilgisayarda kurulabiliyor
 
 Ölçüm (S6000, USB, ikinci ekran 1280×752): PC→tablette çizim ~27 ms, ekran sabitken PC CPU %0,3.

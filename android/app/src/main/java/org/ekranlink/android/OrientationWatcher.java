@@ -10,7 +10,8 @@ import android.view.OrientationEventListener;
 
 /**
  * Tabletin nasıl tutulduğunu izler. Tablet dikey tutulunca PC sanal monitörü döndürür (gerçek bir monitörü dik
- * çevirmek gibi). Pencere cihazla birlikte döner ama PC'ye giden görüntü, çözücü ve dokunma boyutları hep yataydır.
+ * çevirmek gibi). Otomatik döndürme açıkken pencere de cihazla birlikte döner ama PC'ye giden görüntü, çözücü ve
+ * dokunma boyutları hep yataydır.
  *
  * Android'in "otomatik döndür" ayarı kapalıysa algılayıcı açılmaz ve PC'ye yön bildirilmez.
  * Algılayıcı yalnızca uygulama öndeyken (ekran zaten açıkken) ve en yavaş hızda (~5/sn) çalışır.
@@ -19,6 +20,9 @@ final class OrientationWatcher extends OrientationEventListener {
     interface Listener {
         /** Yatay ekrana göre saat yönünde dönüş: 0, 90 ya da 270. Ana iş parçacığında çağrılır. */
         void onOrientation(int degrees);
+
+        /** Android'in "otomatik döndür" ayarı (uygulama öndeyken değişince de). Ana iş parçacığında çağrılır. */
+        void onAutoRotate(boolean on);
     }
 
     private static final int SETTLE_MS = 400; // bu kadar süre aynı yönde kalınca bildir
@@ -94,7 +98,11 @@ final class OrientationWatcher extends OrientationEventListener {
     }
 
     private void update() {
-        if (active && autoRotate() && canDetectOrientation()) {
+        boolean auto = autoRotate(activity);
+        if (active) {
+            listener.onAutoRotate(auto);
+        }
+        if (active && auto && canDetectOrientation()) {
             enable();
         } else {
             disable();
@@ -102,7 +110,7 @@ final class OrientationWatcher extends OrientationEventListener {
         }
     }
 
-    private boolean autoRotate() {
+    static boolean autoRotate(Activity activity) {
         return Settings.System.getInt(activity.getContentResolver(), Settings.System.ACCELEROMETER_ROTATION, 1) != 0;
     }
 

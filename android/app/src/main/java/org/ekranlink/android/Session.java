@@ -1,6 +1,7 @@
 package org.ekranlink.android;
 
 import android.os.Build;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.Surface;
 
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.security.GeneralSecurityException;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Protokol v3 oturumu (docs/PROTOCOL.md).
@@ -44,6 +46,11 @@ final class Session implements H264Decoder.FrameListener {
     static final int MSG_INCOMPATIBLE = 24;
 
     static final int TOUCH_DOWN = 0, TOUCH_MOVE = 1, TOUCH_UP = 2, TOUCH_CANCEL = 3;
+
+    /** PcHello bayrağı: PC oturum boyunca en az 2 sn'de bir Ping gönderir (0.5.3+). */
+    private static final int FLAG_PINGS_ALWAYS = 2;
+    /** Böyle bir PC'den bu kadar süre hiçbir şey gelmezse bağlantı ölü sayılır (PC uyudu, ağdan düştü). */
+    private static final long SILENCE_TIMEOUT_MS = 15000;
 
     /** Eşleştirme penceresi: kullanıcının kararı beklenir ya da PC reddederse kapatılır. */
     interface PairPrompt {
@@ -94,6 +101,9 @@ final class Session implements H264Decoder.FrameListener {
     private boolean authenticated; // el sıkışma bitti: büyük çerçeveler kabul edilir
     private boolean plainVideo; // USB: PC→cihaz görüntüsü şifresiz
     private java.net.Socket socket; // el sıkışmada okuma zaman aşımı için (StreamServer verir)
+    private volatile boolean pcPingsAlways;
+    private volatile boolean declinedHere; // eşleştirme bu cihazda reddedildi
+    private volatile long lastRxMs; // PC'den son çerçeve (SystemClock.elapsedRealtime)
     private byte[] buf = new byte[256 * 1024];
 
     Session(DataInputStream in, OutputStream out, boolean localLink, Surface surface, Stats stats, Host host) {
@@ -144,6 +154,7 @@ final class Session implements H264Decoder.FrameListener {
         try {
             while (!closed) {
                 int len = readFrame();
+                lastRxMs = SystemClock.elapsedRealtime();
                 handle(buf[0] & 0xFF, buf, 1, len - 1);
             }
         } finally {
@@ -162,6 +173,13 @@ final class Session implements H264Decoder.FrameListener {
         IncompatibleException(int messageRes, String message) {
             super(message);
             this.messageRes = messageRes;
+        }
+    }
+
+    /** İlk eşleştirme onaylanmadı (bu cihazda ya da PC'de reddedildi, süresi doldu). */
+    static final class PairingDeclinedException extends IOException {
+        PairingDeclinedException() {
+            super("eşleştirme onaylanmadı");
         }
     }
 
@@ -194,6 +212,7 @@ final class Session implements H264Decoder.FrameListener {
         }
         int o = 1;
         int flags = buf[o++] & 0xFF;
+        pcPingsAlways = (flags & FLAG_PINGS_ALWAYS) != 0;
         byte[] pcId = slice(o, 16);
         o += 16;
         byte[] pcPub = slice(o, 65);
@@ -269,6 +288,7 @@ final class Session implements H264Decoder.FrameListener {
             PairPrompt prompt = host.showPairing(pcName, code, new Runnable() {
                 @Override
                 public void run() {
+                    declinedHere = true;
                     close();
                     try {
                         in.close();
@@ -285,6 +305,9 @@ final class Session implements H264Decoder.FrameListener {
                 if (prompt != null) {
                     prompt.dismiss(); // PC vazgeçti / bağlantı koptu
                 }
+                if (declinedHere) {
+                    throw new PairingDeclinedException(); // bu cihazda "Reddet": bağlantıyı biz kapattık
+                }
                 throw e;
             }
             if (!pcAccepted && prompt != null) {
@@ -292,10 +315,17 @@ final class Session implements H264Decoder.FrameListener {
             }
             // Soru gösterilemediyse (arayüz yok) reddedilir
             boolean accepted = pcAccepted && prompt != null && prompt.await();
-            writeFrameNow(new byte[]{(byte) MSG_PAIR_RESULT, (byte) (accepted ? 1 : 0)});
-            out.flush();
+            try {
+                writeFrameNow(new byte[]{(byte) MSG_PAIR_RESULT, (byte) (accepted ? 1 : 0)});
+                out.flush();
+            } catch (IOException e) {
+                if (accepted) {
+                    throw e;
+                }
+                // Bu cihazda reddedildi: bağlantıyı "Reddet" zaten kapattı, PC de bunu ret sayar
+            }
             if (!accepted) {
-                throw new GeneralSecurityException("eşleştirme reddedildi");
+                throw new PairingDeclinedException();
             }
             store.save(pcId, Crypto.derive(prk, "ekran pair"), pcName);
             Log.i(TAG, "Eşleştirildi: " + pcName);
@@ -362,9 +392,17 @@ final class Session implements H264Decoder.FrameListener {
     }
 
     private void sendLoop() {
+        lastRxMs = SystemClock.elapsedRealtime();
         try {
             while (true) {
-                byte[] body = sendQueue.take();
+                // Gönderecek bir şey yokken de 2 sn'de bir uyanıp PC'nin sesini denetle
+                byte[] body = sendQueue.poll(2, TimeUnit.SECONDS);
+                if (silenceExpired()) {
+                    return;
+                }
+                if (body == null) {
+                    continue;
+                }
                 if (body == STOP) {
                     return;
                 }
@@ -385,6 +423,27 @@ final class Session implements H264Decoder.FrameListener {
                 Log.w(TAG, "Gönderim hatası", e);
             }
         }
+    }
+
+    /**
+     * PC (0.5.3+) saniyede bir Ping gönderir; 15 sn hiçbir şey gelmediyse PC uyudu ya da ağdan düştü: bağlantı
+     * kapatılır (yoksa uygulama sonsuza dek "bağlı" kalır, PC yeniden bağlanamaz). Eski PC'ler arka plandayken
+     * Ping göndermez: onlarda denetlenmez.
+     */
+    private boolean silenceExpired() {
+        if (!pcPingsAlways || closed || SystemClock.elapsedRealtime() - lastRxMs < SILENCE_TIMEOUT_MS) {
+            return false;
+        }
+        Log.w(TAG, "PC " + SILENCE_TIMEOUT_MS / 1000 + " sn yanıt vermedi, bağlantı kapatılıyor");
+        closed = true;
+        java.net.Socket s = socket;
+        if (s != null) {
+            try {
+                s.close(); // okuma iş parçacığı uyanır, oturum biter
+            } catch (IOException ignored) {
+            }
+        }
+        return true;
     }
 
     // --- Mesajlar ---

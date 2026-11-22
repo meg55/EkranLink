@@ -33,10 +33,15 @@ namespace ekran::i18n {
     X(StepsTitle, L"Bağlanmak için", L"To connect")                                                                 \
     X(StepApp, L"1.  Cihaza EkranLink'in Android uygulamasını (APK) kurun ve açın.",                                    \
       L"1.  Install the EkranLink Android app (APK) on the device and open it.")                                       \
-    X(StepUsb, L"2.  USB: kabloyla takın (cihazda USB hata ayıklama açık olmalı).",                                 \
-      L"2.  USB: plug in the cable (USB debugging must be on on the device).")                                     \
-    X(StepWifi, L"     Wi-Fi: cihazı bu bilgisayarla aynı ağa bağlayın; kendiliğinden bulunur.",                    \
-      L"     Wi-Fi: join the same network as this computer; it is found automatically.")                           \
+    X(StepUsb, L"2.  USB: cihazda Geliştirici seçenekleri > USB hata ayıklama'yı açıp kabloyla takın. (Geliştirici "  \
+      L"seçenekleri görünmüyorsa: Ayarlar > Telefon/Tablet hakkında > Yapı numarası'na 7 kez dokunun.)",           \
+      L"2.  USB: turn on Developer options > USB debugging on the device, then plug in the cable. (No Developer "  \
+      L"options? Tap Settings > About phone/tablet > Build number 7 times.)")                                      \
+    X(StepWifi, L"     Wi-Fi: cihazı bu bilgisayarla aynı ağa bağlayın. Listede görününce Bağlan'a basın ve iki "  \
+      L"ekranda aynı kodu onaylayın (yalnızca ilk seferde).",                                                       \
+      L"     Wi-Fi: join the same network as this computer. When it appears in the list, click Connect and "        \
+      L"confirm the same code on both screens (first time only).")                                                  \
+    X(DownloadApp, L"Android uygulamasını indir", L"Download the Android app")                                      \
     X(SecConnection, L"Bağlantı", L"Connection")                                                                    \
     X(LinkType, L"Bağlantı türü", L"Connection type")                                                               \
     X(LinkAuto, L"Otomatik", L"Automatic")                                                                          \
@@ -56,9 +61,12 @@ namespace ekran::i18n {
     X(FoundDevices, L"Bağlanabilecek cihazlar", L"Available devices")                                               \
     X(StateFound, L"Bağlanmaya hazır", L"Ready to connect")                                                         \
     X(StateConnecting, L"Bağlanıyor…", L"Connecting…")                                                              \
-    X(StateWaitingApp, L"Cihazda EkranLink'i açın (cihazdaki \"otomatik aç\" kapalı)",                            \
-      L"Open EkranLink on the device (\"open automatically\" is off there)")                                       \
+    X(StateWaitingApp, L"Cihazda EkranLink'i açın", L"Open EkranLink on the device")                                \
     X(StateAppMissing, L"Cihazda EkranLink kurulu değil", L"EkranLink is not installed on the device")              \
+    X(StateUnauthorized, L"Cihazda \"USB hata ayıklamaya izin verilsin mi?\" sorusunda İzin ver'e dokunun",          \
+      L"On the device, tap Allow on \"Allow USB debugging?\"")                                                     \
+    X(StatePaused, L"Duraklatıldı: cihazda EkranLink arka planda. Uygulamaya dönünce görüntü sürer.",              \
+      L"Paused: EkranLink is in the background on the device. The picture resumes when you return to the app.")    \
     X(DisplayDevice, L"Cihaz", L"Device")                                                                           \
     X(MenuConnectTo, L"Bağlan: %ls", L"Connect: %ls")                                                               \
     X(MenuDisconnectFrom, L"Bağlantıyı kes: %ls", L"Disconnect: %ls")                                               \
@@ -73,8 +81,10 @@ namespace ekran::i18n {
       L"Other monitors turn off while the device is connected and come back when it disconnects.")                 \
     X(HintMirror, L"Seçili bilgisayar ekranının kopyası cihazda görünür.",                                          \
       L"The device shows a copy of the selected computer screen.")                                                  \
-    X(DriverMissing, L"Sanal ekran sürücüsü kurulu değil; yalnızca yansıtma kullanılabilir.",                       \
-      L"The virtual display driver is not installed; only mirroring is available.")                                 \
+    X(DriverMissing, L"İkinci ekran ve Tek ekran için sanal ekran sürücüsü gerekir; bu sürümde henüz yok (kod "     \
+      L"imzası tamamlanınca gelecek). Şimdilik yansıtma kullanılabilir.",                                           \
+      L"Extend and Only this need the virtual display driver, which this release does not include yet (it comes "  \
+      L"once it is code-signed). Mirroring works now.")                                                             \
     X(Orientation, L"Ekran yönü", L"Display orientation")                                                           \
     X(OrientAuto, L"Otomatik (cihazı çevirince döner)", L"Automatic (follows the device)")                          \
     X(OrientLandscape, L"Yatay", L"Landscape")                                                                      \
@@ -127,6 +137,10 @@ namespace ekran::i18n {
       L"app keeps streaming.")                                                                                      \
     X(ServiceFailed, L"Hizmet kurulamadı ya da kaldırılamadı.\nAyrıntı: C:\\ProgramData\\EkranLink\\hizmet.log",        \
       L"Could not install or remove the service.\nDetails: C:\\ProgramData\\EkranLink\\hizmet.log")                    \
+    X(ServiceDisplayName, L"EkranLink tablet ekranı", L"EkranLink tablet display")                                  \
+    X(ServiceDescription,                                                                                           \
+      L"Android tablet ve telefonları bu bilgisayarın ekranı yapar; oturum açma ekranı ve UAC dahil.",              \
+      L"Makes Android tablets and phones a display for this computer, including the sign-in screen and UAC.")      \
     X(ServiceInstalled, L"Cihaz artık oturum açma ekranını da gösterecek.",                                        \
       L"The device will now also show the sign-in screen.")                                                         \
     X(ServiceRemoved, L"Hizmet kaldırıldı; yayını bu uygulama yapıyor.",                                            \
@@ -144,6 +158,15 @@ namespace ekran::i18n {
     X(NoticeAppMissing,                                                                                             \
       L"EkranLink'in Android uygulamasını (APK) cihaza indirip kurun. Kurulunca bağlantı kendiliğinden kurulur.",     \
       L"Download and install the EkranLink Android app (APK) on the device. It connects by itself once installed.")    \
+    X(NoticePairDeclinedTitle, L"Eşleştirme onaylanmadı", L"Pairing was not confirmed")                             \
+    X(NoticePairDeclined,                                                                                           \
+      L"%ls cihazında eşleştirme reddedildi ya da süresi doldu. Yeniden denemek için Bağlan'a basın ve iki "        \
+      L"ekranda aynı kodu onaylayın.",                                                                              \
+      L"Pairing was declined or timed out on %ls. To try again, click Connect and confirm the same code on both "  \
+      L"screens.")                                                                                                  \
+    X(NoticeNewDeviceTitle, L"Yeni cihaz bulundu", L"New device found")                                             \
+    X(NoticeNewDevice, L"%ls bağlanmaya hazır. Bağlanmak için buraya tıklayın.",                                    \
+      L"%ls is ready to connect. Click here to connect.")                                                           \
     X(NoticeTabletOldTitle, L"Cihazdaki EkranLink eski", L"EkranLink on the device is outdated")                           \
     X(NoticeTabletOld, L"Cihaza EkranLink'in Android uygulamasının yeni sürümünü (APK) kurun.",                        \
       L"Install the new version of the EkranLink Android app (APK) on the device.")                                     \

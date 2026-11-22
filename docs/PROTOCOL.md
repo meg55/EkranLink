@@ -54,6 +54,11 @@ If the tablet does not support the PC's version, it sends `Incompatible` (24) in
 `u16 tabletVersion, str appVersion` (unencrypted frame) and closes the connection. Both sides
 tell the user which app needs to be updated (the PC does not install the app on the tablet; the two are downloaded separately).
 
+- `flags` (PcHello): bit0 = the PC wants plain video (honoured only on a local USB link); bit1 = the PC sends
+  `Ping` at least every 2 s for the whole session, also while the tablet app is in the background (0.5.3+).
+  With bit1 the tablet closes the connection after 15 s without any frame from the PC (PC asleep or off the
+  network). The PC closes it after 15 s without any frame from the tablet (`Pong` included), whatever the
+  tablet's version, since every tablet answers `Ping`.
 - `ecdh*`: ephemeral ECDH P-256 public key (`04 || X || Y`), a new one is generated for every connection.
   The tablet verifies that the received point lies on the curve; Windows CNG verifies it on import.
 - `commit` = SHA-256(nonceP). The PC commits to its random value first and reveals it in `Mode`; the tablet
@@ -98,19 +103,19 @@ debugging) does not count as local, and video is encrypted there too.
 | 1 | Hello | T→P | `u16 version, u16 surfaceWidth, u16 surfaceHeight, u16 screenWidth, u16 screenHeight, u16 dpi, u16 sdk, str model, str decoder` |
 | 2 | Config | P→T | `u16 streamWidth, u16 streamHeight, u8 codec(1=H.264), u16 sourceWidth, u16 sourceHeight, u16 contentX, u16 contentY, u16 contentWidth, u16 contentHeight` |
 | 3 | Video | P→T | `u64 pts(µs, PC clock), u8 flags(bit0 key frame, bit1 pusher frame), ... Annex-B data of a single frame` |
-| 4 | Ping | P→T | `u64 time` |
+| 4 | Ping | P→T | `u64 time` — every second (also a liveness check, see `flags` bit1) |
 | 5 | Pong | T→P | `u64 time` (the value from the Ping, unchanged) |
 | 6 | FrameAck | T→P | `u64 pts, u32 decodeTime(µs), u16 count` — the last rendered frame; `count` is the number of frames this acknowledgement covers (every 3rd frame while motion continues, sent immediately when the decoder drains; otherwise 1) |
 | 7 | CursorShape | P→T | `u16 width, u16 height, u16 hotspotX, u16 hotspotY, width×height × u32 ARGB` |
 | 8 | CursorPos | P→T | `s16 x, s16 y, u8 visible` — top-left of the cursor, in source image pixels |
 | 10 | Touch | T→P | `u8 action(0 down,1 move,2 up,3 cancel), u8 finger, u16 x, u16 y, u16 pressure(0–1024)` — stream pixels; each finger with its own `finger` id, `cancel` cancels all fingers |
-| 11 | Orientation | T→P | `u16 degrees` (0, 90, 270) — how the tablet is held, clockwise relative to the landscape screen. Sent only while the tablet's auto-rotate is on, on connect and when the orientation changes |
+| 11 | Orientation | T→P | `u16 degrees` (0, 90, 270) — how the tablet is held, clockwise relative to the landscape screen. Sent on connect and when the orientation changes: from the sensor while the tablet's auto-rotate is on, otherwise only if the window itself is portrait (large screens where Android ignores the landscape lock) |
 | 12 | DisplayPower | P→T | `u8 on` — Windows turned the displays off (0) / on (1). The tablet dims and lets its screen turn off via its own timeout; the connection stays up. When turned on, the tablet lights its screen |
 | 13 | KeyRequest | T→P | (empty) — the tablet re-created its decoder (its surface was destroyed and came back); the PC sends a key frame and resets the acknowledgement counter |
 | 14 | VideoVisible | T→P | `u8 foreground` — the tablet app was sent to the background (0) / came to the foreground (1). While in the background the PC stops capturing and encoding, the connection stays up; on returning to the foreground the tablet sends `KeyRequest`. While in the background the PC does not turn off the tablet's screen |
 | 20–24 | PcHello, TabletKey, Mode, PairResult, Incompatible | | above |
 
-If the first 4 bytes are not `"EKRN"`, the tablet treats the stream as raw H.264 Annex-B (diagnostic mode, `tools/faz0.ps1`).
+If the first 4 bytes are not `"EKRN"`, the tablet treats the stream as raw H.264 Annex-B (diagnostic mode: e.g. `adb forward tcp:27183 tcp:27183`, then ffmpeg with `-f h264 tcp://127.0.0.1:27183`).
 
 ### Content rectangle
 

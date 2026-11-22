@@ -139,7 +139,8 @@ bool VirtualDisplay::add(const VirtualDisplaySpec& spec, std::wstring& gdiName, 
         }
         Sleep(100);
     }
-    logf("Sanal ekran: monitör eklendi ama Windows etkinleştirmedi");
+    logf("Sanal ekran: monitör eklendi ama Windows etkinleştirmedi; kaldırılıyor");
+    remove();  // sonradan etkinleşip görünmeyen bir ekrana pencere taşınmasın
     return false;
 }
 

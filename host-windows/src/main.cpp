@@ -96,10 +96,12 @@ int main(int argc, char** argv) {
         std::fflush(stdout);
     };
     ev.onDevices = [](const std::vector<DeviceInfo>& list) {
-        static const char* states[] = {"bulundu", "bağlanıyor", "bağlı", "cihazda açılması bekleniyor", "uygulama yok"};
+        static const char* states[] = {"bulundu", "bağlanıyor", "bağlı", "cihazda açılması bekleniyor", "uygulama yok",
+                                       "cihazda USB hata ayıklama izni bekleniyor"};
         std::string s;
         for (const auto& d : list)
-            s += (s.empty() ? "" : " · ") + d.name + " (" + d.link + ", " + states[int(d.state) % 5] + ")";
+            s += (s.empty() ? "" : " · ") + d.name + " (" + d.link + ", " + states[int(d.state) % 6] +
+                 (d.paused ? ", duraklatıldı" : "") + ")";
         logf("Cihazlar: %s", s.empty() ? "yok" : s.c_str());
     };
     ev.onPairRequest = [](const std::string& device, const std::string& code, HANDLE) {
